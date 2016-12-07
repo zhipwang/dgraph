@@ -202,8 +202,8 @@ func periodicCommit() {
 func getMemUsage() int {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	megs := ms.Alloc / (1 << 20)
-	return int(megs)
+	megs0 := ms.Alloc / (1 << 20)
+	//	return int(megs)
 
 	// Sticking to ms.Alloc temoprarily.
 	// TODO(Ashwin): Switch to total Memory(RSS) once we figure out
@@ -228,7 +228,10 @@ func getMemUsage() int {
 		}
 
 		megs := kbs / (1 << 10)
-		return megs
+
+		fmt.Printf("~~~~~~~~~memstats: ms:%d ps:%d\n", megs0, megs)
+
+		return int(megs0)
 	}
 
 	contents, err := ioutil.ReadFile("/proc/self/stat")
@@ -398,7 +401,7 @@ func batchCommit() {
 			if sz > 0 {
 				x.AssertTrue(b != nil)
 				loop++
-				fmt.Printf("[%4d] Writing batch of size: %v\n", loop, sz)
+				//				fmt.Printf("[%4d] Writing batch of size: %v\n", loop, sz)
 				x.Checkf(pstore.WriteBatch(b), "Error while writing to RocksDB.")
 				for _, w := range waits {
 					w.Done()
