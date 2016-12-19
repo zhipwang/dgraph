@@ -2016,3 +2016,88 @@ func TestMain(m *testing.M) {
 	x.Init()
 	os.Exit(m.Run())
 }
+
+var q1 = `
+{
+	al(_xid_: alice) {
+		status
+		_xid_
+		follows {
+			status
+			_xid_
+			follows {
+				status
+				_xid_
+				follows {
+					_xid_
+					status
+				}
+			}
+		}
+		status
+		_xid_
+	}
+}
+`
+var q2 = `
+	query queryName {
+		me(_uid_:0x0a) {
+			friends {
+				name
+			}
+			gender,age
+			hometown
+		}
+	}
+`
+
+var q3 = `
+{
+  debug(_xid_: m.0bxtg) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}
+`
+var q4 = `
+{
+  debug(_xid_: m.0c6qh) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        type.object.name.en
+      }
+    }
+  }
+}
+`
+
+func benchmarkQueryParse(q string, b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		gq, _, err := gql.Parse(q)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+		ctx := context.Background()
+		_, err = ToSubGraph(ctx, gq)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+	}
+}
+
+func BenchmarkQueryParse(b *testing.B) {
+	b.Run("q1", func(b *testing.B) { benchmarkQueryParse(q1, b) })
+	b.Run("q2", func(b *testing.B) { benchmarkQueryParse(q2, b) })
+	b.Run("q3", func(b *testing.B) { benchmarkQueryParse(q3, b) })
+	b.Run("q4", func(b *testing.B) { benchmarkQueryParse(q4, b) })
+}

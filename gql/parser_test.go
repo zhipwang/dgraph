@@ -17,11 +17,11 @@
 package gql
 
 import (
-	"strings"
-	"testing"
-
+	"context"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
 )
 
 func childAttrs(g *GraphQuery) []string {
@@ -797,54 +797,4 @@ func TestMutationQuotes(t *testing.T) {
 	`
 	_, _, err := Parse(query)
 	require.NoError(t, err)
-}
-
-var q1 = `
-{
-	al(_xid_: alice) {
-		status
-		_xid_
-		follows {
-			status
-			_xid_
-			follows {
-				status
-				_xid_
-				follows {
-					_xid_
-					status
-				}
-			}
-		}
-		status
-		_xid_
-	}
-}
-`
-var q2 = `
-	query queryName {
-		me(_uid_:0x0a) {
-			friends {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-
-func benchmarkQueryParse(q string, b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, err := Parse(q)
-		if err != nil {
-			b.Error(err)
-			return
-		}
-	}
-}
-
-func BenchmarkQueryParse(b *testing.B) {
-	b.Run("q1", func(b *testing.B) { benchmarkQueryParse(q1, b) })
-	b.Run("q2", func(b *testing.B) { benchmarkQueryParse(q2, b) })
 }
