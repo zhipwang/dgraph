@@ -107,4 +107,6 @@ func runParser(q string, b *testing.B) {
 func BenchmarkQuery(b *testing.B) {
 	b.Run("q1", func(b *testing.B) { runParser(q1, b) })
 	b.Run("q2", func(b *testing.B) { runParser(q2, b) })
+	b.Run("q3", func(b *testing.B) { runParser(q3, b) })
+	b.Run("q4", func(b *testing.B) { runParser(q4, b) })
 }
