@@ -2056,7 +2056,7 @@ var q2 = `
 
 var q3 = `
 {
-  me(_xid_: m.0bxtg) {
+  debug(_xid_: m.0bxtg) {
     type.object.name.en
     film.actor.film {
       film.performance.film {
@@ -2107,7 +2107,7 @@ func BenchmarkQueryParse(b *testing.B) {
 
 var aq1 = `
 {
-	al(xid: "alice") {
+	al(_xid_: "alice") {
 		status
 		_xid_
 		follows {
@@ -2129,7 +2129,7 @@ var aq1 = `
 `
 
 var aq2 = `query queryName {
-		me(uid : "0x0a") {
+		me(_uid_ : "0x0a") {
 			friends {
 				name
 			}
@@ -2141,7 +2141,7 @@ var aq2 = `query queryName {
 
 var aq3 = `
 {
-  me(_xid_: "m.0bxtg") {
+  debug(_xid_: "m.0bxtg") {
     type.object.name.en
     film.actor.film {
       film.performance.film {
@@ -2235,7 +2235,7 @@ func newGQListener() *gQListener {
 }
 
 func TestQueryParse12(t *testing.T) {
-	gq, _, err := gql.Parse(q3)
+	gq, _, err := gql.Parse(q1)
 	if err != nil {
 		t.Error(err)
 		return
@@ -2250,7 +2250,7 @@ func TestQueryParse12(t *testing.T) {
 }
 
 func TestQueryParse1(t *testing.T) {
-	input := antlr.NewInputStream(aq3)
+	input := antlr.NewInputStream(aq1)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)
