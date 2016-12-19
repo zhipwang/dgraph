@@ -10,7 +10,7 @@ type myListener struct {
 	*BaseGraphQLPMListener
 }
 
-func newMyListener() *myListener {
+func NewMyListener() *myListener {
 	return new(myListener)
 }
 
@@ -26,5 +26,5 @@ func main() {
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	p.BuildParseTrees = true
 	tree := p.Document()
-	antlr.ParseTreeWalkerDefault.Walk(newMyListener(), tree)
+	antlr.ParseTreeWalkerDefault.Walk(NewMyListener(), tree)
 }

@@ -1,7 +1,7 @@
 grammar GraphQLPM;
 
 document
-   : definition+
+   : definition
    ;
 
 definition
@@ -17,23 +17,11 @@ operationType
    ;
 
 selectionSet
-   : '{' selection ( ','? selection )* '}'
-   ;
-
-selection
-   : field
+   : '{' field ( ','? field )* '}'
    ;
 
 field
-   : fieldName arguments? selectionSet?
-   ;
-
-fieldName
-   : alias | NAME
-   ;
-
-alias
-   : NAME ':' NAME
+   : NAME arguments? selectionSet?
    ;
 
 arguments
@@ -51,7 +39,6 @@ value
 NAME
    : [_A-Za-z] [._0-9A-Za-z]*
    ;
-
 
 STRING
    : '"' [.A-Za-z0-9]* '"'

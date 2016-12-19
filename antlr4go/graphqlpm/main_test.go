@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"testing"
 )
@@ -86,7 +87,8 @@ func TestQueryParse(t *testing.T) {
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	p.BuildParseTrees = true
 	tree := p.Document()
-	antlr.ParseTreeWalkerDefault.Walk(newMyListener(), tree)
+	antlr.ParseTreeWalkerDefault.Walk(NewMyListener(), tree)
+	fmt.Println("done")
 }
 
 func runParser(q string, b *testing.B) {

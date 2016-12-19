@@ -28,19 +28,7 @@ func (v *BaseGraphQLPMVisitor) VisitSelectionSet(ctx *SelectionSetContext) inter
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGraphQLPMVisitor) VisitSelection(ctx *SelectionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseGraphQLPMVisitor) VisitField(ctx *FieldContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGraphQLPMVisitor) VisitFieldName(ctx *FieldNameContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGraphQLPMVisitor) VisitAlias(ctx *AliasContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

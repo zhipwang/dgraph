@@ -51,29 +51,11 @@ func (s *BaseGraphQLPMListener) EnterSelectionSet(ctx *SelectionSetContext) {}
 // ExitSelectionSet is called when production selectionSet is exited.
 func (s *BaseGraphQLPMListener) ExitSelectionSet(ctx *SelectionSetContext) {}
 
-// EnterSelection is called when production selection is entered.
-func (s *BaseGraphQLPMListener) EnterSelection(ctx *SelectionContext) {}
-
-// ExitSelection is called when production selection is exited.
-func (s *BaseGraphQLPMListener) ExitSelection(ctx *SelectionContext) {}
-
 // EnterField is called when production field is entered.
 func (s *BaseGraphQLPMListener) EnterField(ctx *FieldContext) {}
 
 // ExitField is called when production field is exited.
 func (s *BaseGraphQLPMListener) ExitField(ctx *FieldContext) {}
-
-// EnterFieldName is called when production fieldName is entered.
-func (s *BaseGraphQLPMListener) EnterFieldName(ctx *FieldNameContext) {}
-
-// ExitFieldName is called when production fieldName is exited.
-func (s *BaseGraphQLPMListener) ExitFieldName(ctx *FieldNameContext) {}
-
-// EnterAlias is called when production alias is entered.
-func (s *BaseGraphQLPMListener) EnterAlias(ctx *AliasContext) {}
-
-// ExitAlias is called when production alias is exited.
-func (s *BaseGraphQLPMListener) ExitAlias(ctx *AliasContext) {}
 
 // EnterArguments is called when production arguments is entered.
 func (s *BaseGraphQLPMListener) EnterArguments(ctx *ArgumentsContext) {}

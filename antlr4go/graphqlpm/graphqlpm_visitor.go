@@ -23,17 +23,8 @@ type GraphQLPMVisitor interface {
 	// Visit a parse tree produced by GraphQLPMParser#selectionSet.
 	VisitSelectionSet(ctx *SelectionSetContext) interface{}
 
-	// Visit a parse tree produced by GraphQLPMParser#selection.
-	VisitSelection(ctx *SelectionContext) interface{}
-
 	// Visit a parse tree produced by GraphQLPMParser#field.
 	VisitField(ctx *FieldContext) interface{}
-
-	// Visit a parse tree produced by GraphQLPMParser#fieldName.
-	VisitFieldName(ctx *FieldNameContext) interface{}
-
-	// Visit a parse tree produced by GraphQLPMParser#alias.
-	VisitAlias(ctx *AliasContext) interface{}
 
 	// Visit a parse tree produced by GraphQLPMParser#arguments.
 	VisitArguments(ctx *ArgumentsContext) interface{}

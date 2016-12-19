@@ -16,40 +16,33 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 1072, 54993, 33286, 44333, 17431, 44785, 36224, 43741, 3, 12, 89, 4,
+	3, 1072, 54993, 33286, 44333, 17431, 44785, 36224, 43741, 3, 12, 70, 4,
 	2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7, 4,
-	8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13, 9,
-	13, 3, 2, 6, 2, 28, 10, 2, 13, 2, 14, 2, 29, 3, 3, 3, 3, 5, 3, 34, 10,
-	3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 5, 3, 5, 3, 6, 3, 6, 3, 6, 5, 6, 45, 10,
-	6, 3, 6, 7, 6, 48, 10, 6, 12, 6, 14, 6, 51, 11, 6, 3, 6, 3, 6, 3, 7, 3,
-	7, 3, 8, 3, 8, 5, 8, 59, 10, 8, 3, 8, 5, 8, 62, 10, 8, 3, 9, 3, 9, 5, 9,
-	66, 10, 9, 3, 10, 3, 10, 3, 10, 3, 10, 3, 11, 3, 11, 3, 11, 3, 11, 7, 11,
-	76, 10, 11, 12, 11, 14, 11, 79, 11, 11, 3, 11, 3, 11, 3, 12, 3, 12, 3,
-	12, 3, 12, 3, 13, 3, 13, 3, 13, 2, 2, 14, 2, 4, 6, 8, 10, 12, 14, 16, 18,
-	20, 22, 24, 2, 2, 84, 2, 27, 3, 2, 2, 2, 4, 33, 3, 2, 2, 2, 6, 35, 3, 2,
-	2, 2, 8, 39, 3, 2, 2, 2, 10, 41, 3, 2, 2, 2, 12, 54, 3, 2, 2, 2, 14, 56,
-	3, 2, 2, 2, 16, 65, 3, 2, 2, 2, 18, 67, 3, 2, 2, 2, 20, 71, 3, 2, 2, 2,
-	22, 82, 3, 2, 2, 2, 24, 86, 3, 2, 2, 2, 26, 28, 5, 4, 3, 2, 27, 26, 3,
-	2, 2, 2, 28, 29, 3, 2, 2, 2, 29, 27, 3, 2, 2, 2, 29, 30, 3, 2, 2, 2, 30,
-	3, 3, 2, 2, 2, 31, 34, 5, 10, 6, 2, 32, 34, 5, 6, 4, 2, 33, 31, 3, 2, 2,
-	2, 33, 32, 3, 2, 2, 2, 34, 5, 3, 2, 2, 2, 35, 36, 5, 8, 5, 2, 36, 37, 7,
-	10, 2, 2, 37, 38, 5, 10, 6, 2, 38, 7, 3, 2, 2, 2, 39, 40, 7, 3, 2, 2, 40,
-	9, 3, 2, 2, 2, 41, 42, 7, 4, 2, 2, 42, 49, 5, 12, 7, 2, 43, 45, 7, 5, 2,
-	2, 44, 43, 3, 2, 2, 2, 44, 45, 3, 2, 2, 2, 45, 46, 3, 2, 2, 2, 46, 48,
-	5, 12, 7, 2, 47, 44, 3, 2, 2, 2, 48, 51, 3, 2, 2, 2, 49, 47, 3, 2, 2, 2,
-	49, 50, 3, 2, 2, 2, 50, 52, 3, 2, 2, 2, 51, 49, 3, 2, 2, 2, 52, 53, 7,
-	6, 2, 2, 53, 11, 3, 2, 2, 2, 54, 55, 5, 14, 8, 2, 55, 13, 3, 2, 2, 2, 56,
-	58, 5, 16, 9, 2, 57, 59, 5, 20, 11, 2, 58, 57, 3, 2, 2, 2, 58, 59, 3, 2,
-	2, 2, 59, 61, 3, 2, 2, 2, 60, 62, 5, 10, 6, 2, 61, 60, 3, 2, 2, 2, 61,
-	62, 3, 2, 2, 2, 62, 15, 3, 2, 2, 2, 63, 66, 5, 18, 10, 2, 64, 66, 7, 10,
-	2, 2, 65, 63, 3, 2, 2, 2, 65, 64, 3, 2, 2, 2, 66, 17, 3, 2, 2, 2, 67, 68,
-	7, 10, 2, 2, 68, 69, 7, 7, 2, 2, 69, 70, 7, 10, 2, 2, 70, 19, 3, 2, 2,
-	2, 71, 72, 7, 8, 2, 2, 72, 77, 5, 22, 12, 2, 73, 74, 7, 5, 2, 2, 74, 76,
-	5, 22, 12, 2, 75, 73, 3, 2, 2, 2, 76, 79, 3, 2, 2, 2, 77, 75, 3, 2, 2,
-	2, 77, 78, 3, 2, 2, 2, 78, 80, 3, 2, 2, 2, 79, 77, 3, 2, 2, 2, 80, 81,
-	7, 9, 2, 2, 81, 21, 3, 2, 2, 2, 82, 83, 7, 10, 2, 2, 83, 84, 7, 7, 2, 2,
-	84, 85, 5, 24, 13, 2, 85, 23, 3, 2, 2, 2, 86, 87, 7, 11, 2, 2, 87, 25,
-	3, 2, 2, 2, 10, 29, 33, 44, 49, 58, 61, 65, 77,
+	8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 3, 2, 3, 2, 3, 3, 3, 3, 5, 3, 25, 10,
+	3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 5, 3, 5, 3, 6, 3, 6, 3, 6, 5, 6, 36, 10,
+	6, 3, 6, 7, 6, 39, 10, 6, 12, 6, 14, 6, 42, 11, 6, 3, 6, 3, 6, 3, 7, 3,
+	7, 5, 7, 48, 10, 7, 3, 7, 5, 7, 51, 10, 7, 3, 8, 3, 8, 3, 8, 3, 8, 7, 8,
+	57, 10, 8, 12, 8, 14, 8, 60, 11, 8, 3, 8, 3, 8, 3, 9, 3, 9, 3, 9, 3, 9,
+	3, 10, 3, 10, 3, 10, 2, 2, 11, 2, 4, 6, 8, 10, 12, 14, 16, 18, 2, 2, 66,
+	2, 20, 3, 2, 2, 2, 4, 24, 3, 2, 2, 2, 6, 26, 3, 2, 2, 2, 8, 30, 3, 2, 2,
+	2, 10, 32, 3, 2, 2, 2, 12, 45, 3, 2, 2, 2, 14, 52, 3, 2, 2, 2, 16, 63,
+	3, 2, 2, 2, 18, 67, 3, 2, 2, 2, 20, 21, 5, 4, 3, 2, 21, 3, 3, 2, 2, 2,
+	22, 25, 5, 10, 6, 2, 23, 25, 5, 6, 4, 2, 24, 22, 3, 2, 2, 2, 24, 23, 3,
+	2, 2, 2, 25, 5, 3, 2, 2, 2, 26, 27, 5, 8, 5, 2, 27, 28, 7, 10, 2, 2, 28,
+	29, 5, 10, 6, 2, 29, 7, 3, 2, 2, 2, 30, 31, 7, 3, 2, 2, 31, 9, 3, 2, 2,
+	2, 32, 33, 7, 4, 2, 2, 33, 40, 5, 12, 7, 2, 34, 36, 7, 5, 2, 2, 35, 34,
+	3, 2, 2, 2, 35, 36, 3, 2, 2, 2, 36, 37, 3, 2, 2, 2, 37, 39, 5, 12, 7, 2,
+	38, 35, 3, 2, 2, 2, 39, 42, 3, 2, 2, 2, 40, 38, 3, 2, 2, 2, 40, 41, 3,
+	2, 2, 2, 41, 43, 3, 2, 2, 2, 42, 40, 3, 2, 2, 2, 43, 44, 7, 6, 2, 2, 44,
+	11, 3, 2, 2, 2, 45, 47, 7, 10, 2, 2, 46, 48, 5, 14, 8, 2, 47, 46, 3, 2,
+	2, 2, 47, 48, 3, 2, 2, 2, 48, 50, 3, 2, 2, 2, 49, 51, 5, 10, 6, 2, 50,
+	49, 3, 2, 2, 2, 50, 51, 3, 2, 2, 2, 51, 13, 3, 2, 2, 2, 52, 53, 7, 7, 2,
+	2, 53, 58, 5, 16, 9, 2, 54, 55, 7, 5, 2, 2, 55, 57, 5, 16, 9, 2, 56, 54,
+	3, 2, 2, 2, 57, 60, 3, 2, 2, 2, 58, 56, 3, 2, 2, 2, 58, 59, 3, 2, 2, 2,
+	59, 61, 3, 2, 2, 2, 60, 58, 3, 2, 2, 2, 61, 62, 7, 8, 2, 2, 62, 15, 3,
+	2, 2, 2, 63, 64, 7, 10, 2, 2, 64, 65, 7, 9, 2, 2, 65, 66, 5, 18, 10, 2,
+	66, 17, 3, 2, 2, 2, 67, 68, 7, 11, 2, 2, 68, 19, 3, 2, 2, 2, 8, 24, 35,
+	40, 47, 50, 58,
 }
 
 var deserializer = antlr.NewATNDeserializer(nil)
@@ -57,7 +50,7 @@ var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
 
 var literalNames = []string{
-	"", "'query'", "'{'", "','", "'}'", "':'", "'('", "')'",
+	"", "'query'", "'{'", "','", "'}'", "'('", "')'", "':'",
 }
 
 var symbolicNames = []string{
@@ -66,7 +59,7 @@ var symbolicNames = []string{
 
 var ruleNames = []string{
 	"document", "definition", "operationDefinition", "operationType", "selectionSet",
-	"selection", "field", "fieldName", "alias", "arguments", "argument", "value",
+	"field", "arguments", "argument", "value",
 }
 
 type GraphQLPMParser struct {
@@ -116,13 +109,10 @@ const (
 	GraphQLPMParserRULE_operationDefinition = 2
 	GraphQLPMParserRULE_operationType       = 3
 	GraphQLPMParserRULE_selectionSet        = 4
-	GraphQLPMParserRULE_selection           = 5
-	GraphQLPMParserRULE_field               = 6
-	GraphQLPMParserRULE_fieldName           = 7
-	GraphQLPMParserRULE_alias               = 8
-	GraphQLPMParserRULE_arguments           = 9
-	GraphQLPMParserRULE_argument            = 10
-	GraphQLPMParserRULE_value               = 11
+	GraphQLPMParserRULE_field               = 5
+	GraphQLPMParserRULE_arguments           = 6
+	GraphQLPMParserRULE_argument            = 7
+	GraphQLPMParserRULE_value               = 8
 )
 
 // IDocumentContext is an interface to support dynamic dispatch.
@@ -163,21 +153,8 @@ func NewDocumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *DocumentContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *DocumentContext) AllDefinition() []IDefinitionContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IDefinitionContext)(nil)).Elem())
-	var tst = make([]IDefinitionContext, len(ts))
-
-	for i, t := range ts {
-		if t != nil {
-			tst[i] = t.(IDefinitionContext)
-		}
-	}
-
-	return tst
-}
-
-func (s *DocumentContext) Definition(i int) IDefinitionContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IDefinitionContext)(nil)).Elem(), i)
+func (s *DocumentContext) Definition() IDefinitionContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IDefinitionContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -219,7 +196,6 @@ func (s *DocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 func (p *GraphQLPMParser) Document() (localctx IDocumentContext) {
 	localctx = NewDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, GraphQLPMParserRULE_document)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -238,19 +214,9 @@ func (p *GraphQLPMParser) Document() (localctx IDocumentContext) {
 	}()
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(25)
-	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
-
-	for ok := true; ok; ok = _la == GraphQLPMParserT__0 || _la == GraphQLPMParserT__1 {
-		{
-			p.SetState(24)
-			p.Definition()
-		}
-
-		p.SetState(27)
-		p.GetErrorHandler().Sync(p)
-		_la = p.GetTokenStream().LA(1)
+	{
+		p.SetState(18)
+		p.Definition()
 	}
 
 	return localctx
@@ -364,21 +330,21 @@ func (p *GraphQLPMParser) Definition() (localctx IDefinitionContext) {
 		}
 	}()
 
-	p.SetState(31)
+	p.SetState(22)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case GraphQLPMParserT__1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(29)
+			p.SetState(20)
 			p.SelectionSet()
 		}
 
 	case GraphQLPMParserT__0:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(30)
+			p.SetState(21)
 			p.OperationDefinition()
 		}
 
@@ -503,15 +469,15 @@ func (p *GraphQLPMParser) OperationDefinition() (localctx IOperationDefinitionCo
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(33)
+		p.SetState(24)
 		p.OperationType()
 	}
 	{
-		p.SetState(34)
+		p.SetState(25)
 		p.Match(GraphQLPMParserNAME)
 	}
 	{
-		p.SetState(35)
+		p.SetState(26)
 		p.SelectionSet()
 	}
 
@@ -607,7 +573,7 @@ func (p *GraphQLPMParser) OperationType() (localctx IOperationTypeContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(37)
+		p.SetState(28)
 		p.Match(GraphQLPMParserT__0)
 	}
 
@@ -652,27 +618,27 @@ func NewSelectionSetContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 
 func (s *SelectionSetContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *SelectionSetContext) AllSelection() []ISelectionContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*ISelectionContext)(nil)).Elem())
-	var tst = make([]ISelectionContext, len(ts))
+func (s *SelectionSetContext) AllField() []IFieldContext {
+	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IFieldContext)(nil)).Elem())
+	var tst = make([]IFieldContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
-			tst[i] = t.(ISelectionContext)
+			tst[i] = t.(IFieldContext)
 		}
 	}
 
 	return tst
 }
 
-func (s *SelectionSetContext) Selection(i int) ISelectionContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ISelectionContext)(nil)).Elem(), i)
+func (s *SelectionSetContext) Field(i int) IFieldContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFieldContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(ISelectionContext)
+	return t.(IFieldContext)
 }
 
 func (s *SelectionSetContext) GetRuleContext() antlr.RuleContext {
@@ -728,148 +694,41 @@ func (p *GraphQLPMParser) SelectionSet() (localctx ISelectionSetContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(39)
+		p.SetState(30)
 		p.Match(GraphQLPMParserT__1)
 	}
 	{
-		p.SetState(40)
-		p.Selection()
+		p.SetState(31)
+		p.Field()
 	}
-	p.SetState(47)
+	p.SetState(38)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == GraphQLPMParserT__2 || _la == GraphQLPMParserNAME {
-		p.SetState(42)
+		p.SetState(33)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == GraphQLPMParserT__2 {
 			{
-				p.SetState(41)
+				p.SetState(32)
 				p.Match(GraphQLPMParserT__2)
 			}
 
 		}
 		{
-			p.SetState(44)
-			p.Selection()
+			p.SetState(35)
+			p.Field()
 		}
 
-		p.SetState(49)
+		p.SetState(40)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(50)
+		p.SetState(41)
 		p.Match(GraphQLPMParserT__3)
-	}
-
-	return localctx
-}
-
-// ISelectionContext is an interface to support dynamic dispatch.
-type ISelectionContext interface {
-	antlr.ParserRuleContext
-
-	// GetParser returns the parser.
-	GetParser() antlr.Parser
-
-	// IsSelectionContext differentiates from other interfaces.
-	IsSelectionContext()
-}
-
-type SelectionContext struct {
-	*antlr.BaseParserRuleContext
-	parser antlr.Parser
-}
-
-func NewEmptySelectionContext() *SelectionContext {
-	var p = new(SelectionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = GraphQLPMParserRULE_selection
-	return p
-}
-
-func (*SelectionContext) IsSelectionContext() {}
-
-func NewSelectionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SelectionContext {
-	var p = new(SelectionContext)
-
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
-
-	p.parser = parser
-	p.RuleIndex = GraphQLPMParserRULE_selection
-
-	return p
-}
-
-func (s *SelectionContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *SelectionContext) Field() IFieldContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFieldContext)(nil)).Elem(), 0)
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IFieldContext)
-}
-
-func (s *SelectionContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *SelectionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SelectionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.EnterSelection(s)
-	}
-}
-
-func (s *SelectionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.ExitSelection(s)
-	}
-}
-
-func (s *SelectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case GraphQLPMVisitor:
-		return t.VisitSelection(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-func (p *GraphQLPMParser) Selection() (localctx ISelectionContext) {
-	localctx = NewSelectionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 10, GraphQLPMParserRULE_selection)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(52)
-		p.Field()
 	}
 
 	return localctx
@@ -913,14 +772,8 @@ func NewFieldContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 
 func (s *FieldContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *FieldContext) FieldName() IFieldNameContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFieldNameContext)(nil)).Elem(), 0)
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IFieldNameContext)
+func (s *FieldContext) NAME() antlr.TerminalNode {
+	return s.GetToken(GraphQLPMParserNAME, 0)
 }
 
 func (s *FieldContext) Arguments() IArgumentsContext {
@@ -975,7 +828,7 @@ func (s *FieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 
 func (p *GraphQLPMParser) Field() (localctx IFieldContext) {
 	localctx = NewFieldContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 12, GraphQLPMParserRULE_field)
+	p.EnterRule(localctx, 10, GraphQLPMParserRULE_field)
 	var _la int
 
 	defer func() {
@@ -996,267 +849,30 @@ func (p *GraphQLPMParser) Field() (localctx IFieldContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(54)
-		p.FieldName()
+		p.SetState(43)
+		p.Match(GraphQLPMParserNAME)
 	}
-	p.SetState(56)
+	p.SetState(45)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == GraphQLPMParserT__5 {
+	if _la == GraphQLPMParserT__4 {
 		{
-			p.SetState(55)
+			p.SetState(44)
 			p.Arguments()
 		}
 
 	}
-	p.SetState(59)
+	p.SetState(48)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == GraphQLPMParserT__1 {
 		{
-			p.SetState(58)
+			p.SetState(47)
 			p.SelectionSet()
 		}
 
-	}
-
-	return localctx
-}
-
-// IFieldNameContext is an interface to support dynamic dispatch.
-type IFieldNameContext interface {
-	antlr.ParserRuleContext
-
-	// GetParser returns the parser.
-	GetParser() antlr.Parser
-
-	// IsFieldNameContext differentiates from other interfaces.
-	IsFieldNameContext()
-}
-
-type FieldNameContext struct {
-	*antlr.BaseParserRuleContext
-	parser antlr.Parser
-}
-
-func NewEmptyFieldNameContext() *FieldNameContext {
-	var p = new(FieldNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = GraphQLPMParserRULE_fieldName
-	return p
-}
-
-func (*FieldNameContext) IsFieldNameContext() {}
-
-func NewFieldNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldNameContext {
-	var p = new(FieldNameContext)
-
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
-
-	p.parser = parser
-	p.RuleIndex = GraphQLPMParserRULE_fieldName
-
-	return p
-}
-
-func (s *FieldNameContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *FieldNameContext) Alias() IAliasContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IAliasContext)(nil)).Elem(), 0)
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IAliasContext)
-}
-
-func (s *FieldNameContext) NAME() antlr.TerminalNode {
-	return s.GetToken(GraphQLPMParserNAME, 0)
-}
-
-func (s *FieldNameContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *FieldNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FieldNameContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.EnterFieldName(s)
-	}
-}
-
-func (s *FieldNameContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.ExitFieldName(s)
-	}
-}
-
-func (s *FieldNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case GraphQLPMVisitor:
-		return t.VisitFieldName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-func (p *GraphQLPMParser) FieldName() (localctx IFieldNameContext) {
-	localctx = NewFieldNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 14, GraphQLPMParserRULE_fieldName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
-	p.SetState(63)
-	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 6, p.GetParserRuleContext()) {
-	case 1:
-		p.EnterOuterAlt(localctx, 1)
-		{
-			p.SetState(61)
-			p.Alias()
-		}
-
-	case 2:
-		p.EnterOuterAlt(localctx, 2)
-		{
-			p.SetState(62)
-			p.Match(GraphQLPMParserNAME)
-		}
-
-	}
-
-	return localctx
-}
-
-// IAliasContext is an interface to support dynamic dispatch.
-type IAliasContext interface {
-	antlr.ParserRuleContext
-
-	// GetParser returns the parser.
-	GetParser() antlr.Parser
-
-	// IsAliasContext differentiates from other interfaces.
-	IsAliasContext()
-}
-
-type AliasContext struct {
-	*antlr.BaseParserRuleContext
-	parser antlr.Parser
-}
-
-func NewEmptyAliasContext() *AliasContext {
-	var p = new(AliasContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = GraphQLPMParserRULE_alias
-	return p
-}
-
-func (*AliasContext) IsAliasContext() {}
-
-func NewAliasContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AliasContext {
-	var p = new(AliasContext)
-
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
-
-	p.parser = parser
-	p.RuleIndex = GraphQLPMParserRULE_alias
-
-	return p
-}
-
-func (s *AliasContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *AliasContext) AllNAME() []antlr.TerminalNode {
-	return s.GetTokens(GraphQLPMParserNAME)
-}
-
-func (s *AliasContext) NAME(i int) antlr.TerminalNode {
-	return s.GetToken(GraphQLPMParserNAME, i)
-}
-
-func (s *AliasContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *AliasContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AliasContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.EnterAlias(s)
-	}
-}
-
-func (s *AliasContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GraphQLPMListener); ok {
-		listenerT.ExitAlias(s)
-	}
-}
-
-func (s *AliasContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case GraphQLPMVisitor:
-		return t.VisitAlias(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-func (p *GraphQLPMParser) Alias() (localctx IAliasContext) {
-	localctx = NewAliasContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 16, GraphQLPMParserRULE_alias)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(65)
-		p.Match(GraphQLPMParserNAME)
-	}
-	{
-		p.SetState(66)
-		p.Match(GraphQLPMParserT__4)
-	}
-	{
-		p.SetState(67)
-		p.Match(GraphQLPMParserNAME)
 	}
 
 	return localctx
@@ -1355,7 +971,7 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 
 func (p *GraphQLPMParser) Arguments() (localctx IArgumentsContext) {
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, GraphQLPMParserRULE_arguments)
+	p.EnterRule(localctx, 12, GraphQLPMParserRULE_arguments)
 	var _la int
 
 	defer func() {
@@ -1376,34 +992,34 @@ func (p *GraphQLPMParser) Arguments() (localctx IArgumentsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(69)
-		p.Match(GraphQLPMParserT__5)
+		p.SetState(50)
+		p.Match(GraphQLPMParserT__4)
 	}
 	{
-		p.SetState(70)
+		p.SetState(51)
 		p.Argument()
 	}
-	p.SetState(75)
+	p.SetState(56)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == GraphQLPMParserT__2 {
 		{
-			p.SetState(71)
+			p.SetState(52)
 			p.Match(GraphQLPMParserT__2)
 		}
 		{
-			p.SetState(72)
+			p.SetState(53)
 			p.Argument()
 		}
 
-		p.SetState(77)
+		p.SetState(58)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(78)
-		p.Match(GraphQLPMParserT__6)
+		p.SetState(59)
+		p.Match(GraphQLPMParserT__5)
 	}
 
 	return localctx
@@ -1493,7 +1109,7 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 
 func (p *GraphQLPMParser) Argument() (localctx IArgumentContext) {
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 20, GraphQLPMParserRULE_argument)
+	p.EnterRule(localctx, 14, GraphQLPMParserRULE_argument)
 
 	defer func() {
 		p.ExitRule()
@@ -1513,15 +1129,15 @@ func (p *GraphQLPMParser) Argument() (localctx IArgumentContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(80)
+		p.SetState(61)
 		p.Match(GraphQLPMParserNAME)
 	}
 	{
-		p.SetState(81)
-		p.Match(GraphQLPMParserT__4)
+		p.SetState(62)
+		p.Match(GraphQLPMParserT__6)
 	}
 	{
-		p.SetState(82)
+		p.SetState(63)
 		p.Value()
 	}
 
@@ -1624,7 +1240,7 @@ func (s *StringValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 
 func (p *GraphQLPMParser) Value() (localctx IValueContext) {
 	localctx = NewValueContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 22, GraphQLPMParserRULE_value)
+	p.EnterRule(localctx, 16, GraphQLPMParserRULE_value)
 
 	defer func() {
 		p.ExitRule()
@@ -1645,7 +1261,7 @@ func (p *GraphQLPMParser) Value() (localctx IValueContext) {
 	localctx = NewStringValueContext(p, localctx)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(84)
+		p.SetState(65)
 		p.Match(GraphQLPMParserSTRING)
 	}
 

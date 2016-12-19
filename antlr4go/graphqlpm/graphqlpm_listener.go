@@ -23,17 +23,8 @@ type GraphQLPMListener interface {
 	// EnterSelectionSet is called when entering the selectionSet production.
 	EnterSelectionSet(c *SelectionSetContext)
 
-	// EnterSelection is called when entering the selection production.
-	EnterSelection(c *SelectionContext)
-
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
-
-	// EnterFieldName is called when entering the fieldName production.
-	EnterFieldName(c *FieldNameContext)
-
-	// EnterAlias is called when entering the alias production.
-	EnterAlias(c *AliasContext)
 
 	// EnterArguments is called when entering the arguments production.
 	EnterArguments(c *ArgumentsContext)
@@ -59,17 +50,8 @@ type GraphQLPMListener interface {
 	// ExitSelectionSet is called when exiting the selectionSet production.
 	ExitSelectionSet(c *SelectionSetContext)
 
-	// ExitSelection is called when exiting the selection production.
-	ExitSelection(c *SelectionContext)
-
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)
-
-	// ExitFieldName is called when exiting the fieldName production.
-	ExitFieldName(c *FieldNameContext)
-
-	// ExitAlias is called when exiting the alias production.
-	ExitAlias(c *AliasContext)
 
 	// ExitArguments is called when exiting the arguments production.
 	ExitArguments(c *ArgumentsContext)
