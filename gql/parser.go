@@ -19,8 +19,8 @@ package gql
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/antlr/antlr4/runtime/Go/antlr"
-	"github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
+	// "github.com/antlr/antlr4/runtime/Go/antlr"
+	// "github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
 	"github.com/dgraph-io/dgraph/lex"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/x"
@@ -292,74 +292,74 @@ func substituteVariables(gq *GraphQuery, vmap varMap) error {
 // Parse initializes and runs the lexer. It also constructs the GraphQuery subgraph
 // from the lexed items.
 func Parse(input string) (gq *GraphQuery, mu *Mutation, rerr error) {
-	inStream := antlr.NewInputStream(input)
-	lexer := parser.NewGraphQLPMLexer(inStream)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	p := parser.NewGraphQLPMParser(stream)
-	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	p.BuildParseTrees = true
-	// uptill here we have a cost of : 19000 for q1
-	// next call makes it 100 times more costly to : 1800000
-	_ = p.Document()
+	// inStream := antlr.NewInputStream(input)
+	// lexer := parser.NewGraphQLPMLexer(inStream)
+	// stream := antlr.NewCommonTokenStream(lexer, 0)
+	// p := parser.NewGraphQLPMParser(stream)
+	// p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	// p.BuildParseTrees = true
+	// // uptill here we have a cost of : 19000 for q1
+	// // next call makes it 100 times more costly to : 1800000
+	// tree := p.Document()
+	// antlr.ParseTreeWalkerDefault.Walk(parser.NewMyListener(), tree)
+	// return nil, nil, nil
+	l := &lex.Lexer{}
+	query, vmap, err := parseQueryWithVariables(input)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return nil, nil, nil
-	// l := &lex.Lexer{}
-	// query, vmap, err := parseQueryWithVariables(input)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
+	l.Init(query)
+	go run(l)
 
-	// l.Init(query)
-	// go run(l)
+	fmap := make(fragmentMap)
+	for item := range l.Items {
+		switch item.Typ {
+		case lex.ItemError:
+			return nil, nil, x.Errorf(item.Val)
+		case itemText:
+			continue
 
-	// fmap := make(fragmentMap)
-	// for item := range l.Items {
-	// 	switch item.Typ {
-	// 	case lex.ItemError:
-	// 		return nil, nil, x.Errorf(item.Val)
-	// 	case itemText:
-	// 		continue
+		case itemOpType:
+			if item.Val == "mutation" {
+				if mu != nil {
+					return nil, nil, x.Errorf("Only one mutation block allowed.")
+				}
+				if mu, rerr = getMutation(l); rerr != nil {
+					return nil, nil, rerr
+				}
+			} else if item.Val == "fragment" {
+				// TODO(jchiu0): This is to be done in ParseSchema once it is ready.
+				fnode, rerr := getFragment(l)
+				if rerr != nil {
+					return nil, nil, rerr
+				}
+				fmap[fnode.Name] = fnode
+			} else if item.Val == "query" {
+				if gq, rerr = getVariablesAndQuery(l, vmap); rerr != nil {
+					return nil, nil, rerr
+				}
+			}
+		case itemLeftCurl:
+			if gq, rerr = getQuery(l); rerr != nil {
+				return nil, nil, rerr
+			}
+		}
+	}
 
-	// 	case itemOpType:
-	// 		if item.Val == "mutation" {
-	// 			if mu != nil {
-	// 				return nil, nil, x.Errorf("Only one mutation block allowed.")
-	// 			}
-	// 			if mu, rerr = getMutation(l); rerr != nil {
-	// 				return nil, nil, rerr
-	// 			}
-	// 		} else if item.Val == "fragment" {
-	// 			// TODO(jchiu0): This is to be done in ParseSchema once it is ready.
-	// 			fnode, rerr := getFragment(l)
-	// 			if rerr != nil {
-	// 				return nil, nil, rerr
-	// 			}
-	// 			fmap[fnode.Name] = fnode
-	// 		} else if item.Val == "query" {
-	// 			if gq, rerr = getVariablesAndQuery(l, vmap); rerr != nil {
-	// 				return nil, nil, rerr
-	// 			}
-	// 		}
-	// 	case itemLeftCurl:
-	// 		if gq, rerr = getQuery(l); rerr != nil {
-	// 			return nil, nil, rerr
-	// 		}
-	// 	}
-	// }
+	if gq != nil {
+		// Try expanding fragments using fragment map.
+		if err := gq.expandFragments(fmap); err != nil {
+			return nil, nil, err
+		}
 
-	// if gq != nil {
-	// 	// Try expanding fragments using fragment map.
-	// 	if err := gq.expandFragments(fmap); err != nil {
-	// 		return nil, nil, err
-	// 	}
+		// Substitute all variables with corresponding values
+		if err := substituteVariables(gq, vmap); err != nil {
+			return nil, nil, err
+		}
+	}
 
-	// 	// Substitute all variables with corresponding values
-	// 	if err := substituteVariables(gq, vmap); err != nil {
-	// 		return nil, nil, err
-	// 	}
-	// }
-
-	// return gq, mu, nil
+	return gq, mu, nil
 }
 
 // getVariablesAndQuery checks if the query has a variable list and stores it in

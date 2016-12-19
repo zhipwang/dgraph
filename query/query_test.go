@@ -27,6 +27,9 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
+
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/gql"
 	"github.com/dgraph-io/dgraph/group"
@@ -2100,4 +2103,255 @@ func BenchmarkQueryParse(b *testing.B) {
 	b.Run("q2", func(b *testing.B) { benchmarkQueryParse(q2, b) })
 	b.Run("q3", func(b *testing.B) { benchmarkQueryParse(q3, b) })
 	b.Run("q4", func(b *testing.B) { benchmarkQueryParse(q4, b) })
+}
+
+var aq1 = `
+{
+	al(xid: "alice") {
+		status
+		_xid_
+		follows {
+			status
+			_xid_
+			follows {
+				status
+				_xid_
+				follows {
+					_xid_
+					status
+				}
+			}
+		}
+		status
+		_xid_
+	}
+}
+`
+
+var aq2 = `query queryName {
+		me(uid : "0x0a") {
+			friends {
+				name
+			}
+			gender,age
+			hometown
+		}
+	}
+`
+
+var aq3 = `
+{
+  debug(xid: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}
+`
+
+var aq4 = `
+{
+  debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}
+`
+
+// visitor ---------------------
+type gQVisitor struct {
+	*parser.BaseGraphQLPMVisitor
+}
+
+type stringValue struct {
+	val string
+}
+
+func (this *gQVisitor) VisitStringValue(ctx *parser.StringValueContext) interface{} {
+	return stringValue{ctx.STRING().GetText()}
+}
+
+func (this *gQVisitor) Visit(t antlr.ParseTree) *gql.GraphQuery {
+	return nil
+}
+
+// visitor ends ---------------------
+
+type gQListener struct {
+	*parser.BaseGraphQLPMListener
+	gQPropertyMap map[antlr.RuleContext]*gql.GraphQuery
+}
+
+func (l *gQListener) setGQ(ctx antlr.RuleContext, gQ *gql.GraphQuery) {
+	if ctx != nil {
+		l.gQPropertyMap[ctx] = gQ
+	}
+}
+func (l *gQListener) getGQ(ctx antlr.RuleContext) *gql.GraphQuery {
+	return l.gQPropertyMap[ctx]
+}
+
+// Context is a ParseNode in java/c++ ; how to make gQPropertyMap a map from ParseNode to gql.GraphQuery
+// func (l *gQListener) ExitEveryRule(ctx antlr.ParserRuleContext) {
+// 	gqNode := new(gql.GraphQuery)
+// 	for i := 0; i < ctx.GetChildCount(); i++ {
+// 		child := ctx.GetChild(i)
+// 		if child.(antlr.RuleNode) != nil {
+// 			gqChild := l.getGQ(child.(antlr.RuleNode).GetRuleContext())
+// 			if gqChild != nil {
+// 				gqNode.Children = append(gqNode.Children, gqChild)
+// 			} else {
+// 				fmt.Println("nil node here. :(")
+// 			}
+// 		}
+// 	}
+// 	l.setGQ(ctx.GetRuleContext(), gqNode)
+// }
+
+func newGQListener() *gQListener {
+	r := new(gQListener)
+	r.gQPropertyMap = make(map[antlr.RuleContext]*gql.GraphQuery)
+	return r
+}
+
+func TestQueryParse1(t *testing.T) {
+	input := antlr.NewInputStream(aq3)
+	lexer := parser.NewGraphQLPMLexer(input)
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+	p := parser.NewGraphQLPMParser(stream)
+	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	p.BuildParseTrees = true
+	tree := p.Document()
+	antlr.ParseTreeWalkerDefault.Walk(newGQListener(), tree)
+
+	// visitor := new(gQVisitor)
+	// if visitor != nil {
+	// 	fmt.Println("not nil")
+	// 	// do not know but giving me null-pointer exception
+	// 	// visitor.Visit(tree)
+	// }
+}
+
+// going top down over DocumentContext tree to generate graphquery would be so much easier..
+// if i could call DefinitionContext over d..
+// func gengql.GraphQuery(doc parser.DocumentContext) (gq *gql.GraphQuery, err error) {
+// 	gq = &gql.GraphQuery{
+// 		Args: make(map[string]string),
+// 	}
+// 	for _, d := range doc.AllDefinition() {
+// 		def := d.(parser.DefinitionContext)
+// 		selSet := def.SelectionSet()
+// 		if selSet == nil {
+// 			def.OperationDefinition().SelectionSet()
+// 		}
+// 	}
+// }
+
+// ExitDocument is called when production document is exited.
+func (l *gQListener) ExitDocument(ctx *parser.DocumentContext) {
+	fmt.Println(len(l.gQPropertyMap))
+	q := new(gql.GraphQuery)
+	def := ctx.Definition()
+	qChild := l.getGQ(def.GetRuleContext())
+	if qChild != nil {
+		q.Children = append(q.Children, qChild)
+	} else {
+		fmt.Println("document: nil context")
+	}
+	l.setGQ(ctx.GetRuleContext(), q)
+	fmt.Println(len(l.gQPropertyMap))
+}
+
+// ExitDefinition is called when production definition is exited.
+func (l *gQListener) ExitDefinition(ctx *parser.DefinitionContext) {
+	var sset antlr.RuleContext
+	sset = ctx.SelectionSet()
+	if sset == nil {
+		sset = ctx.OperationDefinition()
+	}
+	l.setGQ(ctx, l.getGQ(sset))
+}
+
+// ExitOperationDefinition is called when production operationDefinition is exited.
+func (l *gQListener) ExitOperationDefinition(ctx *parser.OperationDefinitionContext) {
+	l.setGQ(ctx, l.getGQ(ctx.SelectionSet()))
+}
+
+// ExitOperationType is called when production operationType is exited.
+func (l *gQListener) ExitOperationType(ctx *parser.OperationTypeContext) {}
+
+// ExitSelectionSet is called when production selectionSet is exited.
+func (l *gQListener) ExitSelectionSet(ctx *parser.SelectionSetContext) {
+	q := new(gql.GraphQuery)
+	q.Args = make(map[string]string)
+	for _, f := range ctx.AllField() {
+		fGQ := l.getGQ(f.GetRuleContext())
+		q.Children = append(q.Children, fGQ)
+	}
+	l.setGQ(ctx.GetRuleContext(), q)
+}
+
+// ExitField is called when production field is exited.
+func (l *gQListener) ExitField(ctx *parser.FieldContext) {
+	q := new(gql.GraphQuery)
+	q.Args = make(map[string]string)
+	q.Attr = ctx.NAME().GetText()
+	if args := ctx.Arguments(); args != nil {
+		q.Args = l.getGQ(args).Args
+	}
+	if sset := ctx.SelectionSet(); sset != nil {
+		q.Children = l.getGQ(sset).Children
+	}
+	l.setGQ(ctx.GetRuleContext(), q)
+}
+
+// ExitArguments is called when production arguments is exited.
+func (l *gQListener) ExitArguments(ctx *parser.ArgumentsContext) {
+	q := new(gql.GraphQuery)
+	q.Args = make(map[string]string)
+	for _, arg := range ctx.AllArgument() {
+		argGQ := l.getGQ(arg.GetRuleContext())
+		for k, v := range argGQ.Args {
+			q.Args[k] = v
+		}
+	}
+	l.setGQ(ctx.GetRuleContext(), q)
+}
+
+// ExitArgument is called when production argument is exited.
+func (l *gQListener) ExitArgument(ctx *parser.ArgumentContext) {
+	q := new(gql.GraphQuery)
+	q.Args = make(map[string]string)
+	q.Args[ctx.NAME().GetText()] = l.getGQ(ctx.Value().GetRuleContext()).XID
+	fmt.Println(ctx.NAME().GetText(), l.getGQ(ctx.Value().GetRuleContext()).XID)
+	l.setGQ(ctx.GetRuleContext(), q)
+}
+
+func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
+	fmt.Println(ctx.STRING().GetText())
+	q := new(gql.GraphQuery)
+	// check if this is uid or xid ?
+	q.XID = ctx.STRING().GetText()
+	// q.UID = strconv.ParseUint(ctx.STRING().GetText(), 0, 64)
+	l.setGQ(ctx.GetRuleContext(), q)
 }
