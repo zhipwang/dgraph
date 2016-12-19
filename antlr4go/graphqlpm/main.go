@@ -14,7 +14,7 @@ func newMyListener() *myListener {
 	return new(myListener)
 }
 
-func (this *myListener) EnterEveryRule(ctx antlr.ParserRuleContext) {
+func (this *myListener) ExitEveryRule(ctx antlr.ParserRuleContext) {
 	fmt.Println(ctx.GetText())
 }
 
