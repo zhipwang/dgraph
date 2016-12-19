@@ -20,12 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"testing"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"testing"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
@@ -2056,7 +2056,7 @@ var q2 = `
 
 var q3 = `
 {
-  debug(_xid_: m.0bxtg) {
+  me(_xid_: m.0bxtg) {
     type.object.name.en
     film.actor.film {
       film.performance.film {
@@ -2141,7 +2141,7 @@ var aq2 = `query queryName {
 
 var aq3 = `
 {
-  debug(xid: "m.0bxtg") {
+  me(_xid_: "m.0bxtg") {
     type.object.name.en
     film.actor.film {
       film.performance.film {
@@ -2234,6 +2234,21 @@ func newGQListener() *gQListener {
 	return r
 }
 
+func TestQueryParse12(t *testing.T) {
+	gq, _, err := gql.Parse(q3)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ctx := context.Background()
+	sg, err := ToSubGraph(ctx, gq)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	sg.DebugPrint("")
+}
+
 func TestQueryParse1(t *testing.T) {
 	input := antlr.NewInputStream(aq3)
 	lexer := parser.NewGraphQLPMLexer(input)
@@ -2242,7 +2257,14 @@ func TestQueryParse1(t *testing.T) {
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	p.BuildParseTrees = true
 	tree := p.Document()
-	antlr.ParseTreeWalkerDefault.Walk(newGQListener(), tree)
+	listener := newGQListener()
+	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
+	agq := listener.getGQ(tree)
+
+	ctx := context.Background()
+	sq, err := ToSubGraph(ctx, agq)
+	require.NoError(t, err)
+	sq.DebugPrint("")
 
 	// visitor := new(gQVisitor)
 	// if visitor != nil {
@@ -2269,16 +2291,9 @@ func TestQueryParse1(t *testing.T) {
 
 // ExitDocument is called when production document is exited.
 func (l *gQListener) ExitDocument(ctx *parser.DocumentContext) {
-	fmt.Println(len(l.gQPropertyMap))
-	q := new(gql.GraphQuery)
 	def := ctx.Definition()
 	qChild := l.getGQ(def.GetRuleContext())
-	if qChild != nil {
-		q.Children = append(q.Children, qChild)
-	} else {
-		fmt.Println("document: nil context")
-	}
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, qChild.Children[0])
 	fmt.Println(len(l.gQPropertyMap))
 }
 
@@ -2308,7 +2323,7 @@ func (l *gQListener) ExitSelectionSet(ctx *parser.SelectionSetContext) {
 		fGQ := l.getGQ(f.GetRuleContext())
 		q.Children = append(q.Children, fGQ)
 	}
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, q)
 }
 
 // ExitField is called when production field is exited.
@@ -2318,11 +2333,17 @@ func (l *gQListener) ExitField(ctx *parser.FieldContext) {
 	q.Attr = ctx.NAME().GetText()
 	if args := ctx.Arguments(); args != nil {
 		q.Args = l.getGQ(args).Args
+		if xid, ok := q.Args["_xid_"]; ok {
+			q.XID = xid
+		}
+		if uid, ok := q.Args["_uid_"]; ok {
+			q.UID, _ = strconv.ParseUint(uid, 0, 64)
+		}
 	}
 	if sset := ctx.SelectionSet(); sset != nil {
 		q.Children = l.getGQ(sset).Children
 	}
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, q)
 }
 
 // ExitArguments is called when production arguments is exited.
@@ -2335,7 +2356,7 @@ func (l *gQListener) ExitArguments(ctx *parser.ArgumentsContext) {
 			q.Args[k] = v
 		}
 	}
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, q)
 }
 
 // ExitArgument is called when production argument is exited.
@@ -2344,7 +2365,7 @@ func (l *gQListener) ExitArgument(ctx *parser.ArgumentContext) {
 	q.Args = make(map[string]string)
 	q.Args[ctx.NAME().GetText()] = l.getGQ(ctx.Value().GetRuleContext()).XID
 	fmt.Println(ctx.NAME().GetText(), l.getGQ(ctx.Value().GetRuleContext()).XID)
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, q)
 }
 
 func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
@@ -2353,5 +2374,5 @@ func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
 	// check if this is uid or xid ?
 	q.XID = ctx.STRING().GetText()
 	// q.UID = strconv.ParseUint(ctx.STRING().GetText(), 0, 64)
-	l.setGQ(ctx.GetRuleContext(), q)
+	l.setGQ(ctx, q)
 }
