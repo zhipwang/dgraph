@@ -17,7 +17,6 @@
 package gql
 
 import (
-	"context"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/stretchr/testify/require"
 	"strings"
