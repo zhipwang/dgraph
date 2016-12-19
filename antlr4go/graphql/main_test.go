@@ -1,8 +1,7 @@
-package main
+package parser
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr"
-	"parser"
 	"testing"
 )
 
@@ -42,9 +41,9 @@ var q2 = `query queryName {
 
 func TestQueryParse(t *testing.T) {
 	input := antlr.NewInputStream(q2)
-	lexer := parser.NewGraphQLLexer(input)
+	lexer := NewGraphQLLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
-	p := parser.NewGraphQLParser(stream)
+	p := NewGraphQLParser(stream)
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	p.BuildParseTrees = true
 	_ = p.Document()
@@ -55,9 +54,9 @@ func runParser(q string, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		input := antlr.NewInputStream(q)
-		lexer := parser.NewGraphQLLexer(input)
+		lexer := NewGraphQLLexer(input)
 		stream := antlr.NewCommonTokenStream(lexer, 0)
-		p := parser.NewGraphQLParser(stream)
+		p := NewGraphQLParser(stream)
 		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 		p.BuildParseTrees = true
 		// uptill here we have a cost of : 19000 for q1

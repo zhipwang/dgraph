@@ -1,14 +1,13 @@
-package main
+package parser
 
 import (
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"os"
-	"parser"
 )
 
 type myListener struct {
-	*parser.BaseGraphQLListener
+	*BaseGraphQLListener
 }
 
 func newMyListener() *myListener {
@@ -21,9 +20,9 @@ func (this *myListener) EnterEveryRule(ctx antlr.ParserRuleContext) {
 
 func main() {
 	input := antlr.NewFileStream(os.Args[1])
-	lexer := parser.NewGraphQLLexer(input)
+	lexer := NewGraphQLLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
-	p := parser.NewGraphQLParser(stream)
+	p := NewGraphQLParser(stream)
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	p.BuildParseTrees = true
 	tree := p.Document()
