@@ -2308,7 +2308,7 @@ var aq9 = `{
 
 // List of directors with whom Tom Hanks has worked
 var q10 = `{
-  debug(_xid_: "m.0bxtg") {
+  debug(_xid_: m.0bxtg) {
     type.object.name.en
     film.actor.film {
       film.performance.film {

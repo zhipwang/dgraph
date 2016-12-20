@@ -58,7 +58,7 @@ _xid_ "m.06pj8"
 
 // List of directors with whom Tom Hanks has worked
 var q10 = `{
-  debug(_xid_: "m.0bxtg") {
+  debug(_xid_: m.0bxtg) {
     type.object.name.en
     film.actor.film {
       film.performance.film {
@@ -103,3 +103,136 @@ BenchmarkQueryParse/spielberg:antlr:-4             	    1000	   2022733 ns/op
 PASS
 ok  	github.com/dgraph-io/dgraph/query	8.702s
 
+
+// Tom hanks query : first run..
+        {
+          "_uid_": "0xfc5c49ffffe33702",
+          "film.performance.film": [
+            {
+              "_uid_": "0x6b110dae3ab90ed7",
+              "film.film.directed_by": [
+                {
+                  "_uid_": "0x797e30ff080d9015",
+                  "type.object.name.en": "Ron Howard"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "type.object.name.en": "Tom Hanks"
+    }
+  ],
+  "server_latency": {
+    "json": "784.549탎",
+    "parsing": "228.633탎",
+    "processing": "31.279932ms",
+    "total": "32.296538ms"
+  }
+}
+
+// second run..
+],
+      "type.object.name.en": "Tom Hanks"
+    }
+  ],
+  "server_latency": {
+    "json": "900.606탎",
+    "parsing": "162.179탎",
+    "processing": "1.389448ms",
+    "total": "2.456418ms"
+  }
+}
+
+// Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
+
+// First run:
+              "_uid_": "0xf89fd10079b06276",
+              "film.performance.actor": [
+                {
+                  "_uid_": "0x31b62faaf7158170",
+                  "type.object.name.en": "Adolph Caesar"
+                }
+              ]
+            }
+          ],
+          "type.object.name.en": "The Color Purple"
+        }
+      ],
+      "type.object.name.en": "Steven Spielberg"
+    }
+  ],
+  "server_latency": {
+    "json": "10.333703ms",
+    "parsing": "383.833탎",
+    "processing": "144.907463ms",
+    "total": "155.627186ms"
+  }
+}
+
+// second run :
+          "type.object.name.en": "The Color Purple"
+        }
+      ],
+      "type.object.name.en": "Steven Spielberg"
+    }
+  ],
+  "server_latency": {
+    "json": "17.09579ms",
+    "parsing": "171.262탎",
+    "processing": "16.160152ms",
+    "total": "33.431112ms"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Genre of all the movies acted by actor Leonardo DiCaprio
+{
+  debug(_xid_: m.0dvmd) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.genre {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}
+
+// second run:
+        }
+      ],
+      "type.object.name.en": "Leonardo DiCaprio"
+    }
+  ],
+  "server_latency": {
+    "json": "819.168탎",
+    "parsing": "202.059탎",
+    "processing": "1.08066ms",
+    "total": "2.106747ms"
+  }
+}
