@@ -17,6 +17,27 @@ type GraphQLPMListener interface {
 	// EnterOperationDefinition is called when entering the operationDefinition production.
 	EnterOperationDefinition(c *OperationDefinitionContext)
 
+	// EnterFilters is called when entering the filters production.
+	EnterFilters(c *FiltersContext)
+
+	// EnterPairsNested is called when entering the pairsNested production.
+	EnterPairsNested(c *PairsNestedContext)
+
+	// EnterPairs is called when entering the pairs production.
+	EnterPairs(c *PairsContext)
+
+	// EnterFilterOperation is called when entering the filterOperation production.
+	EnterFilterOperation(c *FilterOperationContext)
+
+	// EnterFuncName is called when entering the funcName production.
+	EnterFuncName(c *FuncNameContext)
+
+	// EnterPair is called when entering the pair production.
+	EnterPair(c *PairContext)
+
+	// EnterFieldNameValue is called when entering the fieldNameValue production.
+	EnterFieldNameValue(c *FieldNameValueContext)
+
 	// EnterOperationType is called when entering the operationType production.
 	EnterOperationType(c *OperationTypeContext)
 
@@ -43,6 +64,27 @@ type GraphQLPMListener interface {
 
 	// ExitOperationDefinition is called when exiting the operationDefinition production.
 	ExitOperationDefinition(c *OperationDefinitionContext)
+
+	// ExitFilters is called when exiting the filters production.
+	ExitFilters(c *FiltersContext)
+
+	// ExitPairsNested is called when exiting the pairsNested production.
+	ExitPairsNested(c *PairsNestedContext)
+
+	// ExitPairs is called when exiting the pairs production.
+	ExitPairs(c *PairsContext)
+
+	// ExitFilterOperation is called when exiting the filterOperation production.
+	ExitFilterOperation(c *FilterOperationContext)
+
+	// ExitFuncName is called when exiting the funcName production.
+	ExitFuncName(c *FuncNameContext)
+
+	// ExitPair is called when exiting the pair production.
+	ExitPair(c *PairContext)
+
+	// ExitFieldNameValue is called when exiting the fieldNameValue production.
+	ExitFieldNameValue(c *FieldNameValueContext)
 
 	// ExitOperationType is called when exiting the operationType production.
 	ExitOperationType(c *OperationTypeContext)

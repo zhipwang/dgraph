@@ -39,6 +39,48 @@ func (s *BaseGraphQLPMListener) EnterOperationDefinition(ctx *OperationDefinitio
 // ExitOperationDefinition is called when production operationDefinition is exited.
 func (s *BaseGraphQLPMListener) ExitOperationDefinition(ctx *OperationDefinitionContext) {}
 
+// EnterFilters is called when production filters is entered.
+func (s *BaseGraphQLPMListener) EnterFilters(ctx *FiltersContext) {}
+
+// ExitFilters is called when production filters is exited.
+func (s *BaseGraphQLPMListener) ExitFilters(ctx *FiltersContext) {}
+
+// EnterPairsNested is called when production pairsNested is entered.
+func (s *BaseGraphQLPMListener) EnterPairsNested(ctx *PairsNestedContext) {}
+
+// ExitPairsNested is called when production pairsNested is exited.
+func (s *BaseGraphQLPMListener) ExitPairsNested(ctx *PairsNestedContext) {}
+
+// EnterPairs is called when production pairs is entered.
+func (s *BaseGraphQLPMListener) EnterPairs(ctx *PairsContext) {}
+
+// ExitPairs is called when production pairs is exited.
+func (s *BaseGraphQLPMListener) ExitPairs(ctx *PairsContext) {}
+
+// EnterFilterOperation is called when production filterOperation is entered.
+func (s *BaseGraphQLPMListener) EnterFilterOperation(ctx *FilterOperationContext) {}
+
+// ExitFilterOperation is called when production filterOperation is exited.
+func (s *BaseGraphQLPMListener) ExitFilterOperation(ctx *FilterOperationContext) {}
+
+// EnterFuncName is called when production funcName is entered.
+func (s *BaseGraphQLPMListener) EnterFuncName(ctx *FuncNameContext) {}
+
+// ExitFuncName is called when production funcName is exited.
+func (s *BaseGraphQLPMListener) ExitFuncName(ctx *FuncNameContext) {}
+
+// EnterPair is called when production pair is entered.
+func (s *BaseGraphQLPMListener) EnterPair(ctx *PairContext) {}
+
+// ExitPair is called when production pair is exited.
+func (s *BaseGraphQLPMListener) ExitPair(ctx *PairContext) {}
+
+// EnterFieldNameValue is called when production fieldNameValue is entered.
+func (s *BaseGraphQLPMListener) EnterFieldNameValue(ctx *FieldNameValueContext) {}
+
+// ExitFieldNameValue is called when production fieldNameValue is exited.
+func (s *BaseGraphQLPMListener) ExitFieldNameValue(ctx *FieldNameValueContext) {}
+
 // EnterOperationType is called when production operationType is entered.
 func (s *BaseGraphQLPMListener) EnterOperationType(ctx *OperationTypeContext) {}
 
