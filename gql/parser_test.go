@@ -17,6 +17,8 @@
 package gql
 
 import (
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -796,4 +798,116 @@ func TestMutationQuotes(t *testing.T) {
 	`
 	_, _, err := Parse(query)
 	require.NoError(t, err)
+}
+
+// List of directors with whom Tom Hanks has worked
+var q1 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
+var aq1 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
+// Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
+var q2 = `{
+  debug(_xid_: m.06pj8) {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq2 = `{
+  debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+func runAntlrParser(q string, b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		input := antlr.NewInputStream(q)
+		lexer := parser.NewGraphQLPMLexer(input)
+		stream := antlr.NewCommonTokenStream(lexer, 0)
+		p := parser.NewGraphQLPMParser(stream)
+		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+		p.BuildParseTrees = true
+		// uptill here we have a cost of : 19000 for q1
+		// next call makes it 100 times more costly to : 1800000
+		_ = p.Document()
+		// try to add listener here as well.
+	}
+}
+
+func runCurrentParser(q string, b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		gq, _, err := Parse(q)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+		ctx := context.Background()
+		_, err = ToSubGraph(ctx, gq)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+	}
+}
+
+func BenchmarkQueryParse(b *testing.B) {
+	b.Run("tomhanks:handwitten:", func(b *testing.B) { runCurrentParser(q1, b) })
+	b.Run("tomhanks:antlr:", func(b *testing.B) { runAntlrParser(aq1, b) })
+	b.Run("spielberg:handwitten:", func(b *testing.B) { runCurrentParser(q2, b) })
+	b.Run("spielberg:antlr:", func(b *testing.B) { runAntlrParser(aq2, b) })
 }

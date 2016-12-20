@@ -2128,29 +2128,29 @@ var q8 = `{
   }
 }`
 
-func benchmarkQueryParse(q string, b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		gq, _, err := gql.Parse(q)
-		if err != nil {
-			b.Error(err)
-			return
-		}
-		ctx := context.Background()
-		_, err = ToSubGraph(ctx, gq)
-		if err != nil {
-			b.Error(err)
-			return
-		}
-	}
-}
+// func benchmarkQueryParse(q string, b *testing.B) {
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		gq, _, err := gql.Parse(q)
+// 		if err != nil {
+// 			b.Error(err)
+// 			return
+// 		}
+// 		ctx := context.Background()
+// 		_, err = ToSubGraph(ctx, gq)
+// 		if err != nil {
+// 			b.Error(err)
+// 			return
+// 		}
+// 	}
+// }
 
-func BenchmarkQueryParse(b *testing.B) {
-	b.Run("q1", func(b *testing.B) { benchmarkQueryParse(q1, b) })
-	b.Run("q2", func(b *testing.B) { benchmarkQueryParse(q2, b) })
-	b.Run("q3", func(b *testing.B) { benchmarkQueryParse(q3, b) })
-	b.Run("q4", func(b *testing.B) { benchmarkQueryParse(q4, b) })
-}
+// func BenchmarkQueryParse(b *testing.B) {
+// 	b.Run("q1", func(b *testing.B) { benchmarkQueryParse(q1, b) })
+// 	b.Run("q2", func(b *testing.B) { benchmarkQueryParse(q2, b) })
+// 	b.Run("q3", func(b *testing.B) { benchmarkQueryParse(q3, b) })
+// 	b.Run("q4", func(b *testing.B) { benchmarkQueryParse(q4, b) })
+// }
 
 var aq1 = `
 {
@@ -2260,6 +2260,79 @@ var aq8 = `{
   }
 }`
 
+// Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
+
+var q9 = `{
+  debug(_xid_: m.06pj8) {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq9 = `{
+  debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+// List of directors with whom Tom Hanks has worked
+var q10 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
+var aq10 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
 // visitor ---------------------
 type gQVisitor struct {
 	*parser.BaseGraphQLPMVisitor
@@ -2317,7 +2390,7 @@ func newGQListener() *gQListener {
 }
 
 func TestQueryParse12(t *testing.T) {
-	gq, _, err := gql.Parse(q8)
+	gq, _, err := gql.Parse(q10)
 	if err != nil {
 		t.Error(err)
 		return
@@ -2332,7 +2405,7 @@ func TestQueryParse12(t *testing.T) {
 }
 
 func TestQueryParse11(t *testing.T) {
-	input := antlr.NewInputStream(aq8)
+	input := antlr.NewInputStream(aq10)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)
@@ -2356,6 +2429,48 @@ func TestQueryParse11(t *testing.T) {
 	// }
 }
 
+func runAntlrParser(q string, b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		input := antlr.NewInputStream(q)
+		lexer := parser.NewGraphQLPMLexer(input)
+		stream := antlr.NewCommonTokenStream(lexer, 0)
+		p := parser.NewGraphQLPMParser(stream)
+		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+		p.BuildParseTrees = true
+		// uptill here we have a cost of : 15000 for q1
+		// next call makes it 100 times more costly to : 1800000
+		tree := p.Document()
+		listener := newGQListener()
+		antlr.ParseTreeWalkerDefault.Walk(listener, tree)
+		_ = listener.getGQ(tree)
+	}
+}
+
+func runCurrentParser(q string, b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		gq, _, err := gql.Parse(q)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+		ctx := context.Background()
+		_, err = ToSubGraph(ctx, gq)
+		if err != nil {
+			b.Error(err)
+			return
+		}
+	}
+}
+
+func BenchmarkQueryParse(b *testing.B) {
+	b.Run("tomhanks:handwitten:", func(b *testing.B) { runCurrentParser(q10, b) })
+	b.Run("tomhanks:antlr:", func(b *testing.B) { runAntlrParser(aq10, b) })
+	b.Run("spielberg:handwitten:", func(b *testing.B) { runCurrentParser(q9, b) })
+	b.Run("spielberg:antlr:", func(b *testing.B) { runAntlrParser(aq9, b) })
+}
+
 // going top down over DocumentContext tree to generate graphquery would be so much easier..
 // if i could call DefinitionContext over d..
 // func gengql.GraphQuery(doc parser.DocumentContext) (gq *gql.GraphQuery, err error) {
@@ -2376,7 +2491,7 @@ func (l *gQListener) ExitDocument(ctx *parser.DocumentContext) {
 	def := ctx.Definition()
 	qChild := l.getGQ(def.GetRuleContext())
 	l.setGQ(ctx, qChild.Children[0])
-	fmt.Println(len(l.gQPropertyMap))
+	// fmt.Println(len(l.gQPropertyMap))
 }
 
 // ExitDefinition is called when production definition is exited.
@@ -2446,12 +2561,12 @@ func (l *gQListener) ExitArgument(ctx *parser.ArgumentContext) {
 	q := new(gql.GraphQuery)
 	q.Args = make(map[string]string)
 	q.Args[ctx.NAME().GetText()] = l.getGQ(ctx.Value().GetRuleContext()).XID
-	fmt.Println(ctx.NAME().GetText(), l.getGQ(ctx.Value().GetRuleContext()).XID)
+	// fmt.Println(ctx.NAME().GetText(), l.getGQ(ctx.Value().GetRuleContext()).XID)
 	l.setGQ(ctx, q)
 }
 
 func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
-	fmt.Println(ctx.STRING().GetText())
+	// fmt.Println(ctx.STRING().GetText())
 	q := new(gql.GraphQuery)
 	// check if this is uid or xid ?
 	q.XID = ctx.STRING().GetText()

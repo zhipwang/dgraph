@@ -1,0 +1,105 @@
+// Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
+var aq9 = `{
+  debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film {
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+=== RUN   TestQueryParse12
+2016/12/20 09:21:06 query.go:165: ["" Alias:"debug" Func:[] SrcSz:1 Op:"" DestSz:0 Dest: 0x0 ValueSz:1]
+2016/12/20 09:21:06 query.go:165: |->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->["film.director.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.initial_release_date" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.country" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.starring" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["film.performance.actor" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["film.performance.character" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.genre" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+--- PASS: TestQueryParse12 (0.00s)
+=== RUN   TestQueryParse11
+"m.06pj8"
+_xid_ "m.06pj8"
+25
+2016/12/20 09:21:06 query.go:165: ["" Alias:"" Func:[] SrcSz:1 Op:"" DestSz:0 Dest: 0x0 ValueSz:1]
+2016/12/20 09:21:06 query.go:165: |->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->["film.director.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.initial_release_date" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.country" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.starring" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["film.performance.actor" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["film.performance.character" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->["film.film.genre" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:21:06 query.go:165: |->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+--- PASS: TestQueryParse11 (0.00s)
+
+
+// List of directors with whom Tom Hanks has worked
+var q10 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
+/query$ got -test.run=QueryParse1 -v
+=== RUN   TestQueryParse12
+2016/12/20 09:23:45 query.go:165: ["" Alias:"debug" Func:[] SrcSz:1 Op:"" DestSz:0 Dest: 0x0 ValueSz:1]
+2016/12/20 09:23:45 query.go:165: |->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->["film.actor.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->["film.performance.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->|->["film.film.directed_by" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+--- PASS: TestQueryParse12 (0.00s)
+=== RUN   TestQueryParse11
+"m.0bxtg"
+_xid_ "m.0bxtg"
+16
+2016/12/20 09:23:45 query.go:165: ["" Alias:"" Func:[] SrcSz:1 Op:"" DestSz:0 Dest: 0x0 ValueSz:1]
+2016/12/20 09:23:45 query.go:165: |->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->["film.actor.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->["film.performance.film" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->|->["film.film.directed_by" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+2016/12/20 09:23:45 query.go:165: |->|->|->|->["type.object.name.en" Alias:"" Func:[] SrcSz:0 Op:"" DestSz:0 Dest: 0x0 ValueSz:0]
+--- PASS: TestQueryParse11 (0.00s)
+PASS
+ok  	github.com/dgraph-io/dgraph/query	0.027s
+
+
+// RESULTS :
+/query$ gotb -test.run=XXX
+BenchmarkQueryParse/tomhanks:handwitten:-4         	   50000	     30988 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4              	    1000	   2073097 ns/op
+BenchmarkQueryParse/spielberg:handwitten:-4        	   20000	     77396 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4             	    1000	   2022733 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	8.702s
+
