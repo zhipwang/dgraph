@@ -224,7 +224,7 @@ func TestGetUID(t *testing.T) {
 	defer os.RemoveAll(dir2)
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				_uid_
 				gender
@@ -248,7 +248,7 @@ func TestGetUIDNotInChild(t *testing.T) {
 	defer os.RemoveAll(dir2)
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				_uid_
 				gender
@@ -271,7 +271,7 @@ func TestGetUIDCount(t *testing.T) {
 	defer os.RemoveAll(dir2)
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				_uid_
 				gender
@@ -296,7 +296,7 @@ func TestDebug1(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			debug(_uid_:0x01) {
+			debug(_uid_:"0x01") {
 				name
 				gender
 				alive
@@ -328,7 +328,7 @@ func TestDebug2(t *testing.T) {
 
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				gender
 				alive
@@ -356,7 +356,7 @@ func TestCount(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				gender
 				alive
@@ -377,7 +377,7 @@ func TestCountError1(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_: 0x01) {
+			me(_uid_: "0x01") {
 				friend {
 					name
 					_count_
@@ -400,7 +400,7 @@ func TestCountError2(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_: 0x01) {
+			me(_uid_: "0x01") {
 				friend {
 					_count_ {
 						friend
@@ -428,7 +428,7 @@ func TestProcessGraph(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_: 0x01) {
+			me(_uid_: "0x01") {
 				friend {
 					name
 				}
@@ -480,7 +480,7 @@ func TestToJSON(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				gender
 			  alive
@@ -519,7 +519,7 @@ func TestFieldAlias(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				MyName:name
 				gender
 				alive
@@ -544,7 +544,7 @@ func TestFieldAliasProto(t *testing.T) {
 	// Alright. Now we have everything set up. Let's create the query.
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				MyName:name
 				gender
 				alive
@@ -640,7 +640,7 @@ func TestToJSONFilter(t *testing.T) {
 	defer os.RemoveAll(dir2)
 	query := `
 		{
-			me(_uid_:0x01) {
+			me(_uid_:"0x01") {
 				name
 				gender
 				friend @filter(anyof("name", "Andrea SomethingElse")) {
@@ -2081,6 +2081,53 @@ var q4 = `
 }
 `
 
+// queries to benchmark on.
+var q5 = `{
+  debug(_xid_: m.0f4vbz) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var q6 = `{
+  debug(_xid_: m.06pj8) {
+    type.object.name.en
+    film.director.film  {
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var q7 = `{
+  debug(_xid_: m.0c6qh) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var q8 = `{
+  debug(_xid_: m.0bxtg) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
 func benchmarkQueryParse(q string, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -2156,27 +2203,62 @@ var aq3 = `
 
 var aq4 = `
 {
-  debug(_xid_: "m.06pj8") {
+  debug(_xid_: "m.0c6qh") {
     type.object.name.en
-    film.director.film {
-      type.object.name.en
-      film.film.initial_release_date
-      film.film.country
-      film.film.starring {
-        film.performance.actor {
-          type.object.name.en
-        }
-        film.performance.character {
-          type.object.name.en
-        }
-      }
-      film.film.genre {
+    film.actor.film {
+      film.performance.film {
         type.object.name.en
       }
     }
   }
 }
 `
+
+var aq5 = `{
+  debug(_xid_: "m.0f4vbz") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq6 = `{
+  debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film  {
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq7 = `{
+  debug(_xid_: "m.0c6qh") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq8 = `{
+  debug(_xid_: "m.0bxtg") {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
 
 // visitor ---------------------
 type gQVisitor struct {
@@ -2235,7 +2317,7 @@ func newGQListener() *gQListener {
 }
 
 func TestQueryParse12(t *testing.T) {
-	gq, _, err := gql.Parse(q1)
+	gq, _, err := gql.Parse(q8)
 	if err != nil {
 		t.Error(err)
 		return
@@ -2249,8 +2331,8 @@ func TestQueryParse12(t *testing.T) {
 	sg.DebugPrint("")
 }
 
-func TestQueryParse1(t *testing.T) {
-	input := antlr.NewInputStream(aq1)
+func TestQueryParse11(t *testing.T) {
+	input := antlr.NewInputStream(aq8)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)

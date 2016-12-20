@@ -19,8 +19,11 @@ package gql
 import (
 	"bytes"
 	"encoding/json"
-	// "github.com/antlr/antlr4/runtime/Go/antlr"
-	// "github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
+	"fmt"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/dgraph-io/dgraph/antlr4go/graphqlpm"
+
 	"github.com/dgraph-io/dgraph/lex"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/x"
@@ -289,77 +292,100 @@ func substituteVariables(gq *GraphQuery, vmap varMap) error {
 	return nil
 }
 
+type gQListener struct {
+	*parser.BaseGraphQLPMListener
+	gQPropertyMap map[antlr.RuleContext]*GraphQuery
+}
+
+func (l *gQListener) setGQ(ctx antlr.RuleContext, gQ *GraphQuery) {
+	if ctx != nil {
+		l.gQPropertyMap[ctx] = gQ
+	}
+}
+func (l *gQListener) getGQ(ctx antlr.RuleContext) *GraphQuery {
+	return l.gQPropertyMap[ctx]
+}
+
+func newGQListener() *gQListener {
+	r := new(gQListener)
+	r.gQPropertyMap = make(map[antlr.RuleContext]*GraphQuery)
+	return r
+}
+
 // Parse initializes and runs the lexer. It also constructs the GraphQuery subgraph
 // from the lexed items.
 func Parse(input string) (gq *GraphQuery, mu *Mutation, rerr error) {
-	// inStream := antlr.NewInputStream(input)
-	// lexer := parser.NewGraphQLPMLexer(inStream)
-	// stream := antlr.NewCommonTokenStream(lexer, 0)
-	// p := parser.NewGraphQLPMParser(stream)
-	// p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	// p.BuildParseTrees = true
-	// // uptill here we have a cost of : 19000 for q1
-	// // next call makes it 100 times more costly to : 1800000
-	// tree := p.Document()
-	// antlr.ParseTreeWalkerDefault.Walk(parser.NewMyListener(), tree)
-	// return nil, nil, nil
-	l := &lex.Lexer{}
-	query, vmap, err := parseQueryWithVariables(input)
-	if err != nil {
-		return nil, nil, err
-	}
+	inStream := antlr.NewInputStream(input)
+	lexer := parser.NewGraphQLPMLexer(inStream)
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+	p := parser.NewGraphQLPMParser(stream)
+	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+	p.BuildParseTrees = true
+	// uptill here we have a cost of : 19000 for q1
+	// next call makes it 100 times more costly to : 1800000
+	tree := p.Document()
+	listener := newGQListener()
+	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
+	agq := listener.getGQ(tree)
+	return agq, nil, nil
 
-	l.Init(query)
-	go run(l)
+	// l := &lex.Lexer{}
+	// query, vmap, err := parseQueryWithVariables(input)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
-	fmap := make(fragmentMap)
-	for item := range l.Items {
-		switch item.Typ {
-		case lex.ItemError:
-			return nil, nil, x.Errorf(item.Val)
-		case itemText:
-			continue
+	// l.Init(query)
+	// go run(l)
 
-		case itemOpType:
-			if item.Val == "mutation" {
-				if mu != nil {
-					return nil, nil, x.Errorf("Only one mutation block allowed.")
-				}
-				if mu, rerr = getMutation(l); rerr != nil {
-					return nil, nil, rerr
-				}
-			} else if item.Val == "fragment" {
-				// TODO(jchiu0): This is to be done in ParseSchema once it is ready.
-				fnode, rerr := getFragment(l)
-				if rerr != nil {
-					return nil, nil, rerr
-				}
-				fmap[fnode.Name] = fnode
-			} else if item.Val == "query" {
-				if gq, rerr = getVariablesAndQuery(l, vmap); rerr != nil {
-					return nil, nil, rerr
-				}
-			}
-		case itemLeftCurl:
-			if gq, rerr = getQuery(l); rerr != nil {
-				return nil, nil, rerr
-			}
-		}
-	}
+	// fmap := make(fragmentMap)
+	// for item := range l.Items {
+	// 	switch item.Typ {
+	// 	case lex.ItemError:
+	// 		return nil, nil, x.Errorf(item.Val)
+	// 	case itemText:
+	// 		continue
 
-	if gq != nil {
-		// Try expanding fragments using fragment map.
-		if err := gq.expandFragments(fmap); err != nil {
-			return nil, nil, err
-		}
+	// 	case itemOpType:
+	// 		if item.Val == "mutation" {
+	// 			if mu != nil {
+	// 				return nil, nil, x.Errorf("Only one mutation block allowed.")
+	// 			}
+	// 			if mu, rerr = getMutation(l); rerr != nil {
+	// 				return nil, nil, rerr
+	// 			}
+	// 		} else if item.Val == "fragment" {
+	// 			// TODO(jchiu0): This is to be done in ParseSchema once it is ready.
+	// 			fnode, rerr := getFragment(l)
+	// 			if rerr != nil {
+	// 				return nil, nil, rerr
+	// 			}
+	// 			fmap[fnode.Name] = fnode
+	// 		} else if item.Val == "query" {
+	// 			if gq, rerr = getVariablesAndQuery(l, vmap); rerr != nil {
+	// 				return nil, nil, rerr
+	// 			}
+	// 		}
+	// 	case itemLeftCurl:
+	// 		if gq, rerr = getQuery(l); rerr != nil {
+	// 			return nil, nil, rerr
+	// 		}
+	// 	}
+	// }
 
-		// Substitute all variables with corresponding values
-		if err := substituteVariables(gq, vmap); err != nil {
-			return nil, nil, err
-		}
-	}
+	// if gq != nil {
+	// 	// Try expanding fragments using fragment map.
+	// 	if err := gq.expandFragments(fmap); err != nil {
+	// 		return nil, nil, err
+	// 	}
 
-	return gq, mu, nil
+	// 	// Substitute all variables with corresponding values
+	// 	if err := substituteVariables(gq, vmap); err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// }
+
+	// return gq, mu, nil
 }
 
 // getVariablesAndQuery checks if the query has a variable list and stores it in
@@ -953,4 +979,92 @@ func godeep(l *lex.Lexer, gq *GraphQuery) error {
 		}
 	}
 	return nil
+}
+
+// ExitDocument is called when production document is exited.
+func (l *gQListener) ExitDocument(ctx *parser.DocumentContext) {
+	def := ctx.Definition()
+	qChild := l.getGQ(def.GetRuleContext())
+	l.setGQ(ctx, qChild.Children[0])
+	fmt.Println(len(l.gQPropertyMap))
+}
+
+// ExitDefinition is called when production definition is exited.
+func (l *gQListener) ExitDefinition(ctx *parser.DefinitionContext) {
+	var sset antlr.RuleContext
+	sset = ctx.SelectionSet()
+	if sset == nil {
+		sset = ctx.OperationDefinition()
+	}
+	l.setGQ(ctx, l.getGQ(sset))
+}
+
+// ExitOperationDefinition is called when production operationDefinition is exited.
+func (l *gQListener) ExitOperationDefinition(ctx *parser.OperationDefinitionContext) {
+	l.setGQ(ctx, l.getGQ(ctx.SelectionSet()))
+}
+
+// ExitOperationType is called when production operationType is exited.
+func (l *gQListener) ExitOperationType(ctx *parser.OperationTypeContext) {}
+
+// ExitSelectionSet is called when production selectionSet is exited.
+func (l *gQListener) ExitSelectionSet(ctx *parser.SelectionSetContext) {
+	q := new(GraphQuery)
+	q.Args = make(map[string]string)
+	for _, f := range ctx.AllField() {
+		fGQ := l.getGQ(f.GetRuleContext())
+		q.Children = append(q.Children, fGQ)
+	}
+	l.setGQ(ctx, q)
+}
+
+// ExitField is called when production field is exited.
+func (l *gQListener) ExitField(ctx *parser.FieldContext) {
+	q := new(GraphQuery)
+	q.Args = make(map[string]string)
+	q.Attr = ctx.NAME().GetText()
+	if args := ctx.Arguments(); args != nil {
+		q.Args = l.getGQ(args).Args
+		if xid, ok := q.Args["_xid_"]; ok {
+			q.XID = xid
+		}
+		if uid, ok := q.Args["_uid_"]; ok {
+			q.UID, _ = strconv.ParseUint(uid, 0, 64)
+		}
+	}
+	if sset := ctx.SelectionSet(); sset != nil {
+		q.Children = l.getGQ(sset).Children
+	}
+	l.setGQ(ctx, q)
+}
+
+// ExitArguments is called when production arguments is exited.
+func (l *gQListener) ExitArguments(ctx *parser.ArgumentsContext) {
+	q := new(GraphQuery)
+	q.Args = make(map[string]string)
+	for _, arg := range ctx.AllArgument() {
+		argGQ := l.getGQ(arg.GetRuleContext())
+		for k, v := range argGQ.Args {
+			q.Args[k] = v
+		}
+	}
+	l.setGQ(ctx, q)
+}
+
+// ExitArgument is called when production argument is exited.
+func (l *gQListener) ExitArgument(ctx *parser.ArgumentContext) {
+	q := new(GraphQuery)
+	q.Args = make(map[string]string)
+	q.Args[ctx.NAME().GetText()] = l.getGQ(ctx.Value().GetRuleContext()).XID
+	fmt.Println(ctx.NAME().GetText(), l.getGQ(ctx.Value().GetRuleContext()).XID)
+	l.setGQ(ctx, q)
+}
+
+func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
+	fmt.Println(ctx.STRING().GetText())
+	q := new(GraphQuery)
+	// check if this is uid or xid ?
+	q.XID = ctx.STRING().GetText()
+	// q.UID = strconv.ParseUint(ctx.STRING().GetText(), 0, 64)
+	l.setGQ(ctx, q)
 }
