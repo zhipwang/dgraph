@@ -78,11 +78,28 @@ var q4 = `
 }
 `
 var q5 = `{
-  me(_xid_: "m.06pj8") {
+   debug(_xid_: "m.06pj8") {
     type.object.name.en
-    film.director.film @filter(anyof("type.object.name.en" , "war spies") || allof("type.object.name.en", "wonder land") )  {
+    film.director.film (first: "2", offset:"10") @filter((anyof("type.object.name.en" , "war spies") 
+                                                          && allof("type.object.name.en", "hello world"))
+                                                      || (allof("type.object.name.en", "wonder land")
+                                                          || allof("type.object.name.en", "so what")))
+    {
       _uid_
       type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
     }
   }
 }`
@@ -115,8 +132,9 @@ func runParser(q string, b *testing.B) {
 }
 
 func BenchmarkQuery(b *testing.B) {
-	b.Run("q1", func(b *testing.B) { runParser(q1, b) })
+	// b.Run("q1", func(b *testing.B) { runParser(q1, b) })
 	b.Run("q2", func(b *testing.B) { runParser(q2, b) })
-	b.Run("q3", func(b *testing.B) { runParser(q3, b) })
-	b.Run("q4", func(b *testing.B) { runParser(q4, b) })
+	// b.Run("q3", func(b *testing.B) { runParser(q3, b) })
+	// b.Run("q4", func(b *testing.B) { runParser(q4, b) })
+	b.Run("q5", func(b *testing.B) { runParser(q5, b) })
 }

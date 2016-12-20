@@ -2348,6 +2348,110 @@ var aq10 = `{
   }
 }`
 
+var q12 = `{
+   debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film (first: 2, offset:10) @filter(anyof("type.object.name.en" , "war spies") 
+                             && allof("type.object.name.en", "hello world")
+                             || allof("type.object.name.en", "wonder land"))  {
+      _uid_
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq12 = `{
+   debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film (first: "2", offset:"10") @filter(anyof("type.object.name.en" , "war spies") 
+                             && allof("type.object.name.en", "hello world")
+                             || allof("type.object.name.en", "wonder land"))  {
+      _uid_
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var q13 = `{
+   debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film (first: 2, offset:10) @filter((anyof("type.object.name.en" , "war spies") 
+                                                          && allof("type.object.name.en", "hello world"))
+                                                      || (allof("type.object.name.en", "wonder land")
+                                                          || allof("type.object.name.en", "so what")))
+    {
+      _uid_
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character @filter(anyof("type.object.name.en", "dicaprio matt")) {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
+var aq13 = `{
+   debug(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film (first: "2", offset:"10") @filter((anyof("type.object.name.en" , "war spies") 
+                                                          && allof("type.object.name.en", "hello world"))
+                                                      || (allof("type.object.name.en", "wonder land")
+                                                          || allof("type.object.name.en", "so what")))
+    {
+      _uid_
+      type.object.name.en
+      film.film.initial_release_date
+      film.film.country
+      film.film.starring {
+        film.performance.actor {
+          type.object.name.en
+        }
+        film.performance.character @filter(anyof("type.object.name.en", "dicaprio matt")) {
+          type.object.name.en
+        }
+      }
+      film.film.genre {
+        type.object.name.en
+      }
+    }
+  }
+}`
+
 // visitor ---------------------
 type gQVisitor struct {
 	*parser.BaseGraphQLPMVisitor
@@ -2420,7 +2524,7 @@ func TestQueryParse12(t *testing.T) {
 }
 
 func TestQueryParse11(t *testing.T) {
-	input := antlr.NewInputStream(aq10)
+	input := antlr.NewInputStream(aq12)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)
@@ -2429,12 +2533,12 @@ func TestQueryParse11(t *testing.T) {
 	tree := p.Document()
 	listener := newGQListener()
 	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
-	agq := listener.getGQ(tree)
+	_ = listener.getGQ(tree)
 
-	ctx := context.Background()
-	sq, err := ToSubGraph(ctx, agq)
-	require.NoError(t, err)
-	sq.DebugPrint("")
+	// ctx := context.Background()
+	// sq, err := ToSubGraph(ctx, agq)
+	// require.NoError(t, err)
+	// sq.DebugPrint("")
 
 	// visitor := new(gQVisitor)
 	// if visitor != nil {
@@ -2451,7 +2555,7 @@ func runAntlrParser(q string, b *testing.B) {
 		lexer := parser.NewGraphQLPMLexer(input)
 		stream := antlr.NewCommonTokenStream(lexer, 0)
 		p := parser.NewGraphQLPMParser(stream)
-		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+		// p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 		p.BuildParseTrees = true
 		// uptill here we have a cost of : 15000 for q1
 		// next call makes it 100 times more costly to : 1800000
@@ -2480,10 +2584,14 @@ func runCurrentParser(q string, b *testing.B) {
 }
 
 func BenchmarkQueryParse(b *testing.B) {
-	b.Run("tomhanks:handwitten:", func(b *testing.B) { runCurrentParser(q10, b) })
-	b.Run("tomhanks:antlr:", func(b *testing.B) { runAntlrParser(aq10, b) })
-	b.Run("spielberg:handwitten:", func(b *testing.B) { runCurrentParser(q9, b) })
-	b.Run("spielberg:antlr:", func(b *testing.B) { runAntlrParser(aq9, b) })
+	// b.Run("tomhanks:handwitten:", func(b *testing.B) { runCurrentParser(q10, b) })
+	// b.Run("tomhanks:antlr:", func(b *testing.B) { runAntlrParser(aq10, b) })
+	// b.Run("spielberg:handwitten:", func(b *testing.B) { runCurrentParser(q9, b) })
+	// b.Run("spielberg:antlr:", func(b *testing.B) { runAntlrParser(aq9, b) })
+	b.Run("nestedquery:handwritten:", func(b *testing.B) { runCurrentParser(q12, b) })
+	b.Run("nestedquery:antlr:", func(b *testing.B) { runAntlrParser(aq12, b) })
+	b.Run("morenestedquery:handwritten:", func(b *testing.B) { runCurrentParser(q13, b) })
+	b.Run("morenestedquery:antlr:", func(b *testing.B) { runAntlrParser(aq13, b) })
 }
 
 // going top down over DocumentContext tree to generate graphquery would be so much easier..
