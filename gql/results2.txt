@@ -1,6 +1,6 @@
 // Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
-var aq9 = `{
-  debug(_xid_: "m.06pj8") {
+var q9 = `{
+  debug(_xid_: m.06pj8) {
     type.object.name.en
     film.director.film {
       type.object.name.en
@@ -96,13 +96,20 @@ ok  	github.com/dgraph-io/dgraph/query	0.027s
 
 // RESULTS :
 /query$ gotb -test.run=XXX
-BenchmarkQueryParse/tomhanks:handwitten:-4         	   50000	     30988 ns/op
-BenchmarkQueryParse/tomhanks:antlr:-4              	    1000	   2073097 ns/op
-BenchmarkQueryParse/spielberg:handwitten:-4        	   20000	     77396 ns/op
-BenchmarkQueryParse/spielberg:antlr:-4             	    1000	   2022733 ns/op
+BenchmarkQueryParse/tomhanks:handwitten:-4         	   50000	     27819 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4              	    2000	   1687983 ns/op
+BenchmarkQueryParse/spielberg:handwitten:-4        	   30000	     54188 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4             	    1000	   1651798 ns/op
 PASS
-ok  	github.com/dgraph-io/dgraph/query	8.702s
+ok  	github.com/dgraph-io/dgraph/query	9.239s
 
+/query$ gotb -test.run=XXX -benchtime=5s
+BenchmarkQueryParse/tomhanks:handwitten:-4         	  300000	     28970 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4              	   10000	   1594090 ns/op
+BenchmarkQueryParse/spielberg:handwitten:-4        	  100000	     52304 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4             	   10000	   1970955 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	50.710s
 
 // Tom hanks query : first run..
         {
