@@ -13,7 +13,7 @@ operationDefinition
    ;
 
 filters
-   : '@filter(' funcName '(' pair (filterOperation pair)* ')' ')'
+   : '@filter(' pair (filterOperation pair)* ')'
    ;
 
 filterOperation
@@ -25,7 +25,7 @@ funcName
    ;
 
 pair
-   : fieldName ',' value
+   : funcName '(' fieldName ',' value ')'
    ;
 
 fieldName

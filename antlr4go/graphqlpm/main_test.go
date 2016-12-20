@@ -80,7 +80,7 @@ var q4 = `
 var q5 = `{
   me(_xid_: "m.06pj8") {
     type.object.name.en
-    film.director.film @filter(anyof("type.object.name.en" , "war spies") )  {
+    film.director.film @filter(anyof("type.object.name.en" , "war spies") || allof("type.object.name.en", "wonder land") )  {
       _uid_
       type.object.name.en
     }
