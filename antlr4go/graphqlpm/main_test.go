@@ -77,9 +77,18 @@ var q4 = `
   }
 }
 `
+var q5 = `{
+  me(_xid_: "m.06pj8") {
+    type.object.name.en
+    film.director.film @filter(anyof("type.object.name.en" , "war spies") )  {
+      _uid_
+      type.object.name.en
+    }
+  }
+}`
 
 func TestQueryParse(t *testing.T) {
-	input := antlr.NewInputStream(q4)
+	input := antlr.NewInputStream(q5)
 	lexer := NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := NewGraphQLPMParser(stream)

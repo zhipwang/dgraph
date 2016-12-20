@@ -12,6 +12,26 @@ operationDefinition
    : operationType NAME selectionSet
    ;
 
+filters
+   : '@filter(' funcName '(' pair (filterOperation pair)* ')' ')'
+   ;
+
+filterOperation
+   : '||' | '&&'
+   ;
+   
+funcName
+   : 'anyof' | 'allof'
+   ;
+
+pair
+   : fieldName ',' value
+   ;
+
+fieldName
+   : STRING # fieldNameValue
+   ;
+   
 operationType
    : 'query'
    ;
@@ -21,7 +41,7 @@ selectionSet
    ;
 
 field
-   : NAME arguments? selectionSet?
+   : NAME arguments? filters? selectionSet?
    ;
 
 arguments
@@ -41,7 +61,7 @@ NAME
    ;
 
 STRING
-   : '"' [.A-Za-z0-9]* '"'
+   : '"' [ .A-Za-z0-9]* '"'
    ;
 
 WS
