@@ -13,17 +13,9 @@ operationDefinition
    ;
 
 filters
-   : '@filter' '(' pairsNested ')'
+   : '@filter(' pair (filterOperation pair)* ')'
    ;
 
-pairsNested
-   : '(' pairsNested ')' (filterOperation pairsNested)* |  pairs
-   ;
-   
-pairs
-   :  pair (filterOperation pair)*
-   ;
-   
 filterOperation
    : '||' | '&&'
    ;

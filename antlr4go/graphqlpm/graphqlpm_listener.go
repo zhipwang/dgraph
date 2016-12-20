@@ -20,12 +20,6 @@ type GraphQLPMListener interface {
 	// EnterFilters is called when entering the filters production.
 	EnterFilters(c *FiltersContext)
 
-	// EnterPairsNested is called when entering the pairsNested production.
-	EnterPairsNested(c *PairsNestedContext)
-
-	// EnterPairs is called when entering the pairs production.
-	EnterPairs(c *PairsContext)
-
 	// EnterFilterOperation is called when entering the filterOperation production.
 	EnterFilterOperation(c *FilterOperationContext)
 
@@ -67,12 +61,6 @@ type GraphQLPMListener interface {
 
 	// ExitFilters is called when exiting the filters production.
 	ExitFilters(c *FiltersContext)
-
-	// ExitPairsNested is called when exiting the pairsNested production.
-	ExitPairsNested(c *PairsNestedContext)
-
-	// ExitPairs is called when exiting the pairs production.
-	ExitPairs(c *PairsContext)
 
 	// ExitFilterOperation is called when exiting the filterOperation production.
 	ExitFilterOperation(c *FilterOperationContext)

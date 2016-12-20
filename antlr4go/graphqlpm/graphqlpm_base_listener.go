@@ -45,18 +45,6 @@ func (s *BaseGraphQLPMListener) EnterFilters(ctx *FiltersContext) {}
 // ExitFilters is called when production filters is exited.
 func (s *BaseGraphQLPMListener) ExitFilters(ctx *FiltersContext) {}
 
-// EnterPairsNested is called when production pairsNested is entered.
-func (s *BaseGraphQLPMListener) EnterPairsNested(ctx *PairsNestedContext) {}
-
-// ExitPairsNested is called when production pairsNested is exited.
-func (s *BaseGraphQLPMListener) ExitPairsNested(ctx *PairsNestedContext) {}
-
-// EnterPairs is called when production pairs is entered.
-func (s *BaseGraphQLPMListener) EnterPairs(ctx *PairsContext) {}
-
-// ExitPairs is called when production pairs is exited.
-func (s *BaseGraphQLPMListener) ExitPairs(ctx *PairsContext) {}
-
 // EnterFilterOperation is called when production filterOperation is entered.
 func (s *BaseGraphQLPMListener) EnterFilterOperation(ctx *FilterOperationContext) {}
 
