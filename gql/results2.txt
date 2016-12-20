@@ -111,6 +111,7 @@ BenchmarkQueryParse/spielberg:antlr:-4             	   10000	   1970955 ns/op
 PASS
 ok  	github.com/dgraph-io/dgraph/query	50.710s
 
+// List of directors with whom Tom Hanks has worked
 // Tom hanks query : first run..
         {
           "_uid_": "0xfc5c49ffffe33702",
@@ -150,6 +151,16 @@ ok  	github.com/dgraph-io/dgraph/query	50.710s
     "total": "2.456418ms"
   }
 }
+// more runs..
+  ],
+  "server_latency": {
+    "json": "1.131803ms",
+    "parsing": "203.186탎",
+    "processing": "1.55496ms",
+    "total": "2.894921ms"
+  }
+}
+
 
 // Details of all the movies directed by Steven Spielberg like release date, actors, genre etc.
 
@@ -191,55 +202,21 @@ ok  	github.com/dgraph-io/dgraph/query	50.710s
     "total": "33.431112ms"
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Genre of all the movies acted by actor Leonardo DiCaprio
-{
-  debug(_xid_: m.0dvmd) {
-    type.object.name.en
-    film.actor.film {
-      film.performance.film {
-        film.film.genre {
-          type.object.name.en
-        }
-      }
-    }
-  }
-}
-
-// second run:
-        }
-      ],
-      "type.object.name.en": "Leonardo DiCaprio"
-    }
+// more runs..
   ],
   "server_latency": {
-    "json": "819.168탎",
-    "parsing": "202.059탎",
-    "processing": "1.08066ms",
-    "total": "2.106747ms"
+    "json": "18.009349ms",
+    "parsing": "312.992탎",
+    "processing": "20.318965ms",
+    "total": "38.644823ms"
+  }
+}
+// more
+  ],
+  "server_latency": {
+    "json": "14.328793ms",
+    "parsing": "215.492탎",
+    "processing": "21.306964ms",
+    "total": "35.854199ms"
   }
 }

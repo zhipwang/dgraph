@@ -28,7 +28,6 @@ var q1 = `
 	}
 }
 `
-
 var q2 = `query queryName {
 		me(uid : "0x0a") {
 			friends {

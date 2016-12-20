@@ -2320,6 +2320,21 @@ var q10 = `{
   }
 }`
 
+var q11 = `{
+  debug(_xid_: m.0bxtg) {
+    type.object.name.en
+    film.actor.film(first:10, offset:10) {
+      film.performance.film {
+        film.film.directed_by {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}`
+
+// friend(first:10, offset:100) @filter(anyof("name", "Andrea") || anyof("name", "Glenn Rhee") || anyof("name", "Daryl Dixon")) {
+
 var aq10 = `{
   debug(_xid_: "m.0bxtg") {
     type.object.name.en
@@ -2440,27 +2455,27 @@ func runAntlrParser(q string, b *testing.B) {
 		p.BuildParseTrees = true
 		// uptill here we have a cost of : 15000 for q1
 		// next call makes it 100 times more costly to : 1800000
-		tree := p.Document()
-		listener := newGQListener()
-		antlr.ParseTreeWalkerDefault.Walk(listener, tree)
-		_ = listener.getGQ(tree)
+		_ = p.Document()
+		// listener := newGQListener()
+		// antlr.ParseTreeWalkerDefault.Walk(listener, tree)
+		// _ = listener.getGQ(tree)
 	}
 }
 
 func runCurrentParser(q string, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		gq, _, err := gql.Parse(q)
+		_, _, err := gql.Parse(q)
 		if err != nil {
 			b.Error(err)
 			return
 		}
-		ctx := context.Background()
-		_, err = ToSubGraph(ctx, gq)
-		if err != nil {
-			b.Error(err)
-			return
-		}
+		// ctx := context.Background()
+		// _, err = ToSubGraph(ctx, gq)
+		// if err != nil {
+		// 	b.Error(err)
+		// 	return
+		// }
 	}
 }
 
@@ -2573,3 +2588,69 @@ func (l *gQListener) ExitStringValue(ctx *parser.StringValueContext) {
 	// q.UID = strconv.ParseUint(ctx.STRING().GetText(), 0, 64)
 	l.setGQ(ctx, q)
 }
+
+// {
+//     me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film (first:2) {
+// 	    film.film.starring {
+// 		    film.performance.actor
+//         film.performance.actor {
+//           type.object.name.en
+//         }
+//       }
+//     }
+//   }
+// }
+
+// {
+//   me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film @filter(allof("type.object.name.en", "Adventures"))  {
+// 	    _uid_
+// 	    type.object.name.en
+//     }
+//   }
+// }
+
+// {
+//   me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film @filter(anyof("type.object.name.en", "Adventures"))  {
+// 	    _uid_
+// 	    type.object.name.en
+//     }
+//   }
+// }
+
+// {
+//   me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film @filter(anyof("type.object.name.en", "Adventures"))  {
+//           	    type.object.name.en
+//     }
+//   }
+// }
+
+// {
+//   me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film {
+// 	    uid
+// 	    type.object.name.en
+//     }
+//   }
+// }
+
+// {
+//   me(_xid_: m.06pj8) {
+//     type.object.name.en
+//     film.director.film  {
+// 	  film.film.genre {
+// 		  type.object.name.en
+// 	  }
+// 	  type.object.name.en
+// 	  film.film.initial_release_date
+//     }
+//   }
+// }

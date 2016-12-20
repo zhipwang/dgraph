@@ -103,6 +103,34 @@ second run:
   "processing": "1.195895ms",
   "total": "2.243513ms"
 }
+5.// Genre of all the movies acted by actor Leonardo DiCaprio
+{
+  debug(_xid_: m.0dvmd) {
+    type.object.name.en
+    film.actor.film {
+      film.performance.film {
+        film.film.genre {
+          type.object.name.en
+        }
+      }
+    }
+  }
+}
+
+// second run:
+        }
+      ],
+      "type.object.name.en": "Leonardo DiCaprio"
+    }
+  ],
+  "server_latency": {
+    "json": "819.168µs",
+    "parsing": "202.059µs",
+    "processing": "1.08066ms",
+    "total": "2.106747ms"
+  }
+}
+
 
 after running big query :
 dgraph was taking too much time;
