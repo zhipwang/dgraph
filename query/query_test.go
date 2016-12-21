@@ -2471,8 +2471,8 @@ func (l *dummyGQListener) ExitStringValue(ctx *parser.StringValueContext) {
 	ctx.STRING().GetText()
 }
 
-func TestQueryParse11(t *testing.T) {
-	input := antlr.NewInputStream(aq11)
+func antlrQueryParse(q string) {
+	input := antlr.NewInputStream(q)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)
@@ -2480,10 +2480,20 @@ func TestQueryParse11(t *testing.T) {
 	p.BuildParseTrees = false
 	listener := newDummyListerner()
 	p.AddParseListener(listener)
+	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 	_ = p.Document()
 }
 
+func TestQueryParse11(t *testing.T) {
+	antlrQueryParse(aq11)
+}
+
 func runAntlrParser(q string, b *testing.B) {
+	aqs := []string{aq1, aq2, aq3, aq4, aq5, aq6, aq7, aq8, aq9, aq10, aq11}
+	for _, aq := range aqs {
+		antlrQueryParse(aq)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		input := antlr.NewInputStream(q)
@@ -2493,6 +2503,7 @@ func runAntlrParser(q string, b *testing.B) {
 		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 		p.BuildParseTrees = false
 		p.AddParseListener(newDummyListerner())
+		p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 		_ = p.Document()
 	}
 }

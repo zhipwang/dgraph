@@ -220,6 +220,7 @@ func (p *GraphQLPMParser) Document() (localctx IDocumentContext) {
 
 	defer func() {
 		if err := recover(); err != nil {
+			fmt.Println("in recover")
 			if v, ok := err.(antlr.RecognitionException); ok {
 				localctx.SetException(v)
 				p.GetErrorHandler().ReportError(p, v)
