@@ -2453,29 +2453,34 @@ func TestQueryParse12(t *testing.T) {
 	sg.DebugPrint("")
 }
 
+type dummyGQListener struct {
+	*parser.BaseGraphQLPMListener
+}
+
+func newDummyListerner() *dummyGQListener {
+	return new(dummyGQListener)
+}
+
+// ExitArgument is called when production argument is exited.
+func (l *dummyGQListener) ExitArgument(ctx *parser.ArgumentContext) {
+	ctx.NAME().GetText()
+	// fmt.Println(ctx.NAME().GetText())
+}
+
+func (l *dummyGQListener) ExitStringValue(ctx *parser.StringValueContext) {
+	ctx.STRING().GetText()
+}
+
 func TestQueryParse11(t *testing.T) {
 	input := antlr.NewInputStream(aq11)
 	lexer := parser.NewGraphQLPMLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewGraphQLPMParser(stream)
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-	p.BuildParseTrees = true
-	tree := p.Document()
-	listener := newGQListener()
-	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
-	_ = listener.getGQ(tree)
-
-	// ctx := context.Background()
-	// sq, err := ToSubGraph(ctx, agq)
-	// require.NoError(t, err)
-	// sq.DebugPrint("")
-
-	// visitor := new(gQVisitor)
-	// if visitor != nil {
-	// 	fmt.Println("not nil")
-	// 	// do not know but giving me null-pointer exception
-	// 	// visitor.Visit(tree)
-	// }
+	p.BuildParseTrees = false
+	listener := newDummyListerner()
+	p.AddParseListener(listener)
+	_ = p.Document()
 }
 
 func runAntlrParser(q string, b *testing.B) {
@@ -2486,13 +2491,9 @@ func runAntlrParser(q string, b *testing.B) {
 		stream := antlr.NewCommonTokenStream(lexer, 0)
 		p := parser.NewGraphQLPMParser(stream)
 		p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
-		p.BuildParseTrees = true
-		// uptill here we have a cost of : 15000 for q1
-		// next call makes it 100 times more costly to : 1800000
+		p.BuildParseTrees = false
+		p.AddParseListener(newDummyListerner())
 		_ = p.Document()
-		// listener := newGQListener()
-		// antlr.ParseTreeWalkerDefault.Walk(listener, tree)
-		// _ = listener.getGQ(tree)
 	}
 }
 
@@ -2504,12 +2505,6 @@ func runCurrentParser(q string, b *testing.B) {
 			b.Error(err)
 			return
 		}
-		// ctx := context.Background()
-		// _, err = ToSubGraph(ctx, gq)
-		// if err != nil {
-		// 	b.Error(err)
-		// 	return
-		// }
 	}
 }
 
