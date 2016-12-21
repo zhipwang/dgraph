@@ -336,3 +336,67 @@ BenchmarkQueryParse/morenestedquery:handwritten:-4           100000         9356
 BenchmarkQueryParse/morenestedquery:antlr:-4                   2000       4382988 ns/op
 PASS
 ok      github.com/dgraph-io/dgraph/query    34.984s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+https://github.com/dgraph-io/dgraph/blob/2477b83fdf90287768293f146f9e4b4ca1eb2ca9/antlr4go/graphqlpm/GraphQLPM.g4
+https://github.com/dgraph-io/dgraph/blob/2477b83fdf90287768293f146f9e4b4ca1eb2ca9/antlr4go/graphqlpm/main_test.go
+
+dgraph/antlr4go/graphqlpm$ gotb -test.run=XXX -benchtime=2s -v
+BenchmarkQuery/q1-4         	    5000	   1221967 ns/op
+BenchmarkQuery/q2-4         	    2000	   1710850 ns/op
+BenchmarkQuery/q3-4         	    3000	   1230518 ns/op
+BenchmarkQuery/q4-4         	    3000	   1568564 ns/op
+BenchmarkQuery/q5-4         	    2000	   1803392 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/antlr4go/graphqlpm	22.179s
+
+/graphqlpm$ gotb -test.run=XXX -benchtime=2s -v
+BenchmarkQuery/q1-4         	    2000	   1476172 ns/op
+BenchmarkQuery/q2-4         	    2000	   1766084 ns/op
+BenchmarkQuery/q3-4         	    2000	   1573337 ns/op
+BenchmarkQuery/q4-4         	    2000	   1826182 ns/op
+BenchmarkQuery/q5-4         	    2000	   1819458 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/antlr4go/graphqlpm	17.747s
+
+https://github.com/dgraph-io/dgraph/blob/8ccf5cb5246099df4a01918536da9a46b25e6f75/query/query_test.go#L2263
+https://github.com/dgraph-io/dgraph/blob/8ccf5cb5246099df4a01918536da9a46b25e6f75/query/query_test.go#L2516
+
+query$ gotb -test.run=XXX -benchtime=2s -v
+BenchmarkQueryParse/spielberg:handwitten:-4         	  100000	     46918 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4              	    2000	   1741364 ns/op
+BenchmarkQueryParse/tomhanks:handwitten:-4          	  100000	     25982 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4               	    2000	   1654579 ns/op
+BenchmarkQueryParse/nestedquery:handwritten:-4      	   30000	     73053 ns/op
+BenchmarkQueryParse/nestedquery:antlr:-4            	    1000	   3385005 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	21.922s
+ashishnegi@ashish:~/work/golang/src/github.com/dgraph-io/dgraph/query$ gotb -test.run=XXX -benchtime=2s -v
+BenchmarkQueryParse/spielberg:handwitten:-4         	  100000	     54190 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4              	    2000	   1936500 ns/op
+BenchmarkQueryParse/tomhanks:handwitten:-4          	  200000	     28477 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4               	    2000	   1502808 ns/op
+BenchmarkQueryParse/nestedquery:handwritten:-4      	   50000	     71023 ns/op
+BenchmarkQueryParse/nestedquery:antlr:-4            	    1000	   2971993 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	26.616s
+
+
