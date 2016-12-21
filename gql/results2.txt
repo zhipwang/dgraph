@@ -400,3 +400,23 @@ PASS
 ok  	github.com/dgraph-io/dgraph/query	26.616s
 
 
+### using listeners while parsing ; not generating parsetrees. d813287fde26e58b3ec80ce31bbaaae0ce68ffb9
+
+query$ gotb -test.run=XXX -v -benchtime=2s
+BenchmarkQueryParse/spielberg:handwitten:-4         	  100000	     48658 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4              	    2000	   1616340 ns/op
+BenchmarkQueryParse/tomhanks:handwitten:-4          	  100000	     29333 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4               	    2000	   1686794 ns/op
+BenchmarkQueryParse/nestedquery:handwritten:-4      	   30000	     75949 ns/op
+BenchmarkQueryParse/nestedquery:antlr:-4            	    1000	   3803162 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	22.780s
+ashishnegi@ashish:~/work/golang/src/github.com/dgraph-io/dgraph/query$ gotb -test.run=XXX -v -benchtime=3s
+BenchmarkQueryParse/spielberg:handwitten:-4         	  200000	     40929 ns/op
+BenchmarkQueryParse/spielberg:antlr:-4              	    2000	   1708438 ns/op
+BenchmarkQueryParse/tomhanks:handwitten:-4          	  200000	     30532 ns/op
+BenchmarkQueryParse/tomhanks:antlr:-4               	    2000	   1653997 ns/op
+BenchmarkQueryParse/nestedquery:handwritten:-4      	  100000	     71860 ns/op
+BenchmarkQueryParse/nestedquery:antlr:-4            	    2000	   3083613 ns/op
+PASS
+ok  	github.com/dgraph-io/dgraph/query	36.480s
