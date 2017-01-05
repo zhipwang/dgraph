@@ -29,7 +29,6 @@ func run(l *lex.Lexer) {
 	for state := lexText; state != nil; {
 		state = state(l)
 	}
-
 }
 
 // Parse parses the schema file.
@@ -101,7 +100,7 @@ func processScalarBlock(l *lex.Lexer) error {
 				str[name] = t
 
 				// Check for index / reverse.
-				for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+				for item := l.NextTok(); item.Typ != itemDummy; item = l.NextTok() {
 					if next.Typ == lex.ItemError {
 						return x.Errorf(next.Val)
 					}
@@ -164,7 +163,7 @@ func processScalar(l *lex.Lexer) error {
 				}
 
 				// Check for index.
-				for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+				for item := l.NextTok(); item.Typ != itemDummy; item = l.NextTok() {
 					if next.Typ == lex.ItemError {
 						return x.Errorf(next.Val)
 					}

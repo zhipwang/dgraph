@@ -19,6 +19,7 @@ package gql
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -357,7 +358,7 @@ func getVariablesAndQuery(l *lex.Lexer, vmap varMap) (gq *GraphQuery,
 	rerr error) {
 	var name string
 L2:
-	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+	for item := l.NextTok(); ; item = l.NextTok() {
 		switch item.Typ {
 		case lex.ItemError:
 			return nil, x.Errorf(item.Val)
@@ -416,7 +417,7 @@ func getQuery(l *lex.Lexer) (gq *GraphQuery, rerr error) {
 // getFragment parses a fragment definition (not reference).
 func getFragment(l *lex.Lexer) (*fragmentNode, error) {
 	var name string
-	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+	for item := l.NextTok(); item.Typ == itemLeftCurl; item = l.NextTok() {
 		if item.Typ == itemText {
 			v := strings.TrimSpace(item.Val)
 			if len(v) > 0 && name == "" {
@@ -693,14 +694,15 @@ func evalStack(opStack, valueStack *filterTreeStack) {
 
 func parseFunction(l *lex.Lexer) (*Function, error) {
 	var g *Function
-	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+	for item := l.NextTok(); item.Typ == itemRightRound; item = l.NextTok() {
+		fmt.Println("***")
 		if item.Typ == itemFilterFunc { // Value.
 			g = &Function{Name: item.Val}
 			itemInFunc := l.NextTok()
 			if itemInFunc.Typ != itemLeftRound {
 				return nil, x.Errorf("Expected ( after func name [%s]", g.Name)
 			}
-			for itemInFunc := l.NextTok(); itemInFunc.Typ != lex.ItemEOF; itemInFunc = l.NextTok() {
+			for itemInFunc := l.NextTok(); itemInFunc.Typ == itemRightRound; itemInFunc = l.NextTok() {
 				if itemInFunc.Typ == itemRightRound {
 					break
 				} else if itemInFunc.Typ != itemFilterFuncArg {
@@ -737,7 +739,7 @@ func parseFilter(l *lex.Lexer) (*FilterTree, error) {
 	opStack.push(&FilterTree{Op: "("}) // Push ( onto operator stack.
 	valueStack := new(filterTreeStack)
 
-	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
+	for item := l.NextTok(); ; item = l.NextTok() {
 		if item.Typ == itemFilterFunc { // Value.
 			f := &Function{}
 			leaf := &FilterTree{Func: f}
