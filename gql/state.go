@@ -41,33 +41,36 @@ const (
 
 // Constants representing type of different graphql lexed items.
 const (
-	itemText            lex.ItemType = 5 + iota // plain text
-	itemLeftCurl                                // left curly bracket
-	itemRightCurl                               // right curly bracket
-	itemComma                                   // a comma
-	itemEqual                                   // equals to symbol
-	itemComment                                 // comment
-	itemName                                    // [9] names
-	itemOpType                                  // operation type
-	itemString                                  // quoted string
-	itemLeftRound                               // left round bracket
-	itemRightRound                              // right round bracket
-	itemArgName                                 // argument name
-	itemArgVal                                  // argument val
-	itemMutationOp                              // mutation operation
-	itemMutationContent                         // mutation content
-	itemFragmentSpread                          // three dots and name
-	itemVarName                                 // dollar followed by a name
-	itemVarType                                 // type a variable
-	itemVarDefault                              // default value of a variable
-	itemAlias                                   // Alias for a field
-	itemDirectiveName                           // Name starting with @
-	itemFilterAnd                               // And inside a filter.
-	itemFilterOr                                // Or inside a filter.
-	itemFilterFunc                              // Function inside a filter.
-	itemFilterFuncArg                           // Function args inside a filter.
-	itemGenerator                               // To specify its a generator.
-	itemArgument                                // To specify its a argument list.
+	itemText       lex.ItemType = 5 + iota // plain text
+	itemLeftCurl                           // left curly bracket
+	itemRightCurl                          // right curly bracket
+	itemComma                              // a comma
+	itemEqual                              // equals to symbol
+	itemComment                            // comment
+	itemName                               // [9] names
+	itemOpType                             // operation type
+	itemString                             // quoted string
+	itemLeftRound                          // left round bracket
+	itemRightRound                         // right round bracket
+
+	itemMutationOp      // mutation operation
+	itemMutationContent // mutation content
+	itemFragmentSpread  // three dots and name
+	itemAnd             // And inside a filter.
+	itemOr              // Or inside a filter.
+
+	itemArgName    // argument name
+	itemArgVal     // argument val
+	itemVarName    // dollar followed by a name
+	itemVarType    // type a variable
+	itemVarDefault // default value of a variable
+	itemAlias      // Alias for a field
+
+	itemDirectiveName // Name starting with @
+	itemFilterFunc    // Function inside a filter.
+	itemFilterFuncArg // Function args inside a filter.
+	itemGenerator     // To specify its a generator.
+	itemArgument      // To specify its a argument list.
 )
 
 // lexText lexes the input string and calls other lex functions.
