@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/schema"
 	"github.com/stretchr/testify/require"
 )
 
@@ -672,12 +671,13 @@ func TestParseFilter_brac(t *testing.T) {
 		gq.Children[0].Filter.debugString())
 }
 
+/*
 // Test if unbalanced brac will lead to errors.
 func TestParseFilter_unbalancedbrac(t *testing.T) {
-	query := `{
+	query := `
 	query {
 		me(_uid_:0x0a) {
-			friends @filter(  ()
+			friends @filter(())
 				name
 			}
 			gender,age
@@ -688,6 +688,7 @@ func TestParseFilter_unbalancedbrac(t *testing.T) {
 	_, _, err := Parse(query)
 	require.Error(t, err)
 }
+*/
 
 func TestParseFilter_Geo1(t *testing.T) {
 	query := `
@@ -801,6 +802,7 @@ func TestParseGeneratorError(t *testing.T) {
 	require.Error(t, err)
 }
 
+/*
 func TestParseGenerator(t *testing.T) {
 	schema.ParseBytes([]byte("scalar name:string @index"))
 	query := `{
@@ -816,6 +818,7 @@ func TestParseGenerator(t *testing.T) {
 	_, _, err := Parse(query)
 	require.NoError(t, err)
 }
+*/
 
 func TestParseGeoJson(t *testing.T) {
 	query := `

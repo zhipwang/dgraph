@@ -105,7 +105,6 @@ func run(l *lex.Lexer) {
 	for state := lexText; state != nil; {
 		state = state(l)
 	}
-	close(l.Items) // No more tokens.
 }
 
 // DebugPrint is useful for debugging.
@@ -298,10 +297,11 @@ func Parse(input string) (gq *GraphQuery, mu *Mutation, rerr error) {
 	}
 
 	l.Init(query)
-	go run(l)
+	//Let lexer finish.
+	run(l)
 
 	fmap := make(fragmentMap)
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		switch item.Typ {
 		case lex.ItemError:
 			return nil, nil, x.Errorf(item.Val)
@@ -357,7 +357,7 @@ func getVariablesAndQuery(l *lex.Lexer, vmap varMap) (gq *GraphQuery,
 	rerr error) {
 	var name string
 L2:
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		switch item.Typ {
 		case lex.ItemError:
 			return nil, x.Errorf(item.Val)
@@ -401,7 +401,7 @@ func getQuery(l *lex.Lexer) (gq *GraphQuery, rerr error) {
 	}
 
 	// Recurse to deeper levels through godeep.
-	item := <-l.Items
+	item := l.NextTok()
 	if item.Typ == itemLeftCurl {
 		if rerr = godeep(l, gq); rerr != nil {
 			return nil, rerr
@@ -416,7 +416,7 @@ func getQuery(l *lex.Lexer) (gq *GraphQuery, rerr error) {
 // getFragment parses a fragment definition (not reference).
 func getFragment(l *lex.Lexer) (*fragmentNode, error) {
 	var name string
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == itemText {
 			v := strings.TrimSpace(item.Val)
 			if len(v) > 0 && name == "" {
@@ -452,7 +452,7 @@ func getFragment(l *lex.Lexer) (*fragmentNode, error) {
 // operation in Mutation.
 func getMutation(l *lex.Lexer) (*Mutation, error) {
 	var mu *Mutation
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == itemText {
 			continue
 		}
@@ -478,7 +478,7 @@ func parseMutationOp(l *lex.Lexer, op string, mu *Mutation) error {
 	}
 
 	parse := false
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == itemText {
 			continue
 		}
@@ -511,7 +511,7 @@ func parseVariables(l *lex.Lexer, vmap varMap) error {
 	for {
 		var varName string
 		// Get variable name.
-		item := <-l.Items
+		item := l.NextTok()
 		if item.Typ == itemVarName {
 			varName = item.Val
 		} else if item.Typ == itemRightRound {
@@ -521,7 +521,7 @@ func parseVariables(l *lex.Lexer, vmap varMap) error {
 		}
 
 		// Get variable type.
-		item = <-l.Items
+		item = l.NextTok()
 		if item.Typ != itemVarType {
 			return x.Errorf("Expecting a variable type. Got: %v", item)
 		}
@@ -546,9 +546,9 @@ func parseVariables(l *lex.Lexer, vmap varMap) error {
 		}
 
 		// Check for '=' sign and optional default value.
-		item = <-l.Items
+		item = l.NextTok()
 		if item.Typ == itemEqual {
-			it := <-l.Items
+			it := l.NextTok()
 			if it.Typ != itemVarDefault {
 				return x.Errorf("Expecting default value of a variable. Got: %v", item)
 			}
@@ -565,7 +565,7 @@ func parseVariables(l *lex.Lexer, vmap varMap) error {
 					Type:  varType,
 				}
 			}
-			item = <-l.Items
+			item = l.NextTok()
 		}
 
 		if item.Typ == itemComma {
@@ -583,7 +583,7 @@ func parseArguments(l *lex.Lexer) (result []pair, rerr error) {
 		var p pair
 
 		// Get key.
-		item := <-l.Items
+		item := l.NextTok()
 		if item.Typ == itemArgName {
 			p.Key = item.Val
 
@@ -595,7 +595,7 @@ func parseArguments(l *lex.Lexer) (result []pair, rerr error) {
 		}
 
 		// Get value.
-		item = <-l.Items
+		item = l.NextTok()
 		if item.Typ != itemArgVal {
 			return result, x.Errorf("Expecting argument value. Got: %v", item)
 		}
@@ -693,14 +693,14 @@ func evalStack(opStack, valueStack *filterTreeStack) {
 
 func parseFunction(l *lex.Lexer) (*Function, error) {
 	var g *Function
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == itemFilterFunc { // Value.
 			g = &Function{Name: item.Val}
-			itemInFunc := <-l.Items
+			itemInFunc := l.NextTok()
 			if itemInFunc.Typ != itemLeftRound {
 				return nil, x.Errorf("Expected ( after func name [%s]", g.Name)
 			}
-			for itemInFunc = range l.Items {
+			for itemInFunc := l.NextTok(); itemInFunc.Typ != lex.ItemEOF; itemInFunc = l.NextTok() {
 				if itemInFunc.Typ == itemRightRound {
 					break
 				} else if itemInFunc.Typ != itemFilterFuncArg {
@@ -728,7 +728,7 @@ func parseFunction(l *lex.Lexer) (*Function, error) {
 
 // parseFilter parses the filter directive to produce a QueryFilter / parse tree.
 func parseFilter(l *lex.Lexer) (*FilterTree, error) {
-	item := <-l.Items
+	item := l.NextTok()
 	if item.Typ != itemLeftRound {
 		return nil, x.Errorf("Expected ( after filter directive")
 	}
@@ -737,17 +737,17 @@ func parseFilter(l *lex.Lexer) (*FilterTree, error) {
 	opStack.push(&FilterTree{Op: "("}) // Push ( onto operator stack.
 	valueStack := new(filterTreeStack)
 
-	for item = range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == itemFilterFunc { // Value.
 			f := &Function{}
 			leaf := &FilterTree{Func: f}
 			f.Name = item.Val
-			itemInFunc := <-l.Items
+			itemInFunc := l.NextTok()
 			if itemInFunc.Typ != itemLeftRound {
 				return nil, x.Errorf("Expected ( after func name [%s]", leaf.Func.Name)
 			}
 			var terminated bool
-			for itemInFunc = range l.Items {
+			for itemInFunc := l.NextTok(); itemInFunc.Typ != lex.ItemEOF; itemInFunc = l.NextTok() {
 				if itemInFunc.Typ == itemRightRound {
 					terminated = true
 					break
@@ -787,9 +787,9 @@ func parseFilter(l *lex.Lexer) (*FilterTree, error) {
 				break
 			}
 
-		} else if item.Typ == itemFilterAnd || item.Typ == itemFilterOr {
+		} else if item.Typ == itemAnd || item.Typ == itemOr {
 			op := "&"
-			if item.Typ == itemFilterOr {
+			if item.Typ == itemOr {
 				op = "|"
 			}
 			opPred := filterOpPrecedence[op]
@@ -833,18 +833,18 @@ func getRoot(l *lex.Lexer) (gq *GraphQuery, rerr error) {
 	gq = &GraphQuery{
 		Args: make(map[string]string),
 	}
-	item := <-l.Items
+	item := l.NextTok()
 	if item.Typ != itemName {
 		return nil, x.Errorf("Expected some name. Got: %v", item)
 	}
 
 	gq.Alias = item.Val
-	item = <-l.Items
+	item = l.NextTok()
 	if item.Typ != itemLeftRound {
 		return nil, x.Errorf("Expected variable start. Got: %v", item)
 	}
 
-	item = <-l.Items
+	item = l.NextTok()
 	if item.Typ == itemGenerator {
 		// Store the generator function.
 		gen, err := parseFunction(l)
@@ -887,7 +887,7 @@ func getRoot(l *lex.Lexer) (gq *GraphQuery, rerr error) {
 // godeep constructs the subgraph from the lexed items and a GraphQuery node.
 func godeep(l *lex.Lexer, gq *GraphQuery) error {
 	curp := gq // Used to track current node, for nesting.
-	for item := range l.Items {
+	for item := l.NextTok(); item.Typ != lex.ItemEOF; item = l.NextTok() {
 		if item.Typ == lex.ItemError {
 			return x.Errorf(item.Val)
 		}
@@ -926,7 +926,7 @@ func godeep(l *lex.Lexer, gq *GraphQuery) error {
 			}
 
 		} else if item.Typ == itemLeftRound {
-			item = <-l.Items
+			item = l.NextTok()
 			if item.Typ == itemArgument {
 				args, err := parseArguments(l)
 				if err != nil {
