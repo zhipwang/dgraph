@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/dgraph/task"
 	"github.com/stretchr/testify/require"
@@ -300,6 +301,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 
 func BenchmarkListIntersectReal(b *testing.B) {
 	c := 1
+	max := time.Since(time.Now())
 	for c < 1000 {
 		l1, err := ioutil.ReadFile(fmt.Sprintf("uiddump/a%d.gob", c))
 		if err != nil {
@@ -325,7 +327,49 @@ func BenchmarkListIntersectReal(b *testing.B) {
 			break
 		}
 
+		st := time.Now()
 		IntersectWith(u, v)
+		di := time.Since(st)
+		if max < di {
+			max = di
+			fmt.Println(c)
+		}
 		c++
+	}
+}
+
+func BenchmarkListIntersectRealExpensive(b *testing.B) {
+	l1, err := ioutil.ReadFile(fmt.Sprintf("uiddump/a%d.gob", 594))
+	if err != nil {
+		return
+	}
+	n1 := bytes.NewBuffer(l1)
+	var u *task.List
+	dec1 := gob.NewDecoder(n1)
+	err = dec1.Decode(&u)
+	if err != nil {
+		return
+	}
+
+	l2, err := ioutil.ReadFile(fmt.Sprintf("uiddump/b%d.gob", 594))
+	if err != nil {
+		return
+	}
+	n2 := bytes.NewBuffer(l2)
+	var v *task.List
+	dec2 := gob.NewDecoder(n2)
+	err = dec2.Decode(&v)
+	if err != nil {
+		return
+	}
+
+	arrSz := len(u.Uids)
+	uCopy := make([]uint64, arrSz, arrSz)
+	copy(uCopy, u.Uids)
+
+	for k := 0; k < b.N; k++ {
+		IntersectWith(u, v)
+		u.Uids = u.Uids[:arrSz]
+		copy(u.Uids, uCopy)
 	}
 }
