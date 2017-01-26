@@ -41,27 +41,30 @@ func idealJump(u []uint64, id uint64, i int) int {
 // IntersectWith intersects u with v. The update is made to u.
 // u, v should be sorted.
 func IntersectWith(u, v *task.List) {
-	/*
-		//DUMP
-		c := co
-		fmt.Println("DUMPING .........................................")
-		x.Checkf(os.MkdirAll("uiddump", 0700), "uiddump")
-		filename := path.Join("uiddump", fmt.Sprintf("a%d.gob", c))
-		f, err := os.Create(filename)
-		x.Checkf(err, filename)
-		enc := gob.NewEncoder(f)
-		x.Check(enc.Encode(u))
-		x.Checkf(f.Close(), filename)
-		//DUMP
-		filename = path.Join("uiddump", fmt.Sprintf("b%d.gob", c))
-		f, err = os.Create(filename)
-		x.Checkf(err, filename)
-		enc = gob.NewEncoder(f)
-		x.Check(enc.Encode(v))
-		x.Checkf(f.Close(), filename)
-		//DUMP
-		co++
-	*/
+	out := u.Uids[:0]
+	n := len(u.Uids)
+	m := len(v.Uids)
+	for i, k := 0, 0; i < n && k < m; {
+		uid := u.Uids[i]
+		vid := v.Uids[k]
+		if uid > vid {
+			for ; k < m && v.Uids[k] < uid; k++ {
+			}
+		} else if uid == vid {
+			out = append(out, uid)
+			k++
+			i++
+		} else {
+			for ; i < n && u.Uids[i] < vid; i++ {
+			}
+		}
+	}
+	u.Uids = out
+}
+
+// IntersectWith intersects u with v. The update is made to u.
+// u, v should be sorted.
+func IntersectWithExp(u, v *task.List) {
 	out := u.Uids[:0]
 	n := len(u.Uids)
 	m := len(v.Uids)
@@ -80,6 +83,23 @@ func IntersectWith(u, v *task.List) {
 			i = idealJump(u.Uids, vid, i)
 			for ; i < n && u.Uids[i] < vid; i++ {
 			}
+		}
+	}
+	u.Uids = out
+}
+
+// IntersectWith intersects u with v. The update is made to u.
+// u, v should be sorted.
+func IntersectWithBinarySearch(u, v *task.List) {
+	out := u.Uids[:0]
+	m := len(v.Uids)
+
+	for _, uid := range u.Uids {
+		idx := sort.Search(m, func(i int) bool {
+			return v.Uids[i] == uid
+		})
+		if idx != -1 {
+			out = append(out, uid)
 		}
 	}
 	u.Uids = out

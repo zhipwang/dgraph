@@ -17,14 +17,10 @@
 package algo
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/dgraph/task"
 	"github.com/stretchr/testify/require"
@@ -278,27 +274,82 @@ func runIntersectRandom(arrSz int, limit int64, b *testing.B) {
 
 }
 
-/*
 func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
-		b.Run(fmt.Sprintf(":random:size=%d:overlap=%.2f:", sz, overlap),
-			func(b *testing.B) {
-				runIntersectRandom(sz, int64(float64(sz)/overlap), b)
-			})
+		sz1 := sz
+		sz2 := sz
+		for r := 1; r < 100000 && sz2 < 1000000; r *= 10 {
+			sz1 = sz
+			sz2 = sz * r
+
+			u1, v1 := make([]uint64, sz1, sz1), make([]uint64, sz2, sz2)
+			limit := int64(float64(sz) / overlap)
+			for i := 0; i < sz1; i++ {
+				u1[i] = uint64(rand.Int63n(limit))
+			}
+			for i := 0; i < sz2; i++ {
+				v1[i] = uint64(rand.Int63n(limit))
+			}
+			sort.Sort(uint64Slice(u1))
+			sort.Sort(uint64Slice(v1))
+
+			u := newList(u1)
+			v := newList(v1)
+			ucopy := make([]uint64, len(u1), len(u1))
+			copy(ucopy, u1)
+
+			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWith(u, v)
+						u.Uids = u.Uids[:sz1]
+						copy(u.Uids, ucopy)
+					}
+				})
+
+			b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithExp(u, v)
+						u.Uids = u.Uids[:sz1]
+						copy(u.Uids, ucopy)
+					}
+				})
+
+			b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithBinarySearch(u, v)
+						u.Uids = u.Uids[:sz1]
+						copy(u.Uids, ucopy)
+					}
+				})
+		}
 	}
 
-	randomTests(500, 0.3)
-	randomTests(10000, 0.3)
-	randomTests(1000000, 0.3)
-	randomTests(500, 0.1)
-	randomTests(10000, 0.1)
-	randomTests(1000000, 0.1)
-	randomTests(500, 0.01)
+	randomTests(10, 0.01)
+	randomTests(100, 0.01)
+	randomTests(1000, 0.01)
 	randomTests(10000, 0.01)
+	randomTests(100000, 0.01)
 	randomTests(1000000, 0.01)
-}
-*/
 
+	randomTests(10, 0.1)
+	randomTests(100, 0.1)
+	randomTests(1000, 0.1)
+	randomTests(10000, 0.1)
+	randomTests(100000, 0.1)
+	randomTests(1000000, 0.1)
+
+	randomTests(10, 0.4)
+	randomTests(100, 0.4)
+	randomTests(1000, 0.4)
+	randomTests(10000, 0.4)
+	randomTests(100000, 0.4)
+	randomTests(1000000, 0.4)
+}
+
+/*
 func BenchmarkListIntersectReal(b *testing.B) {
 	c := 1
 	max := time.Since(time.Now())
@@ -337,7 +388,6 @@ func BenchmarkListIntersectReal(b *testing.B) {
 		c++
 	}
 }
-
 func BenchmarkListIntersectRealExpensive(b *testing.B) {
 	l1, err := ioutil.ReadFile(fmt.Sprintf("uiddump/a%d.gob", 594))
 	if err != nil {
@@ -373,3 +423,39 @@ func BenchmarkListIntersectRealExpensive(b *testing.B) {
 		copy(u.Uids, uCopy)
 	}
 }
+func BenchmarkListIntersectRealExpensiveBinSearch(b *testing.B) {
+	l1, err := ioutil.ReadFile(fmt.Sprintf("uiddump/a%d.gob", 594))
+	if err != nil {
+		return
+	}
+	n1 := bytes.NewBuffer(l1)
+	var u *task.List
+	dec1 := gob.NewDecoder(n1)
+	err = dec1.Decode(&u)
+	if err != nil {
+		return
+	}
+
+	l2, err := ioutil.ReadFile(fmt.Sprintf("uiddump/b%d.gob", 594))
+	if err != nil {
+		return
+	}
+	n2 := bytes.NewBuffer(l2)
+	var v *task.List
+	dec2 := gob.NewDecoder(n2)
+	err = dec2.Decode(&v)
+	if err != nil {
+		return
+	}
+
+	arrSz := len(u.Uids)
+	uCopy := make([]uint64, arrSz, arrSz)
+	copy(uCopy, u.Uids)
+
+	for k := 0; k < b.N; k++ {
+		IntersectWithBinarySearch(u, v)
+		u.Uids = u.Uids[:arrSz]
+		copy(u.Uids, uCopy)
+	}
+}
+*/
