@@ -26,16 +26,13 @@ func idealJump(u []uint64, id uint64, i int) int {
 		i += step
 		step *= 10
 	}
-
 	if step > 1 {
 		step /= 10
 	}
-
 	for i+step < lenL && u[i+step] < id {
 		i += step
 		step += step
 	}
-
 	return i
 }
 
