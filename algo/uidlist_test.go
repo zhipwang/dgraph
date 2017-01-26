@@ -17,12 +17,15 @@
 package algo
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/gob"
+	"io/ioutil"
 	"math/rand"
 	"sort"
 	"testing"
 
 	"github.com/dgraph-io/dgraph/task"
+	"github.com/dgraph-io/dgraph/x"
 	"github.com/stretchr/testify/require"
 )
 
@@ -274,6 +277,7 @@ func runIntersectRandom(arrSz int, limit int64, b *testing.B) {
 
 }
 
+/*
 func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
 		b.Run(fmt.Sprintf(":random:size=%d:overlap=%.2f:", sz, overlap),
@@ -291,4 +295,34 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests(500, 0.01)
 	randomTests(10000, 0.01)
 	randomTests(1000000, 0.01)
+}
+*/
+
+func BenchmarkListIntersectReal(b *testing.B) {
+	l1, err := ioutil.ReadFile("uidsint1/a")
+	x.Check(err)
+	n1 := bytes.NewBuffer(l1)
+	var u []uint64
+	dec1 := gob.NewDecoder(n1)
+	x.Check(dec1.Decode(&u))
+
+	l2, err := ioutil.ReadFile("uidsint1/b")
+	x.Check(err)
+	n2 := bytes.NewBuffer(l2)
+	var v []uint64
+	dec2 := gob.NewDecoder(n2)
+	x.Check(dec2.Decode(&v))
+
+	u1 := &task.List{u}
+	v1 := &task.List{v}
+	arrSz := len(u)
+	ucopy := make([]uint64, len(u), len(u))
+	copy(ucopy, u)
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		IntersectWith(u1, v1)
+		u1.Uids = u1.Uids[:arrSz]
+		copy(u1.Uids, ucopy)
+	}
 }
