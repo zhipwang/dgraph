@@ -8,6 +8,8 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
+var co = 1
+
 // ApplyFilter applies a filter to our UIDList.
 func ApplyFilter(u *task.List, f func(uint64, int) bool) {
 	out := u.Uids[:0]
@@ -39,6 +41,27 @@ func idealJump(u []uint64, id uint64, i int) int {
 // IntersectWith intersects u with v. The update is made to u.
 // u, v should be sorted.
 func IntersectWith(u, v *task.List) {
+	/*
+		//DUMP
+		c := co
+		fmt.Println("DUMPING .........................................")
+		x.Checkf(os.MkdirAll("uiddump", 0700), "uiddump")
+		filename := path.Join("uiddump", fmt.Sprintf("a%d.gob", c))
+		f, err := os.Create(filename)
+		x.Checkf(err, filename)
+		enc := gob.NewEncoder(f)
+		x.Check(enc.Encode(u))
+		x.Checkf(f.Close(), filename)
+		//DUMP
+		filename = path.Join("uiddump", fmt.Sprintf("b%d.gob", c))
+		f, err = os.Create(filename)
+		x.Checkf(err, filename)
+		enc = gob.NewEncoder(f)
+		x.Check(enc.Encode(v))
+		x.Checkf(f.Close(), filename)
+		//DUMP
+		co++
+	*/
 	out := u.Uids[:0]
 	n := len(u.Uids)
 	m := len(v.Uids)

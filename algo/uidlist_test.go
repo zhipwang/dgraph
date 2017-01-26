@@ -19,13 +19,13 @@ package algo
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"sort"
 	"testing"
 
 	"github.com/dgraph-io/dgraph/task"
-	"github.com/dgraph-io/dgraph/x"
 	"github.com/stretchr/testify/require"
 )
 
@@ -299,30 +299,33 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 */
 
 func BenchmarkListIntersectReal(b *testing.B) {
-	l1, err := ioutil.ReadFile("uidsint1/a")
-	x.Check(err)
-	n1 := bytes.NewBuffer(l1)
-	var u []uint64
-	dec1 := gob.NewDecoder(n1)
-	x.Check(dec1.Decode(&u))
+	c := 1
+	for c < 1000 {
+		l1, err := ioutil.ReadFile(fmt.Sprintf("uiddump/a%d.gob", c))
+		if err != nil {
+			break
+		}
+		n1 := bytes.NewBuffer(l1)
+		var u *task.List
+		dec1 := gob.NewDecoder(n1)
+		err = dec1.Decode(&u)
+		if err != nil {
+			break
+		}
 
-	l2, err := ioutil.ReadFile("uidsint1/b")
-	x.Check(err)
-	n2 := bytes.NewBuffer(l2)
-	var v []uint64
-	dec2 := gob.NewDecoder(n2)
-	x.Check(dec2.Decode(&v))
+		l2, err := ioutil.ReadFile(fmt.Sprintf("uiddump/b%d.gob", c))
+		if err != nil {
+			break
+		}
+		n2 := bytes.NewBuffer(l2)
+		var v *task.List
+		dec2 := gob.NewDecoder(n2)
+		err = dec2.Decode(&v)
+		if err != nil {
+			break
+		}
 
-	u1 := &task.List{u}
-	v1 := &task.List{v}
-	arrSz := len(u)
-	ucopy := make([]uint64, len(u), len(u))
-	copy(ucopy, u)
-
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		IntersectWith(u1, v1)
-		u1.Uids = u1.Uids[:arrSz]
-		copy(u1.Uids, ucopy)
+		IntersectWith(u, v)
+		c++
 	}
 }

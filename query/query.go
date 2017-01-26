@@ -19,12 +19,8 @@ package query
 import (
 	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
-	"fmt"
 	"log"
-	"os"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,7 +100,7 @@ type Latency struct {
 	ProtocolBuffer time.Duration `json:"pb_conversion"`
 }
 
-var one = false
+var one = 1
 
 // ToMap converts the latency object to a map.
 func (l *Latency) ToMap() map[string]string {
@@ -799,26 +795,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 	}
 
 	for _, l := range sg.uidMatrix {
-		//DUMP
-		if !one {
-			fmt.Println("DUMPING .........................................")
-			x.Checkf(os.MkdirAll("uidsint1", 0700), "uidsint1")
-			filename := path.Join("uidsint1", "a")
-			f, err := os.Create(filename)
-			x.Checkf(err, filename)
-			enc := gob.NewEncoder(f)
-			x.Check(enc.Encode(sg.DestUIDs.Uids))
-			x.Checkf(f.Close(), filename)
-			//DUMP
-			filename = path.Join("uidsint1", "b")
-			f, err = os.Create(filename)
-			x.Checkf(err, filename)
-			enc = gob.NewEncoder(f)
-			x.Check(enc.Encode(l.Uids))
-			x.Checkf(f.Close(), filename)
-			//DUMP
-			one = true
-		}
 		algo.IntersectWith(l, sg.DestUIDs)
 	}
 	if len(sg.Params.Order) == 0 {
