@@ -53,52 +53,76 @@ func IntersectWithBlock(u, v []Block) {
 	n := len(v)
 
 	for i < m && j < n {
-		uid := u[i].list[ii]
-		vid := v[j].list[jj]
+
+		ulist := u[i].list
+		vlist := v[j].list
 		ub := u[i].maxInt
 		vb := v[j].maxInt
 		ulen := len(u[i].list)
 		vlen := len(v[j].list)
 
-		if uid == vid {
-			out[i].list[kk] = uid
-			kk++
-			ii++
-			jj++
-			if ii == ulen {
+	L:
+		for ii < ulen && jj < vlen {
+			uid := ulist[ii]
+			vid := vlist[jj]
+
+			if uid == vid {
+				out[i].list[kk] = uid
+				kk++
+				ii++
+				jj++
+				if ii == ulen {
+					out[i].list = out[i].list[:kk]
+					i++
+					ii = 0
+					kk = 0
+					break L
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
+			} else if ub < vid {
 				out[i].list = out[i].list[:kk]
 				i++
 				ii = 0
 				kk = 0
-			}
-			if jj == vlen {
+				break L
+			} else if vb < uid {
 				j++
 				jj = 0
+				break L
+			} else if uid < vid {
+				for ; ii < ulen && u[i].list[ii] < vid; ii++ {
+				}
+				if ii == ulen {
+					out[i].list = out[i].list[:kk]
+					i++
+					ii = 0
+					kk = 0
+					break L
+				}
+			} else if uid > vid {
+				for ; jj < vlen && v[j].list[jj] < uid; jj++ {
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
 			}
-		} else if ub < vid {
+		}
+
+		if ii == ulen {
 			out[i].list = out[i].list[:kk]
 			i++
 			ii = 0
 			kk = 0
-		} else if vb < uid {
+		}
+		if jj == vlen {
 			j++
 			jj = 0
-		} else if uid < vid {
-			for ; ii < ulen && u[i].list[ii] < vid; ii++ {
-			}
-			if ii == ulen {
-				out[i].list = out[i].list[:kk]
-				i++
-				ii = 0
-				kk = 0
-			}
-		} else if uid > vid {
-			for ; jj < vlen && v[j].list[jj] < uid; jj++ {
-			}
-			if jj == vlen {
-				j++
-				jj = 0
-			}
 		}
 	}
 	u = out
