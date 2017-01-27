@@ -180,6 +180,16 @@ func TestUIDListIntersect1(t *testing.T) {
 	require.Empty(t, u.Uids)
 }
 
+func TestUIDListIntersectBlock(t *testing.T) {
+	u := newList([]uint64{1, 2, 3})
+	v := newList([]uint64{1, 2, 3, 4, 5})
+	u1 := SortedListToBlock(u.Uids)
+	v1 := SortedListToBlock(v.Uids)
+	IntersectWithBlock(u1, v1)
+	ul := BlockToList(u1)
+	require.Equal(t, ul, []uint64{1, 2, 3})
+}
+
 func TestUIDListIntersect2(t *testing.T) {
 	u := newList([]uint64{1, 2, 3})
 	v := newList([]uint64{1, 2, 3, 4, 5})
@@ -298,6 +308,10 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 			ucopy := make([]uint64, len(u1), len(u1))
 			copy(ucopy, u1)
 
+			ub := SortedListToBlock(u1)
+			ubCopy := SortedListToBlock(u1)
+			vb := SortedListToBlock(v1)
+
 			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
@@ -307,23 +321,33 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					}
 				})
 
-			b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+			b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
-						IntersectWithExp(u, v)
-						u.Uids = u.Uids[:sz1]
-						copy(u.Uids, ucopy)
+						IntersectWithBlock(ub, vb)
+						copy(ub, ubCopy)
 					}
 				})
 
-			b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-				func(b *testing.B) {
-					for k := 0; k < b.N; k++ {
-						IntersectWithBinarySearch(u, v)
-						u.Uids = u.Uids[:sz1]
-						copy(u.Uids, ucopy)
-					}
-				})
+			/*
+				b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+					func(b *testing.B) {
+						for k := 0; k < b.N; k++ {
+							IntersectWithExp(u, v)
+							u.Uids = u.Uids[:sz1]
+							copy(u.Uids, ucopy)
+						}
+					})
+
+				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+					func(b *testing.B) {
+						for k := 0; k < b.N; k++ {
+							IntersectWithBinarySearch(u, v)
+							u.Uids = u.Uids[:sz1]
+							copy(u.Uids, ucopy)
+						}
+					})
+			*/
 		}
 	}
 

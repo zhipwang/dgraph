@@ -8,7 +8,101 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-var co = 1
+type Block struct {
+	list   []uint64
+	maxInt uint64
+}
+
+func SortedListToBlock(l []uint64) []Block {
+	var b = make([]Block, 1, 2)
+	bIdx := 0
+	for _, it := range l {
+		if len(b[bIdx].list) > 2 {
+			b[bIdx].maxInt = b[bIdx].list[2]
+			b = append(b, Block{list: make([]uint64, 0, 2)})
+			bIdx++
+		}
+		b[bIdx].list = append(b[bIdx].list, it)
+	}
+
+	b[bIdx].maxInt = b[bIdx].list[len(b[bIdx].list)-1]
+	return b
+}
+
+func BlockToList(b []Block) []uint64 {
+	var res []uint64
+	for _, it := range b {
+		for _, el := range it.list {
+			res = append(res, el)
+		}
+	}
+	return res
+}
+
+func IntersectWithBlock(u, v []Block) {
+	out := u
+
+	i := 0
+	j := 0
+
+	ii := 0
+	jj := 0
+	kk := 0
+
+	m := len(u)
+	n := len(v)
+
+	for i < m && j < n {
+		uid := u[i].list[ii]
+		vid := v[j].list[jj]
+		ub := u[i].maxInt
+		vb := v[j].maxInt
+		ulen := len(u[i].list)
+		vlen := len(v[j].list)
+
+		if uid == vid {
+			out[i].list[kk] = uid
+			kk++
+			ii++
+			jj++
+			if ii == ulen {
+				out[i].list = out[i].list[:kk]
+				i++
+				ii = 0
+				kk = 0
+			}
+			if jj == vlen {
+				j++
+				jj = 0
+			}
+		} else if ub < vid {
+			out[i].list = out[i].list[:kk]
+			i++
+			ii = 0
+			kk = 0
+		} else if vb < uid {
+			j++
+			jj = 0
+		} else if uid < vid {
+			for ; ii < ulen && u[i].list[ii] < vid; ii++ {
+			}
+			if ii == ulen {
+				out[i].list = out[i].list[:kk]
+				i++
+				ii = 0
+				kk = 0
+			}
+		} else if uid > vid {
+			for ; jj < vlen && v[j].list[jj] < uid; jj++ {
+			}
+			if jj == vlen {
+				j++
+				jj = 0
+			}
+		}
+	}
+	u = out
+}
 
 // ApplyFilter applies a filter to our UIDList.
 func ApplyFilter(u *task.List, f func(uint64, int) bool) {
