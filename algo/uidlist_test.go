@@ -288,9 +288,13 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
 		sz1 := sz
 		sz2 := sz
-		for r := 1; r < 100000 && sz2 < 1000000; r *= 10 {
+		rs := []int{1, 10, 50, 100, 500, 1000, 10000, 100000, 1000000}
+		for _, r := range rs {
 			sz1 = sz
 			sz2 = sz * r
+			if sz2 > 10000000 {
+				break
+			}
 
 			u1, v1 := make([]uint64, sz1, sz1), make([]uint64, sz2, sz2)
 			limit := int64(float64(sz) / overlap)
@@ -369,6 +373,13 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests(10000, 0.4)
 	randomTests(100000, 0.4)
 	randomTests(1000000, 0.4)
+
+	randomTests(10, 0.8)
+	randomTests(100, 0.8)
+	randomTests(1000, 0.8)
+	randomTests(10000, 0.8)
+	randomTests(100000, 0.8)
+	randomTests(1000000, 0.8)
 }
 
 /*
