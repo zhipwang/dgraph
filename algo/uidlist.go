@@ -17,9 +17,9 @@ func SortedListToBlock(l []uint64) []Block {
 	var b = make([]Block, 1, 2)
 	bIdx := 0
 	for _, it := range l {
-		if len(b[bIdx].list) > 2 {
-			b[bIdx].maxInt = b[bIdx].list[2]
-			b = append(b, Block{list: make([]uint64, 0, 2)})
+		if len(b[bIdx].list) > 100 {
+			b[bIdx].maxInt = b[bIdx].list[100]
+			b = append(b, Block{list: make([]uint64, 0, 100)})
 			bIdx++
 		}
 		b[bIdx].list = append(b[bIdx].list, it)
@@ -214,9 +214,9 @@ func IntersectWithBinarySearch(u, v *task.List) {
 
 	for _, uid := range u.Uids {
 		idx := sort.Search(m, func(i int) bool {
-			return v.Uids[i] == uid
+			return v.Uids[i] >= uid
 		})
-		if idx != -1 {
+		if idx < m && v.Uids[idx] == uid {
 			out = append(out, uid)
 		}
 	}

@@ -329,25 +329,23 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					}
 				})
 
-			/*
-				b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-					func(b *testing.B) {
-						for k := 0; k < b.N; k++ {
-							IntersectWithExp(u, v)
-							u.Uids = u.Uids[:sz1]
-							copy(u.Uids, ucopy)
-						}
-					})
+			b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithExp(u, v)
+						u.Uids = u.Uids[:sz1]
+						copy(u.Uids, ucopy)
+					}
+				})
 
-				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-					func(b *testing.B) {
-						for k := 0; k < b.N; k++ {
-							IntersectWithBinarySearch(u, v)
-							u.Uids = u.Uids[:sz1]
-							copy(u.Uids, ucopy)
-						}
-					})
-			*/
+			b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithBinarySearch(u, v)
+						u.Uids = u.Uids[:sz1]
+						copy(u.Uids, ucopy)
+					}
+				})
 		}
 	}
 
