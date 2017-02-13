@@ -7,7 +7,7 @@ import (
 	"github.com/dgraph-io/dgraph/task"
 )
 
-const blockSize = 100
+var blockSize = 100
 
 // ListIterator is used to read through the task.List.
 type ListIterator struct {
