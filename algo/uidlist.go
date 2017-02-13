@@ -9,6 +9,23 @@ import (
 
 const blockSize = 100
 
+// IntersectWith intersects u with v. The update is made to u.
+// u, v should be sorted.
+func IntersectWithBinarySearch(u, v []uint64) {
+	out := u[:0]
+	m := len(v)
+
+	for _, uid := range u {
+		idx := sort.Search(m, func(i int) bool {
+			return v[i] == uid
+		})
+		if idx != -1 {
+			out = append(out, uid)
+		}
+	}
+	u = out
+}
+
 // ListIterator is used to read through the task.List.
 type ListIterator struct {
 	list     *task.List
