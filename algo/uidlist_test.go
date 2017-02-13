@@ -276,9 +276,10 @@ func (xs uint64Slice) Swap(i, j int) {
 }
 
 func BenchmarkListIntersectRandom(b *testing.B) {
-	randomTests := func(sz int, overlap float64) {
+	randomTests := func(sz int, overlap float64, blksz int) {
 		sz1 := sz
 		sz2 := sz
+		blockSize = blksz
 		for r := 1; r < 100000 && sz2 < 1000000; r *= 10 {
 			sz1 = sz
 			sz2 = sz * r
@@ -300,7 +301,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 			vb := SortedListToBlock(v1)
 			ubCopy := SortedListToBlock(u1)
 
-			b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+			b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:blocksize=%d", r, sz, overlap, blksz),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
 						IntersectWith(ub, vb)
@@ -309,6 +310,24 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 				})
 		}
 	}
+
+	randomTests(10, 0.1, 10)
+	randomTests(1000, 0.1, 10)
+	randomTests(100000, 0.1, 10)
+	randomTests(1000000, 0.1, 10)
+
+	fmt.Println()
+	randomTests(10, 0.1, 100)
+	randomTests(1000, 0.1, 100)
+	randomTests(100000, 0.1, 100)
+	randomTests(1000000, 0.1, 100)
+
+	fmt.Println()
+	randomTests(10, 0.1, 1000)
+	randomTests(1000, 0.1, 1000)
+	randomTests(100000, 0.1, 1000)
+	randomTests(1000000, 0.1, 1000)
+
 }
 
 /*
