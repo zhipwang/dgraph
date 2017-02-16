@@ -7,6 +7,126 @@ import (
 	"github.com/dgraph-io/dgraph/task"
 )
 
+type Block struct {
+	list   []uint64
+	maxInt uint64
+}
+
+func SortedListToBlock1(l []uint64) []Block {
+	var b = make([]Block, 1, 2)
+	bIdx := 0
+	for _, it := range l {
+		if len(b[bIdx].list) > 100 {
+			b[bIdx].maxInt = b[bIdx].list[100]
+			b = append(b, Block{list: make([]uint64, 0, 100)})
+			bIdx++
+		}
+		b[bIdx].list = append(b[bIdx].list, it)
+	}
+
+	b[bIdx].maxInt = b[bIdx].list[len(b[bIdx].list)-1]
+	return b
+}
+
+func BlockToList1(b []Block) []uint64 {
+	var res []uint64
+	for _, it := range b {
+		for _, el := range it.list {
+			res = append(res, el)
+		}
+	}
+	return res
+}
+
+func IntersectWithBlock1(u, v []Block) {
+	out := u
+
+	i := 0
+	j := 0
+
+	ii := 0
+	jj := 0
+	kk := 0
+
+	m := len(u)
+	n := len(v)
+
+	for i < m && j < n {
+
+		ulist := u[i].list
+		vlist := v[j].list
+		ub := u[i].maxInt
+		vb := v[j].maxInt
+		ulen := len(u[i].list)
+		vlen := len(v[j].list)
+
+	L:
+		for ii < ulen && jj < vlen {
+			uid := ulist[ii]
+			vid := vlist[jj]
+
+			if uid == vid {
+				out[i].list[kk] = uid
+				kk++
+				ii++
+				jj++
+				if ii == ulen {
+					out[i].list = out[i].list[:kk]
+					i++
+					ii = 0
+					kk = 0
+					break L
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
+			} else if ub < vid {
+				out[i].list = out[i].list[:kk]
+				i++
+				ii = 0
+				kk = 0
+				break L
+			} else if vb < uid {
+				j++
+				jj = 0
+				break L
+			} else if uid < vid {
+				for ; ii < ulen && u[i].list[ii] < vid; ii++ {
+				}
+				if ii == ulen {
+					out[i].list = out[i].list[:kk]
+					i++
+					ii = 0
+					kk = 0
+					break L
+				}
+			} else if uid > vid {
+				for ; jj < vlen && v[j].list[jj] < uid; jj++ {
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
+			}
+		}
+
+		if ii == ulen {
+			out[i].list = out[i].list[:kk]
+			i++
+			ii = 0
+			kk = 0
+		}
+		if jj == vlen {
+			j++
+			jj = 0
+		}
+	}
+	u = out
+}
+
 const blockSize = 100
 
 // ListIterator is used to read through the task.List.

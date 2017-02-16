@@ -1,0 +1,426 @@
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10:overlap=0.01:-4         	20000000	        81.7 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10:overlap=0.01:-4            	20000000	        82.3 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10:overlap=0.01:-4        	 5000000	       250 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10:overlap=0.01:-4           	10000000	       130 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10:overlap=0.01:-4        	 3000000	       486 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10:overlap=0.01:-4           	10000000	       223 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10:overlap=0.01:-4       	 2000000	       882 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10:overlap=0.01:-4          	 5000000	       366 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10:overlap=0.01:-4       	 1000000	      1521 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10:overlap=0.01:-4          	 3000000	       550 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10:overlap=0.01:-4      	 1000000	      1560 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10:overlap=0.01:-4         	 1000000	      1191 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=10:overlap=0.01:-4     	 1000000	      1680 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=10:overlap=0.01:-4        	  300000	      4824 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=10:overlap=0.01:-4    	 1000000	      1969 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=10:overlap=0.01:-4       	   10000	    197706 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000000:size=10:overlap=0.01:-4   	  500000	      2263 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000000:size=10:overlap=0.01:-4      	    1000	   2336159 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100:overlap=0.01:-4        	20000000	        59.2 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100:overlap=0.01:-4           	 3000000	       609 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100:overlap=0.01:-4       	 2000000	       931 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100:overlap=0.01:-4          	 3000000	       400 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100:overlap=0.01:-4       	  300000	      4425 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100:overlap=0.01:-4          	 1000000	      1562 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100:overlap=0.01:-4      	  200000	     10065 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100:overlap=0.01:-4         	  500000	      3404 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=100:overlap=0.01:-4      	  100000	     21584 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=100:overlap=0.01:-4         	  200000	      8861 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=100:overlap=0.01:-4     	  100000	     22434 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=100:overlap=0.01:-4        	  200000	     11188 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=100:overlap=0.01:-4    	   50000	     29878 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=100:overlap=0.01:-4       	   10000	    206620 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=100:overlap=0.01:-4   	   30000	     37942 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=100:overlap=0.01:-4      	    1000	   2393197 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000:overlap=0.01:-4       	20000000	        68.9 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000:overlap=0.01:-4          	  300000	      4317 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000:overlap=0.01:-4      	 2000000	       706 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000:overlap=0.01:-4         	  200000	      6833 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=1000:overlap=0.01:-4      	   50000	     28464 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=1000:overlap=0.01:-4         	   50000	     25285 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=1000:overlap=0.01:-4     	   20000	     97035 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=1000:overlap=0.01:-4        	   30000	     41009 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=1000:overlap=0.01:-4     	    5000	    299326 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=1000:overlap=0.01:-4        	   10000	    129704 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=1000:overlap=0.01:-4    	    5000	    341128 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=1000:overlap=0.01:-4       	    5000	    257422 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=1000:overlap=0.01:-4   	    3000	    540601 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=1000:overlap=0.01:-4      	     500	   2742293 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10000:overlap=0.01:-4      	20000000	        74.2 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10000:overlap=0.01:-4         	   10000	    101291 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10000:overlap=0.01:-4     	  100000	     13833 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10000:overlap=0.01:-4        	   20000	     97865 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10000:overlap=0.01:-4     	    3000	    362486 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10000:overlap=0.01:-4        	    3000	    410229 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10000:overlap=0.01:-4    	    1000	   1206024 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10000:overlap=0.01:-4       	    2000	    781086 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10000:overlap=0.01:-4    	     300	   4847514 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10000:overlap=0.01:-4       	     500	   2271699 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10000:overlap=0.01:-4   	     300	   5444391 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10000:overlap=0.01:-4      	     500	   3625862 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100000:overlap=0.01:-4     	 2000000	       828 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100000:overlap=0.01:-4        	    2000	   1078502 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100000:overlap=0.01:-4    	   10000	    190284 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100000:overlap=0.01:-4       	    1000	   1487601 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100000:overlap=0.01:-4    	     300	   5123349 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100000:overlap=0.01:-4       	     300	   4816135 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100000:overlap=0.01:-4   	     100	  14081209 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100000:overlap=0.01:-4      	     200	   8228915 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000000:overlap=0.01:-4    	  100000	     13122 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000000:overlap=0.01:-4       	     100	  12418485 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000000:overlap=0.01:-4   	     500	   2543290 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000000:overlap=0.01:-4      	     100	  15005817 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10:overlap=0.10:-4         	20000000	        68.6 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10:overlap=0.10:-4            	20000000	        61.3 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10:overlap=0.10:-4        	 5000000	       254 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10:overlap=0.10:-4           	10000000	       133 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10:overlap=0.10:-4        	 2000000	       753 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10:overlap=0.10:-4           	10000000	       186 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10:overlap=0.10:-4       	 1000000	      1489 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10:overlap=0.10:-4          	 3000000	       543 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10:overlap=0.10:-4       	 1000000	      1908 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10:overlap=0.10:-4          	 2000000	       750 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10:overlap=0.10:-4      	 1000000	      2038 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10:overlap=0.10:-4         	 1000000	      1036 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=10:overlap=0.10:-4     	 1000000	      2037 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=10:overlap=0.10:-4        	  200000	      6519 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=10:overlap=0.10:-4    	 1000000	      2060 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=10:overlap=0.10:-4       	   10000	    162646 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000000:size=10:overlap=0.10:-4   	 1000000	      2330 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000000:size=10:overlap=0.10:-4      	     500	   2428511 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100:overlap=0.10:-4        	 5000000	       291 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100:overlap=0.10:-4           	10000000	       191 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100:overlap=0.10:-4       	  500000	      2606 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100:overlap=0.10:-4          	 1000000	      1018 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100:overlap=0.10:-4       	  200000	      9158 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100:overlap=0.10:-4          	  300000	      3626 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100:overlap=0.10:-4      	  100000	     11400 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100:overlap=0.10:-4         	  300000	      4719 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=100:overlap=0.10:-4      	  100000	     20240 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=100:overlap=0.10:-4         	  200000	      8606 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=100:overlap=0.10:-4     	  100000	     22332 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=100:overlap=0.10:-4        	  200000	     11708 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=100:overlap=0.10:-4    	   50000	     29023 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=100:overlap=0.10:-4       	   10000	    200924 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=100:overlap=0.10:-4   	   50000	     35819 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=100:overlap=0.10:-4      	     500	   2413493 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000:overlap=0.10:-4       	 5000000	       281 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000:overlap=0.10:-4          	 1000000	      2120 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000:overlap=0.10:-4      	   50000	     23994 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000:overlap=0.10:-4         	  100000	     15166 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=1000:overlap=0.10:-4      	   10000	    139719 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=1000:overlap=0.10:-4         	   30000	     43283 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=1000:overlap=0.10:-4     	   10000	    196627 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=1000:overlap=0.10:-4        	   30000	     55871 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=1000:overlap=0.10:-4     	    5000	    305552 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=1000:overlap=0.10:-4        	   10000	    126626 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=1000:overlap=0.10:-4    	    3000	    339021 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=1000:overlap=0.10:-4       	    5000	    264875 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=1000:overlap=0.10:-4   	    3000	    466485 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=1000:overlap=0.10:-4      	     500	   2516023 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10000:overlap=0.10:-4      	  500000	      2697 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10000:overlap=0.10:-4         	   50000	     35005 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10000:overlap=0.10:-4     	    5000	    285994 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10000:overlap=0.10:-4        	   10000	    183903 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10000:overlap=0.10:-4     	    1000	   1740187 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10000:overlap=0.10:-4        	    2000	    669484 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10000:overlap=0.10:-4    	     500	   2622874 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10000:overlap=0.10:-4       	    2000	   1016586 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10000:overlap=0.10:-4    	     300	   4683344 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10000:overlap=0.10:-4       	    1000	   2213287 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10000:overlap=0.10:-4   	     300	   5323230 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10000:overlap=0.10:-4      	     500	   3447685 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100000:overlap=0.10:-4     	   30000	     43616 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100000:overlap=0.10:-4        	    3000	    477030 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100000:overlap=0.10:-4    	     500	   3183518 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100000:overlap=0.10:-4       	     500	   2519160 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100000:overlap=0.10:-4    	     100	  18582813 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100000:overlap=0.10:-4       	     200	   7782083 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100000:overlap=0.10:-4   	      50	  31008283 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100000:overlap=0.10:-4      	     100	  11925526 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000000:overlap=0.10:-4    	    2000	    587455 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000000:overlap=0.10:-4       	     200	   6470556 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000000:overlap=0.10:-4   	      50	  35679166 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000000:overlap=0.10:-4      	      50	  28660890 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10:overlap=0.40:-4         	20000000	        99.7 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10:overlap=0.40:-4            	30000000	        35.2 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10:overlap=0.40:-4        	 5000000	       313 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10:overlap=0.40:-4           	10000000	       145 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10:overlap=0.40:-4        	 2000000	       633 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10:overlap=0.40:-4           	10000000	       216 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10:overlap=0.40:-4       	 1000000	      1164 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10:overlap=0.40:-4          	 3000000	       517 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10:overlap=0.40:-4       	 1000000	      1871 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10:overlap=0.40:-4          	 2000000	       801 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10:overlap=0.40:-4      	 1000000	      1595 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10:overlap=0.40:-4         	 2000000	      1001 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=10:overlap=0.40:-4     	 1000000	      1504 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=10:overlap=0.40:-4        	  200000	      5295 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=10:overlap=0.40:-4    	 1000000	      1963 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=10:overlap=0.40:-4       	   10000	    136662 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000000:size=10:overlap=0.40:-4   	 1000000	      1853 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000000:size=10:overlap=0.40:-4      	     500	   2585555 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100:overlap=0.40:-4        	 3000000	       457 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100:overlap=0.40:-4           	 5000000	       236 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100:overlap=0.40:-4       	  500000	      3095 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100:overlap=0.40:-4          	 1000000	      1122 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100:overlap=0.40:-4       	  200000	      8772 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100:overlap=0.40:-4          	  500000	      3177 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100:overlap=0.40:-4      	  100000	     12621 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100:overlap=0.40:-4         	  300000	      4726 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=100:overlap=0.40:-4      	  100000	     19384 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=100:overlap=0.40:-4         	  200000	      8534 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=100:overlap=0.40:-4     	  100000	     23515 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=100:overlap=0.40:-4        	  200000	     12250 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=100:overlap=0.40:-4    	   50000	     28308 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=100:overlap=0.40:-4       	   10000	    392401 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=100:overlap=0.40:-4   	   30000	     43509 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=100:overlap=0.40:-4      	     500	   3220896 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000:overlap=0.40:-4       	 1000000	      1829 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000:overlap=0.40:-4          	 1000000	      2211 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000:overlap=0.40:-4      	   30000	     46322 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000:overlap=0.40:-4         	  100000	     18097 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=1000:overlap=0.40:-4      	   10000	    143811 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=1000:overlap=0.40:-4         	   30000	     43728 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=1000:overlap=0.40:-4     	    5000	    208478 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=1000:overlap=0.40:-4        	   30000	     60884 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=1000:overlap=0.40:-4     	    5000	    273889 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=1000:overlap=0.40:-4        	   10000	    131332 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=1000:overlap=0.40:-4    	    5000	    286382 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=1000:overlap=0.40:-4       	    5000	    266413 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=1000:overlap=0.40:-4   	    3000	    461868 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=1000:overlap=0.40:-4      	     500	   2539388 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10000:overlap=0.40:-4      	   50000	     23457 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10000:overlap=0.40:-4         	   30000	     47973 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10000:overlap=0.40:-4     	    2000	    547530 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10000:overlap=0.40:-4        	    5000	    243120 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10000:overlap=0.40:-4     	    1000	   1723965 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10000:overlap=0.40:-4        	    2000	    663398 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10000:overlap=0.40:-4    	     500	   2586134 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10000:overlap=0.40:-4       	    2000	    975740 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10000:overlap=0.40:-4    	     300	   4355117 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10000:overlap=0.40:-4       	    1000	   2141082 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10000:overlap=0.40:-4   	     300	   4798028 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10000:overlap=0.40:-4      	     500	   3849599 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100000:overlap=0.40:-4     	    5000	    286342 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100000:overlap=0.40:-4        	    2000	    657100 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100000:overlap=0.40:-4    	     200	   6330314 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100000:overlap=0.40:-4       	     500	   3268865 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100000:overlap=0.40:-4    	     100	  19382794 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100000:overlap=0.40:-4       	     200	   7572771 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100000:overlap=0.40:-4   	      50	  28918280 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100000:overlap=0.40:-4      	     100	  10812039 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000000:overlap=0.40:-4    	     500	   3070929 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000000:overlap=0.40:-4       	     200	   7654870 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000000:overlap=0.40:-4   	      20	  64609107 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000000:overlap=0.40:-4      	      50	  32515159 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10:overlap=0.80:-4         	20000000	       104 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10:overlap=0.80:-4            	30000000	        49.2 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10:overlap=0.80:-4        	 5000000	       274 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10:overlap=0.80:-4           	20000000	       108 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10:overlap=0.80:-4        	 2000000	       929 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10:overlap=0.80:-4           	 5000000	       389 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10:overlap=0.80:-4       	 2000000	       828 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10:overlap=0.80:-4          	 5000000	       313 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10:overlap=0.80:-4       	 1000000	      1411 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10:overlap=0.80:-4          	 3000000	       556 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10:overlap=0.80:-4      	 1000000	      1510 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10:overlap=0.80:-4         	 1000000	      1182 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=10:overlap=0.80:-4     	 1000000	      1618 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=10:overlap=0.80:-4        	  200000	      6852 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=10:overlap=0.80:-4    	 1000000	      1640 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=10:overlap=0.80:-4       	   10000	    277062 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000000:size=10:overlap=0.80:-4   	 1000000	      1420 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000000:size=10:overlap=0.80:-4      	    1000	   2236849 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100:overlap=0.80:-4        	 2000000	       774 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100:overlap=0.80:-4           	 5000000	       311 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100:overlap=0.80:-4       	  500000	      3356 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100:overlap=0.80:-4          	 1000000	      1158 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100:overlap=0.80:-4       	  200000	      8399 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100:overlap=0.80:-4          	  500000	      3192 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100:overlap=0.80:-4      	  100000	     15210 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100:overlap=0.80:-4         	  300000	      4992 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=100:overlap=0.80:-4      	  100000	     17267 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=100:overlap=0.80:-4         	  200000	      7729 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=100:overlap=0.80:-4     	  100000	     17227 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=100:overlap=0.80:-4        	  200000	     11901 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=100:overlap=0.80:-4    	  100000	     19037 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=100:overlap=0.80:-4       	   10000	    203379 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100000:size=100:overlap=0.80:-4   	   50000	     24594 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100000:size=100:overlap=0.80:-4      	     500	   2423844 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=1000:overlap=0.80:-4       	  300000	      3477 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=1000:overlap=0.80:-4          	  500000	      2409 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=1000:overlap=0.80:-4      	   30000	     48026 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=1000:overlap=0.80:-4         	  100000	     18651 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=1000:overlap=0.80:-4      	   10000	    139974 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=1000:overlap=0.80:-4         	   30000	     44316 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=1000:overlap=0.80:-4     	   10000	    196786 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=1000:overlap=0.80:-4        	   30000	     59042 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=1000:overlap=0.80:-4     	    5000	    326341 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=1000:overlap=0.80:-4        	   10000	    109955 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=1000:overlap=0.80:-4    	    5000	    313180 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=1000:overlap=0.80:-4       	   10000	    305984 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10000:size=1000:overlap=0.80:-4   	    3000	    379736 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10000:size=1000:overlap=0.80:-4      	     500	   3270099 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=10000:overlap=0.80:-4      	   20000	     63122 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=10000:overlap=0.80:-4         	   20000	     67244 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=10000:overlap=0.80:-4     	    2000	    604667 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=10000:overlap=0.80:-4        	    5000	    256375 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=10000:overlap=0.80:-4     	    1000	   1773278 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=10000:overlap=0.80:-4        	    2000	    743816 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=10000:overlap=0.80:-4    	     500	   2608155 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=10000:overlap=0.80:-4       	    2000	    943747 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=500:size=10000:overlap=0.80:-4    	     500	   3975751 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=500:size=10000:overlap=0.80:-4       	    1000	   2053116 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1000:size=10000:overlap=0.80:-4   	     300	   4157786 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1000:size=10000:overlap=0.80:-4      	     500	   3370699 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=1:size=100000:overlap=0.80:-4     	    2000	    568781 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=1:size=100000:overlap=0.80:-4        	    2000	    774744 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=10:size=100000:overlap=0.80:-4    	     200	   6598144 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=10:size=100000:overlap=0.80:-4       	     500	   3333360 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=50:size=100000:overlap=0.80:-4    	     100	  19028797 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=50:size=100000:overlap=0.80:-4       	     200	   7502279 ns/op
+
+BenchmarkListIntersectRandom/:Iterator:ratio=100:size=100000:overlap=0.80:-4   	      50	  28541824 ns/op
+BenchmarkListIntersectRandom/:Block:ratio=100:size=100000:overlap=0.80:-4      	     200	   9940225 ns/op
+

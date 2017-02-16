@@ -17,6 +17,9 @@
 package algo
 
 import (
+	"fmt"
+	"math/rand"
+	"sort"
 	"testing"
 
 	"github.com/dgraph-io/dgraph/task"
@@ -292,6 +295,109 @@ func (xs uint64Slice) Less(i, j int) bool {
 }
 func (xs uint64Slice) Swap(i, j int) {
 	xs[i], xs[j] = xs[j], xs[i]
+}
+
+func BenchmarkListIntersectRandom(b *testing.B) {
+	randomTests := func(sz int, overlap float64) {
+		sz1 := sz
+		sz2 := sz
+		rs := []int{1, 10, 50, 100, 500, 1000, 10000, 100000, 1000000}
+		for _, r := range rs {
+			sz1 = sz
+			sz2 = sz * r
+			if sz2 > 10000000 {
+				break
+			}
+
+			u1, v1 := make([]uint64, sz1, sz1), make([]uint64, sz2, sz2)
+			limit := int64(float64(sz) / overlap)
+			for i := 0; i < sz1; i++ {
+				u1[i] = uint64(rand.Int63n(limit))
+			}
+			for i := 0; i < sz2; i++ {
+				v1[i] = uint64(rand.Int63n(limit))
+			}
+			sort.Sort(uint64Slice(u1))
+			sort.Sort(uint64Slice(v1))
+			/*
+				u := newList(u1)
+				v := newList(v1)
+				ucopy := make([]uint64, len(u1), len(u1))
+				copy(ucopy, u1)
+			*/
+			uc := SortedListToBlock1(u1)
+			ucCopy := SortedListToBlock1(u1)
+			vc := SortedListToBlock1(v1)
+
+			ub := SortedListToBlock(u1)
+			ubCopy := SortedListToBlock(u1)
+			vb := SortedListToBlock(v1)
+
+			b.Run(fmt.Sprintf(":Iterator:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWith(ub, vb)
+						copy(ub.Blocks, ubCopy.Blocks)
+					}
+				})
+
+			b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithBlock1(uc, vc)
+						copy(uc, ucCopy)
+					}
+				})
+			fmt.Println()
+			/*
+				b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+					func(b *testing.B) {
+						for k := 0; k < b.N; k++ {
+							IntersectWithExp(u, v)
+							u.Uids = u.Uids[:sz1]
+							copy(u.Uids, ucopy)
+						}
+					})
+
+				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+					func(b *testing.B) {
+						for k := 0; k < b.N; k++ {
+							IntersectWithBinarySearch(u, v)
+							u.Uids = u.Uids[:sz1]
+							copy(u.Uids, ucopy)
+						}
+					})
+			*/
+		}
+	}
+
+	randomTests(10, 0.01)
+	randomTests(100, 0.01)
+	randomTests(1000, 0.01)
+	randomTests(10000, 0.01)
+	randomTests(100000, 0.01)
+	randomTests(1000000, 0.01)
+
+	randomTests(10, 0.1)
+	randomTests(100, 0.1)
+	randomTests(1000, 0.1)
+	randomTests(10000, 0.1)
+	randomTests(100000, 0.1)
+	randomTests(1000000, 0.1)
+
+	randomTests(10, 0.4)
+	randomTests(100, 0.4)
+	randomTests(1000, 0.4)
+	randomTests(10000, 0.4)
+	randomTests(100000, 0.4)
+	randomTests(1000000, 0.4)
+
+	randomTests(10, 0.8)
+	randomTests(100, 0.8)
+	randomTests(1000, 0.8)
+	randomTests(10000, 0.8)
+	randomTests(100000, 0.8)
+	randomTests(1000000, 0.8)
 }
 
 /*
