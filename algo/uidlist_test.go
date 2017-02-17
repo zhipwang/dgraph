@@ -305,7 +305,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 		for _, r := range rs {
 			sz1 = sz
 			sz2 = sz * r
-			if sz2 > 10000000 {
+			if sz2 > 1000000 {
 				break
 			}
 
@@ -319,12 +319,12 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 			}
 			sort.Sort(uint64Slice(u1))
 			sort.Sort(uint64Slice(v1))
-			/*
-				u := newList(u1)
-				v := newList(v1)
-				ucopy := make([]uint64, len(u1), len(u1))
-				copy(ucopy, u1)
-			*/
+
+			u := u1
+			v := v1
+			ucopy := make([]uint64, len(u1), len(u1))
+			copy(ucopy, u1)
+
 			uc := SortedListToBlock1(u1)
 			ucCopy := SortedListToBlock1(u1)
 			vc := SortedListToBlock1(v1)
@@ -348,17 +348,19 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 						copy(uc, ucCopy)
 					}
 				})
-			fmt.Println()
-			/*
-				b.Run(fmt.Sprintf(":Exp:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-					func(b *testing.B) {
-						for k := 0; k < b.N; k++ {
-							IntersectWithExp(u, v)
-							u.Uids = u.Uids[:sz1]
-							copy(u.Uids, ucopy)
-						}
-					})
 
+			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						IntersectWithLin(u, v)
+						u = u[:sz1]
+						copy(u, ucopy)
+					}
+				})
+
+			fmt.Println()
+
+			/*
 				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 					func(b *testing.B) {
 						for k := 0; k < b.N; k++ {

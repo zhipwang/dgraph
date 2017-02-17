@@ -7,6 +7,33 @@ import (
 	"github.com/dgraph-io/dgraph/task"
 )
 
+// Old list.
+
+// IntersectWith intersects u with v. The update is made to u.
+// u, v should be sorted.
+func IntersectWithLin(u, v []uint64) {
+	out := u[:0]
+	n := len(u)
+	m := len(v)
+	for i, k := 0, 0; i < n && k < m; {
+		uid := u[i]
+		vid := v[k]
+		if uid > vid {
+			for k = k + 1; k < m && v[k] < uid; k++ {
+			}
+		} else if uid == vid {
+			out = append(out, uid)
+			k++
+			i++
+		} else {
+			for i = i + 1; i < n && u[i] < vid; i++ {
+			}
+		}
+	}
+	u = out
+}
+
+// Old block.
 type Block struct {
 	list   []uint64
 	maxInt uint64
@@ -127,6 +154,7 @@ func IntersectWithBlock1(u, v []Block) {
 	u = out
 }
 
+// New iterator.
 const blockSize = 100
 
 // ListIterator is used to read through the task.List.
@@ -265,6 +293,9 @@ func (l *ListIterator) Seek(uid uint64, whence int) {
 		// Seek the current list first.
 		for l.lidx < len(l.curBlock.List) && l.curBlock.List[l.lidx] < uid {
 			l.lidx++
+		}
+		if l.lidx == len(l.curBlock.List) {
+			l.isEnd = true
 		}
 		return
 	}
