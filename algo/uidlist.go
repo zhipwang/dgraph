@@ -251,7 +251,24 @@ func (l *ListIterator) Seek(uid uint64, whence int) {
 		if l.lidx < len(l.curBlock.List) {
 			return
 		}
+
+		// linear seek over blocks.
+		for l.bidx < len(l.list.Blocks) && uid > l.list.Blocks[l.bidx].MaxInt {
+			l.bidx++
+		}
+		if l.bidx == len(l.list.Blocks) {
+			l.isEnd = true
+			return
+		}
+		l.curBlock = l.list.Blocks[l.bidx]
+
+		// Seek the current list first.
+		for l.lidx < len(l.curBlock.List) && l.curBlock.List[l.lidx] < uid {
+			l.lidx++
+		}
+		return
 	}
+	// Binary seek.
 	// TODO(Ashwin): Do a benchmark to see if linear scan is better than binary if whence is 1
 	u := l.list
 	i := sort.Search(len(u.Blocks), func(i int) bool { return u.Blocks[i].MaxInt >= uid })
@@ -341,6 +358,13 @@ func ListLen(l *task.List) int {
 }
 
 func IntersectWith(u, v *task.List) {
+	lenu := ListLen(u)
+	lenv := ListLen(v)
+	ratio := lenv / (lenu + 1)
+	var typ int
+	if ratio < 500 {
+		typ = 1
+	}
 	itu := NewListIterator(u)
 	itv := NewListIterator(v)
 	out := NewWriteIterator(u, 0)
@@ -352,9 +376,9 @@ func IntersectWith(u, v *task.List) {
 			itu.Next()
 			itv.Next()
 		} else if uid < vid {
-			itu.Seek(vid, 1)
+			itu.Seek(vid, typ)
 		} else if uid > vid {
-			itv.Seek(uid, 1)
+			itv.Seek(uid, typ)
 		}
 	}
 	out.End()
