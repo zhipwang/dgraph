@@ -289,7 +289,7 @@ func (l *ListIterator) Seek(uid uint64, whence int) {
 			return
 		}
 		l.curBlock = l.list.Blocks[l.bidx]
-
+		l.lidx = 0
 		// Seek the current list first.
 		for l.lidx < len(l.curBlock.List) && l.curBlock.List[l.lidx] < uid {
 			l.lidx++
