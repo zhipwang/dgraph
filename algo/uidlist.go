@@ -11,10 +11,10 @@ import (
 
 // IntersectWith intersects u with v. The update is made to u.
 // u, v should be sorted.
-func IntersectWithLin(u, v []uint64) {
-	out := u[:0]
+func IntersectWithLin(u, v []uint64) []uint64 {
 	n := len(u)
 	m := len(v)
+	q := 0
 	for i, k := 0, 0; i < n && k < m; {
 		uid := u[i]
 		vid := v[k]
@@ -22,7 +22,8 @@ func IntersectWithLin(u, v []uint64) {
 			for k = k + 1; k < m && v[k] < uid; k++ {
 			}
 		} else if uid == vid {
-			out = append(out, uid)
+			u[q] = uid
+			q++
 			k++
 			i++
 		} else {
@@ -30,7 +31,7 @@ func IntersectWithLin(u, v []uint64) {
 			}
 		}
 	}
-	u = out
+	return u[:q]
 }
 
 // Old block.
@@ -65,7 +66,7 @@ func BlockToList1(b []Block) []uint64 {
 	return res
 }
 
-func IntersectWithBlock1(u, v []Block) {
+func IntersectWithBlock1(u, v []Block) []Block {
 	out := u
 
 	i := 0
@@ -151,7 +152,10 @@ func IntersectWithBlock1(u, v []Block) {
 			jj = 0
 		}
 	}
-	u = out
+	if i == len(u) {
+		out[i-1].list = out[i-1].list[:kk]
+	}
+	return out
 }
 
 // New iterator.

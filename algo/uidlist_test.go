@@ -322,6 +322,8 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 
 			u := u1
 			v := v1
+			b.Logf("u: %v\n", u)
+			b.Logf("v: %v\n", v)
 			ucopy := make([]uint64, len(u1), len(u1))
 			copy(ucopy, u1)
 
@@ -345,7 +347,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
 						copy(uc, ucCopy)
-						IntersectWithBlock1(uc, vc)
+						uc = IntersectWithBlock1(uc, vc)
 					}
 				})
 
@@ -354,7 +356,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					for k := 0; k < b.N; k++ {
 						u = u[:sz1]
 						copy(u, ucopy)
-						IntersectWithLin(u, v)
+						u = IntersectWithLin(u, v)
 					}
 				})
 
