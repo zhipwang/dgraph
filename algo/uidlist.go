@@ -1,7 +1,6 @@
 package algo
 
 import (
-	"container/heap"
 	"sort"
 
 	"github.com/dgraph-io/dgraph/task"
@@ -71,6 +70,7 @@ func IntersectWithBlock1(u, v []Block) []Block {
 
 	i := 0
 	j := 0
+	k := 0
 
 	ii := 0
 	jj := 0
@@ -80,7 +80,6 @@ func IntersectWithBlock1(u, v []Block) []Block {
 	n := len(v)
 
 	for i < m && j < n {
-
 		ulist := u[i].list
 		vlist := v[j].list
 		ub := u[i].maxInt
@@ -94,27 +93,36 @@ func IntersectWithBlock1(u, v []Block) []Block {
 			vid := vlist[jj]
 
 			if uid == vid {
-				out[i].list[kk] = uid
+				out[k].list[kk] = uid
 				kk++
+				if kk == 100 {
+					k++
+					kk = 0
+				}
 				ii++
 				jj++
 				if ii == ulen {
-					out[i].list = out[i].list[:kk]
+					//out[i].list = out[i].list[:kk]
 					i++
-					ii = 0
-					kk = 0
-					break L
+					//kk = 0
 				}
 				if jj == vlen {
 					j++
 					jj = 0
+				}
+				if ii == ulen {
+					ii = 0
+					break L
+				}
+				if jj == vlen {
+					jj = 0
 					break L
 				}
 			} else if ub < vid {
-				out[i].list = out[i].list[:kk]
+				//out[k].list = out[i].list[:kk]
 				i++
 				ii = 0
-				kk = 0
+				//kk = 0
 				break L
 			} else if vb < uid {
 				j++
@@ -124,10 +132,10 @@ func IntersectWithBlock1(u, v []Block) []Block {
 				for ; ii < ulen && u[i].list[ii] < vid; ii++ {
 				}
 				if ii == ulen {
-					out[i].list = out[i].list[:kk]
+					//	out[k].list = out[i].list[:kk]
 					i++
 					ii = 0
-					kk = 0
+					//	kk = 0
 					break L
 				}
 			} else if uid > vid {
@@ -140,20 +148,23 @@ func IntersectWithBlock1(u, v []Block) []Block {
 				}
 			}
 		}
-
 		if ii == ulen {
-			out[i].list = out[i].list[:kk]
+			//out[k].list = out[i].list[:kk]
 			i++
 			ii = 0
-			kk = 0
+			//kk = 0
 		}
 		if jj == vlen {
 			j++
 			jj = 0
 		}
 	}
-	if i == len(u) {
-		out[i-1].list = out[i-1].list[:kk]
+	out = out[:k+1]
+	if kk == 0 {
+		out = out[:k]
+	} else {
+		out[k].list = out[k].list[:kk]
+		out[k].maxInt = out[k].list[kk-1]
 	}
 	return out
 }
@@ -359,7 +370,18 @@ func (l *ListIterator) Next() {
 	l.lidx++
 	if l.lidx >= len(l.curBlock.List) {
 		l.lidx = 0
-		l.NextBlock()
+		if l.isEnd {
+			return
+		}
+		l.bidx++
+		if l.bidx >= len(l.list.Blocks) {
+			l.isEnd = true
+			return
+		}
+		l.curBlock = l.list.Blocks[l.bidx]
+		if len(l.curBlock.List) == 0 {
+			l.isEnd = true
+		}
 	}
 }
 
@@ -371,8 +393,12 @@ func Slice(ul *task.List, start, end int) {
 	it.SeekToIndex(start)
 
 	i := 0
-	for ; start+i < end && it.Valid(); it.Next() {
-		out.Append(it.Val())
+	for ; it.Valid(); it.Next() {
+		uid := it.Val()
+		if uid == 0 {
+			break
+		}
+		out.Append(uid)
 		i++
 	}
 	out.End()
@@ -429,6 +455,7 @@ func IntersectWith(u, v *task.List) {
 	out.End()
 }
 
+/*
 // ApplyFilter applies a filter to our UIDList.
 func ApplyFilter(u *task.List, f func(uint64, int) bool) {
 	out := NewWriteIterator(u, 0)
@@ -582,7 +609,7 @@ func IndexOf(u *task.List, uid uint64) (int, int) {
 	}
 	return -1, -1
 }
-
+*/
 func Swap(ul *task.List, i, j int) {
 	i1, i2 := ridx(ul, i)
 	j1, j2 := ridx(ul, j)
