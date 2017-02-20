@@ -198,7 +198,6 @@ func TestIterator2(t *testing.T) {
 	}
 	require.Equal(t, ls, res)
 }
-*/
 func TestUIDListIntersect1(t *testing.T) {
 	u := newList([]uint64{1, 2, 3})
 	v := newList([]uint64{})
@@ -255,7 +254,7 @@ func TestUIDListIntersectDupSecond(t *testing.T) {
 	IntersectWith(u, v)
 	require.Equal(t, []uint64{1, 2}, BlockToList(u))
 }
-
+*/
 /*
 func TestApplyFilterUint(t *testing.T) {
 	l := []uint64{1, 2, 3, 4, 5}
@@ -304,7 +303,7 @@ func BenchmarkListIteration(b *testing.B) {
 		u := make([]uint64, sz, sz)
 		limit := int64(float64(sz))
 		for i := 0; i < sz; i++ {
-			u[i] = uint64(rand.Int63n(limit))
+			u[i] = uint64(rand.Int63n(limit) + 1)
 		}
 		sort.Sort(uint64Slice(u))
 
@@ -318,8 +317,9 @@ func BenchmarkListIteration(b *testing.B) {
 				for k := 0; k < b.N; k++ {
 					it := NewListIterator(ub)
 					p = 0
-					for ; it.Valid(); it.Next() {
-						_ = it.Val()
+					uid := it.Next()
+					for uid != 0 {
+						uid = it.Next()
 						p++
 					}
 				}
@@ -383,11 +383,12 @@ func BenchmarkListIteration(b *testing.B) {
 	randomTests(1000000)
 }
 
+/*
 func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
 		sz1 := sz
 		sz2 := sz
-		rs := []int{1, 10, 50, 100, 500 /*1000, 10000, 100000, 1000000 */}
+		rs := []int{1, 10, 50, 100, 500 }// 1000, 10000, 100000, 1000000 }
 		for _, r := range rs {
 			sz1 = sz
 			sz2 = sz * r
@@ -444,7 +445,6 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					}
 				})
 
-			/*
 				f1 := BlockToList(ub)
 				f2 := BlockToList1(uc)
 				if len(f1) != len(u) || len(f2) != len(u) {
@@ -458,10 +458,8 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 						b.Fatalf("Uids are different at idx: %v: %v %v %v", i, u[i], f1[i], f2[i])
 					}
 				}
-			*/
 			fmt.Println()
 
-			/*
 				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 					func(b *testing.B) {
 						for k := 0; k < b.N; k++ {
@@ -470,7 +468,6 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 							copy(u.Uids, ucopy)
 						}
 					})
-			*/
 		}
 	}
 
@@ -502,7 +499,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests(100000, 0.8)
 	randomTests(1000000, 0.8)
 }
-
+*/
 /*
 // Benchmarks for IntersectWith
 // random data : u and v having data within range [0, limit)

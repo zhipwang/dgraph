@@ -271,7 +271,7 @@ func NewListIterator(l *task.List) ListIterator {
 		list:     l,
 		curBlock: cur,
 		bidx:     0,
-		lidx:     0,
+		lidx:     -1,
 		isEnd:    isEnd,
 	}
 }
@@ -341,11 +341,13 @@ func (l *ListIterator) Valid() bool {
 	return !l.isEnd
 }
 
+/*
 // Val returns the value pointed to by the iterator.
 func (l *ListIterator) Val() uint64 {
 	return l.curBlock.List[l.lidx]
 }
-
+*/
+/*
 func (l *ListIterator) NextBlock() {
 	if l.isEnd {
 		return
@@ -360,29 +362,32 @@ func (l *ListIterator) NextBlock() {
 		l.isEnd = true
 	}
 }
+*/
 
 // Next moves the iterator to the next element and also sets the end if the last element
 // is consumed already.
-func (l *ListIterator) Next() {
+func (l *ListIterator) Next() uint64 {
 	if l.isEnd {
-		return
+		return 0
 	}
 	l.lidx++
 	if l.lidx >= len(l.curBlock.List) {
 		l.lidx = 0
 		if l.isEnd {
-			return
+			return 0
 		}
 		l.bidx++
 		if l.bidx >= len(l.list.Blocks) {
 			l.isEnd = true
-			return
+			return 0
 		}
 		l.curBlock = l.list.Blocks[l.bidx]
 		if len(l.curBlock.List) == 0 {
 			l.isEnd = true
+			return 0
 		}
 	}
+	return l.curBlock.List[l.lidx]
 }
 
 // Slice returns a new task.List with the elements between start index and end index
@@ -392,14 +397,10 @@ func Slice(ul *task.List, start, end int) {
 	it := NewListIterator(ul)
 	it.SeekToIndex(start)
 
-	i := 0
-	for ; it.Valid(); it.Next() {
-		uid := it.Val()
-		if uid == 0 {
-			break
-		}
+	uid := it.Next()
+	for uid != 0 {
 		out.Append(uid)
-		i++
+		uid = it.Next()
 	}
 	out.End()
 }
@@ -428,6 +429,7 @@ func ListLen(l *task.List) int {
 	return length
 }
 
+/*
 func IntersectWith(u, v *task.List) {
 	lenu := ListLen(u)
 	lenv := ListLen(v)
@@ -439,22 +441,22 @@ func IntersectWith(u, v *task.List) {
 	itu := NewListIterator(u)
 	itv := NewListIterator(v)
 	out := NewWriteIterator(u, 0)
-	for itu.Valid() && itv.Valid() {
-		uid := itu.Val()
-		vid := itv.Val()
+	uid := itu.Next()
+	vid := itv.Next()
+	for uid != 0 || vid != 0 {
 		if uid == vid {
 			out.Append(uid)
-			itu.Next()
-			itv.Next()
+			uid = itu.Next()
+			vid = itv.Next()
 		} else if uid < vid {
-			itu.Seek(vid, typ)
+			uid = itu.Seek(vid, typ)
 		} else if uid > vid {
-			itv.Seek(uid, typ)
+			vid = itv.Seek(uid, typ)
 		}
 	}
 	out.End()
 }
-
+*/
 /*
 // ApplyFilter applies a filter to our UIDList.
 func ApplyFilter(u *task.List, f func(uint64, int) bool) {
