@@ -110,7 +110,6 @@ func TestMergeSorted10(t *testing.T) {
 	}
 	require.Equal(t, BlockToList(MergeSorted(input)), []uint64{1, 2, 3, 4, 6, 8, 9})
 }
-
 func TestIntersectSorted1(t *testing.T) {
 	input := []*task.List{
 		newList([]uint64{1, 2, 3}),
@@ -298,6 +297,7 @@ func (xs uint64Slice) Swap(i, j int) {
 	xs[i], xs[j] = xs[j], xs[i]
 }
 
+/*
 func BenchmarkListIteration(b *testing.B) {
 	randomTests := func(sz int) {
 		u := make([]uint64, sz, sz)
@@ -363,7 +363,6 @@ func BenchmarkListIteration(b *testing.B) {
 		}
 		fmt.Println()
 
-		/*
 			b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
@@ -372,7 +371,6 @@ func BenchmarkListIteration(b *testing.B) {
 						copy(u.Uids, ucopy)
 					}
 				})
-		*/
 	}
 
 	randomTests(10)
@@ -382,13 +380,13 @@ func BenchmarkListIteration(b *testing.B) {
 	randomTests(100000)
 	randomTests(1000000)
 }
+*/
 
-/*
 func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
 		sz1 := sz
 		sz2 := sz
-		rs := []int{1, 10, 50, 100, 500 }// 1000, 10000, 100000, 1000000 }
+		rs := []int{1, 10, 50, 100, 500} // 1000, 10000, 100000, 1000000 }
 		for _, r := range rs {
 			sz1 = sz
 			sz2 = sz * r
@@ -411,11 +409,11 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 			v := v1
 			ucopy := make([]uint64, len(u1), len(u1))
 			copy(ucopy, u1)
-
-			uc := SortedListToBlock1(u1)
-			ucCopy := SortedListToBlock1(u1)
-			vc := SortedListToBlock1(v1)
-
+			/*
+				uc := SortedListToBlock1(u1)
+				ucCopy := SortedListToBlock1(u1)
+				vc := SortedListToBlock1(v1)
+			*/
 			ub := SortedListToBlock(u1)
 			ubCopy := SortedListToBlock(u1)
 			vb := SortedListToBlock(v1)
@@ -427,15 +425,15 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 						IntersectWith(ub, vb)
 					}
 				})
-
-			b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-				func(b *testing.B) {
-					for k := 0; k < b.N; k++ {
-						copy(uc, ucCopy)
-						uc = IntersectWithBlock1(uc, vc)
-					}
-				})
-
+			/*
+				b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+					func(b *testing.B) {
+						for k := 0; k < b.N; k++ {
+							copy(uc, ucCopy)
+							uc = IntersectWithBlock1(uc, vc)
+						}
+					})
+			*/
 			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
@@ -445,21 +443,21 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					}
 				})
 
-				f1 := BlockToList(ub)
-				f2 := BlockToList1(uc)
-				if len(f1) != len(u) || len(f2) != len(u) {
-					b.Logf("u: %v\n", u)
-					b.Logf("f1: %v\n", f1)
-					b.Logf("f2: %v\n", f2)
-					b.Fatalf("lengths are different: %v %v %v %v %v", len(u), len(f1), len(f2), sz1, sz2)
+			f1 := BlockToList(ub)
+			//f2 := BlockToList1(uc)
+			if len(f1) != len(u) {
+				b.Logf("u: %v\n", u)
+				b.Logf("f1: %v\n", f1)
+				//b.Logf("f2: %v\n", f2)
+				b.Fatalf("lengths are different: %v %v %v %v %v", len(u), len(f1))
+			}
+			for i := range u {
+				if f1[i] != u[i] {
+					b.Fatalf("Uids are different at idx: %v: %v %v %v", i, u[i], f1[i])
 				}
-				for i := range u {
-					if f1[i] != u[i] || f2[i] != u[i] {
-						b.Fatalf("Uids are different at idx: %v: %v %v %v", i, u[i], f1[i], f2[i])
-					}
-				}
+			}
 			fmt.Println()
-
+			/*
 				b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 					func(b *testing.B) {
 						for k := 0; k < b.N; k++ {
@@ -468,6 +466,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 							copy(u.Uids, ucopy)
 						}
 					})
+			*/
 		}
 	}
 
@@ -499,7 +498,7 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests(100000, 0.8)
 	randomTests(1000000, 0.8)
 }
-*/
+
 /*
 // Benchmarks for IntersectWith
 // random data : u and v having data within range [0, limit)

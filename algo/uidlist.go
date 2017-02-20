@@ -429,6 +429,76 @@ func ListLen(l *task.List) int {
 	return length
 }
 
+func IntersectWith(u, v *task.List) {
+	i, ii := 0, 0 //itu := NewListIterator(u)
+	j, jj := 0, 0 //itv := NewListIterator(v)
+	out := NewWriteIterator(u, 0)
+	m := len(u.Blocks)
+	n := len(v.Blocks)
+	for i < m && j < n {
+		ulist := u.Blocks[i].List
+		vlist := v.Blocks[j].List
+		ub := u.Blocks[i].MaxInt
+		vb := v.Blocks[j].MaxInt
+		ulen := len(ulist)
+		vlen := len(vlist)
+	L:
+		for ii < ulen && jj < vlen {
+			uid := ulist[ii]
+			vid := vlist[jj]
+
+			if uid == vid {
+				out.Append(uid)
+				ii++
+				jj++
+				if ii == ulen {
+					i++
+					ii = 0
+					break L
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
+			} else if ub < vid {
+				i++
+				ii = 0
+				break L
+			} else if vb < uid {
+				j++
+				jj = 0
+				break L
+			} else if uid < vid {
+				for ; ii < ulen && ulist[ii] < vid; ii++ {
+				}
+				if ii == ulen {
+					i++
+					ii = 0
+					break L
+				}
+			} else if uid > vid {
+				for ; jj < vlen && vlist[jj] < uid; jj++ {
+				}
+				if jj == vlen {
+					j++
+					jj = 0
+					break L
+				}
+			}
+		}
+		if ii == ulen {
+			i++
+			ii = 0
+		}
+		if jj == vlen {
+			j++
+			jj = 0
+		}
+	}
+	out.End()
+}
+
 /*
 func IntersectWith(u, v *task.List) {
 	lenu := ListLen(u)
