@@ -217,12 +217,16 @@ func (l *WriteIterator) Append(uid uint64) {
 		l.curBlock.MaxInt = l.curBlock.List[blockSize-1]
 		l.lidx = 0
 		l.bidx++
-	}
-	if l.bidx == len(l.list.Blocks) {
+		if l.bidx == len(l.list.Blocks) {
+			// If we reached the end of blocks, add a new one.
+			l.list.Blocks = append(l.list.Blocks, &task.Block{List: make([]uint64, blockSize)})
+		}
+		l.curBlock = l.list.Blocks[l.bidx]
+	} else if l.bidx == len(l.list.Blocks) {
 		// If we reached the end of blocks, add a new one.
 		l.list.Blocks = append(l.list.Blocks, &task.Block{List: make([]uint64, blockSize)})
+		l.curBlock = l.list.Blocks[l.bidx]
 	}
-	l.curBlock = l.list.Blocks[l.bidx]
 	l.curBlock.List[l.lidx] = uid
 	l.lidx++
 }
@@ -331,6 +335,21 @@ func (l *ListIterator) Val() uint64 {
 	return l.curBlock.List[l.lidx]
 }
 
+func (l *ListIterator) NextBlock() {
+	if l.isEnd {
+		return
+	}
+	l.bidx++
+	if l.bidx >= len(l.list.Blocks) {
+		l.isEnd = true
+		return
+	}
+	l.curBlock = l.list.Blocks[l.bidx]
+	if len(l.curBlock.List) == 0 {
+		l.isEnd = true
+	}
+}
+
 // Next moves the iterator to the next element and also sets the end if the last element
 // is consumed already.
 func (l *ListIterator) Next() {
@@ -340,16 +359,7 @@ func (l *ListIterator) Next() {
 	l.lidx++
 	if l.lidx >= len(l.curBlock.List) {
 		l.lidx = 0
-		l.bidx++
-	}
-	if l.bidx >= len(l.list.Blocks) {
-		l.isEnd = true
-		return
-	}
-	// Update the current block.
-	l.curBlock = l.list.Blocks[l.bidx]
-	if len(l.curBlock.List) == 0 {
-		l.isEnd = true
+		l.NextBlock()
 	}
 }
 
