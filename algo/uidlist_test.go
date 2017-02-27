@@ -409,16 +409,18 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 			v := v1
 			ucopy := make([]uint64, len(u1), len(u1))
 			copy(ucopy, u1)
+
 			/*
 				uc := SortedListToBlock1(u1)
 				ucCopy := SortedListToBlock1(u1)
 				vc := SortedListToBlock1(v1)
 			*/
+
 			ub := SortedListToBlock(u1)
 			ubCopy := SortedListToBlock(u1)
 			vb := SortedListToBlock(v1)
 
-			b.Run(fmt.Sprintf(":Iterator:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+			b.Run(fmt.Sprintf(":New:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
 						copy(ub.Blocks, ubCopy.Blocks)
@@ -426,13 +428,13 @@ func BenchmarkListIntersectRandom(b *testing.B) {
 					}
 				})
 			/*
-				b.Run(fmt.Sprintf(":Block:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-					func(b *testing.B) {
-						for k := 0; k < b.N; k++ {
-							copy(uc, ucCopy)
-							uc = IntersectWithBlock1(uc, vc)
-						}
-					})
+				b.Run(fmt.Sprintf(":New:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+				func(b *testing.B) {
+					for k := 0; k < b.N; k++ {
+						copy(uc, ucCopy)
+						uc = IntersectWith1(uc, vc)
+					}
+				})
 			*/
 			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
