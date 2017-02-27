@@ -79,7 +79,9 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 	b.Put(w.snapshotKey(gid), data)
 	fmt.Printf("Writing snapshot to WAL: %+v\n", s)
 
-	return x.Wrapf(w.wals.WriteBatch(b), "wal.Store: While Store Snapshot")
+	err = w.wals.WriteBatch(b)
+	b.Clear()
+	return x.Wrapf(err, "wal.Store: While Store Snapshot")
 }
 
 // Store stores the snapshot, hardstate and entries for a given RAFT group.
@@ -122,6 +124,7 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 	}
 
 	err := w.wals.WriteBatch(b)
+	b.Clear()
 	return x.Wrapf(err, "wal.Store: While WriteBatch")
 }
 

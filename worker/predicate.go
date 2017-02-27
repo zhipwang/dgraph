@@ -64,6 +64,7 @@ func writeBatch(ctx context.Context, kv chan *task.KV, che chan error) {
 	if batchSize > 0 {
 		x.Trace(ctx, "Doing batch write %d.", batchWriteNum)
 		che <- pstore.WriteBatch(wb)
+		wb.Clear()
 		return
 	}
 	che <- nil

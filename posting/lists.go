@@ -262,8 +262,8 @@ func periodicCommit() {
 func getMemUsage() int {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	megs := ms.Alloc / (1 << 20)
-	return int(megs)
+	megs := int(ms.Alloc / (1 << 20))
+	//	return megs
 
 	// Sticking to ms.Alloc temoprarily.
 	// TODO(Ashwin): Switch to total Memory(RSS) once we figure out
@@ -287,7 +287,12 @@ func getMemUsage() int {
 			return 0
 		}
 
-		megs := kbs / (1 << 10)
+		f, err := os.OpenFile("/tmp/mem.txt", os.O_APPEND|os.O_WRONLY, 0755)
+		x.Check(err)
+		x.Check2(f.WriteString(fmt.Sprintf("~~~~%d %d\n", megs, kbs/(1<<10))))
+		f.Close()
+		//		x.Check(memFile.Sync())
+		//		megs := kbs / (1 << 10)
 		return megs
 	}
 
@@ -396,6 +401,9 @@ func GetOrCreate(key []byte, group uint32) (rlist *List, decr func()) {
 			x.Check(err)
 			if slice.Size() == 0 {
 				x.Check(pstore.SetOne(key, dummyPostingList))
+			}
+			if slice != nil {
+				slice.Free()
 			}
 		}(key)
 	}
