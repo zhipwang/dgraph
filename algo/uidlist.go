@@ -30,6 +30,34 @@ func Sort(ul *task.List) {
 
 // Old list.
 
+func IntersectWithJump(u, v []uint64) []uint64 {
+	n := len(u)
+	m := len(v)
+	jump := m / n
+	q := 0
+	for i, k := 0, 0; i < n && k < m; {
+		uid := u[i]
+		vid := v[k]
+		if uid == vid {
+			u[q] = uid
+			q++
+			k++
+			i++
+		} else if k+jump < m && uid > v[k+jump] {
+			k = k + jump
+		} else if i+jump < n && vid > u[i+jump] {
+			i = i + jump
+		} else if uid > vid {
+			for k = k + 1; k < m && v[k] < uid; k++ {
+			}
+		} else {
+			for i = i + 1; i < n && u[i] < vid; i++ {
+			}
+		}
+	}
+	return u[:q]
+}
+
 // IntersectWith intersects u with v. The update is made to u.
 // u, v should be sorted.
 func IntersectWithLin(u, v []uint64) []uint64 {

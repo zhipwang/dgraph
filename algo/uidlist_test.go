@@ -542,12 +542,12 @@ func BenchmarkListIntersect(b *testing.B) {
 					}
 				})
 			*/
-			b.Run(fmt.Sprintf(":Lin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
+			b.Run(fmt.Sprintf(":Jump:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
 				func(b *testing.B) {
 					for k := 0; k < b.N; k++ {
 						u = u[:sz1]
 						copy(u, ucopy)
-						u = IntersectWithLin(u, v)
+						u = IntersectWithJump(u, v)
 					}
 				})
 
