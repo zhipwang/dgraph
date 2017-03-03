@@ -296,8 +296,51 @@ func (xs uint64Slice) Less(i, j int) bool {
 func (xs uint64Slice) Swap(i, j int) {
 	xs[i], xs[j] = xs[j], xs[i]
 }
+func BenchmarkListCreation(b *testing.B) {
+	randomTests := func(sz int) {
+		b.Run(fmt.Sprintf(":WriteIterator:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					ub := new(task.List)
+					it := NewWriteIterator(ub, 0)
+					for i := 0; i < sz; i++ {
+						it.Append(100)
+					}
+					it.End()
+				}
+			})
 
-/*
+		b.Run(fmt.Sprintf(":PreAllSlice:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					list := make([]uint64, sz)
+					for i := 0; i < sz; i++ {
+						list[i] = 100
+					}
+				}
+			})
+
+		b.Run(fmt.Sprintf(":AppendSlice:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					var list []uint64
+					for i := 0; i < sz; i++ {
+						list = append(list, 100)
+					}
+				}
+			})
+
+		fmt.Println()
+	}
+
+	randomTests(10)
+	randomTests(100)
+	randomTests(1000)
+	randomTests(10000)
+	randomTests(100000)
+	randomTests(1000000)
+}
+
 func BenchmarkListIteration(b *testing.B) {
 	randomTests := func(sz int) {
 		u := make([]uint64, sz, sz)
@@ -362,15 +405,6 @@ func BenchmarkListIteration(b *testing.B) {
 			b.Fatalf("Invalid iteration: %d, %d, %d", p, q, r)
 		}
 		fmt.Println()
-
-			b.Run(fmt.Sprintf(":Bin:ratio=%d:size=%d:overlap=%.2f:", r, sz, overlap),
-				func(b *testing.B) {
-					for k := 0; k < b.N; k++ {
-						IntersectWithBinarySearch(u, v)
-						u.Uids = u.Uids[:sz1]
-						copy(u.Uids, ucopy)
-					}
-				})
 	}
 
 	randomTests(10)
@@ -380,7 +414,6 @@ func BenchmarkListIteration(b *testing.B) {
 	randomTests(100000)
 	randomTests(1000000)
 }
-*/
 
 func BenchmarkListIntersectRandom(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
