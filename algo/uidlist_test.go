@@ -341,6 +341,79 @@ func BenchmarkListCreation(b *testing.B) {
 	randomTests(1000000)
 }
 
+func BenchmarkListSorting(b *testing.B) {
+	randomTests := func(sz int) {
+		u := make([]uint64, sz, sz)
+		limit := int64(float64(sz))
+		for i := 0; i < sz; i++ {
+			u[i] = uint64(rand.Int63n(limit) + 1)
+		}
+		ub := SortedListToBlock(u)
+
+		b.Run(fmt.Sprintf(":Iterator:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					Sort(ub)
+				}
+			})
+
+		b.Run(fmt.Sprintf(":Lin:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					sort.Sort(uint64Slice(u))
+				}
+			})
+
+		fmt.Println()
+	}
+
+	randomTests(10)
+	randomTests(100)
+	randomTests(1000)
+	randomTests(10000)
+	randomTests(100000)
+	randomTests(1000000)
+}
+
+func BenchmarkListSlicing(b *testing.B) {
+	randomTests := func(sz int) {
+		u := make([]uint64, sz, sz)
+		limit := int64(float64(sz))
+		for i := 0; i < sz; i++ {
+			u[i] = uint64(rand.Int63n(limit) + 1)
+		}
+		sort.Sort(uint64Slice(u))
+		ub := SortedListToBlock(u)
+
+		b.Run(fmt.Sprintf(":Iterator:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					i := rand.Int63n(int64(ListLen(ub)))
+					j := rand.Int63n(int64(i))
+					Slice(ub, int(i), int(j))
+				}
+			})
+
+		b.Run(fmt.Sprintf(":Block:size=%d:", sz),
+			func(b *testing.B) {
+				for k := 0; k < b.N; k++ {
+					i := rand.Int63n(int64(len(u)))
+					j := rand.Int63n(int64(i))
+					u = u[i:j]
+				}
+			})
+
+		fmt.Println()
+	}
+
+	randomTests(10)
+	randomTests(100)
+	randomTests(1000)
+	randomTests(10000)
+	randomTests(100000)
+	randomTests(1000000)
+}
+
 func BenchmarkListIteration(b *testing.B) {
 	randomTests := func(sz int) {
 		u := make([]uint64, sz, sz)
@@ -415,7 +488,7 @@ func BenchmarkListIteration(b *testing.B) {
 	randomTests(1000000)
 }
 
-func BenchmarkListIntersectRandom(b *testing.B) {
+func BenchmarkListIntersect(b *testing.B) {
 	randomTests := func(sz int, overlap float64) {
 		sz1 := sz
 		sz2 := sz

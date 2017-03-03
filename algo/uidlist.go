@@ -6,6 +6,28 @@ import (
 	"github.com/dgraph-io/dgraph/task"
 )
 
+// AsList implements sort.Interface by for block lists
+type AsList struct{ l *task.List }
+
+func (s AsList) Len() int { return ListLen(s.l) }
+func (s AsList) Swap(i, j int) {
+	p, q := ridx(s.l, i)
+	m, n := ridx(s.l, j)
+	s.l.Blocks[p].List[q], s.l.Blocks[m].List[n] = s.l.Blocks[m].List[n], s.l.Blocks[p].List[q]
+}
+func (s AsList) Less(i, j int) bool {
+	p, q := ridx(s.l, i)
+	m, n := ridx(s.l, j)
+	return s.l.Blocks[p].List[q] < s.l.Blocks[m].List[n]
+}
+
+func Sort(ul *task.List) {
+	sort.Sort(AsList{ul})
+	for _, it := range ul.Blocks {
+		it.MaxInt = it.List[len(it.List)-1]
+	}
+}
+
 // Old list.
 
 // IntersectWith intersects u with v. The update is made to u.
