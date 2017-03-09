@@ -35,8 +35,8 @@ import (
 
 	"github.com/dgryski/go-farm"
 
+	"github.com/dgraph-io/dgraph/protos/typesp"
 	"github.com/dgraph-io/dgraph/store"
-	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -69,7 +69,7 @@ type syncMarks struct {
 func init() {
 	x.AddInit(func() {
 		h := md5.New()
-		pl := types.PostingList{
+		pl := typesp.PostingList{
 			Checksum: h.Sum(nil),
 		}
 		var err error
@@ -151,6 +151,10 @@ func aggressivelyEvict() {
 
 	log.Println("Aggressive evict, committing to RocksDB")
 	CommitLists(1)
+	lhmap.EachWithDelete(func(k uint64, l *List) {
+		l.SetForDeletion()
+		l.decr()
+	})
 
 	log.Println("Trying to free OS memory")
 	// Forces garbage collection followed by returning as much memory to the OS
@@ -432,14 +436,12 @@ func CommitLists(numRoutines int) {
 		go func() {
 			defer wg.Done()
 			for l := range workChan {
-				l.SetForDeletion() // No more AddMutation.
 				commitOne(l, c)
-				l.decr()
 			}
 		}()
 	}
 
-	lhmap.EachWithDelete(func(k uint64, l *List) {
+	lhmap.Each(func(k uint64, l *List) {
 		if l == nil { // To be safe. Check might be unnecessary.
 			return
 		}
