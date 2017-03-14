@@ -17,6 +17,7 @@
 package query
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -103,6 +104,28 @@ func TestRetrieveFacetsSimple(t *testing.T) {
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
 		`{"me":[{"@facets":{"name":{"origin":"french"}},"gender":"female","name":"Michonne"}]}`,
+		js)
+}
+
+func TestFacetsReverse(t *testing.T) {
+	populateGraphWithFacets(t)
+	defer teardownGraphWithFacets(t)
+	query := `
+      {
+        me(id:24) {
+          name
+          ~friend @facets {
+            name
+            gender
+            alive
+          }
+        }
+      }
+    `
+	js := processToFastJSON(t, query)
+	fmt.Println(string(js))
+	require.JSONEq(t,
+		`{"me":[{"name":"Glenn Rhee","~friend":[{"@facets":{"_":{"close":true,"family":true,"since":"2004-05-02T15:04:05Z"}},"gender":"female","name":"Michonne"},{"name":"Andrea"},{"name":"Michale"}]}]}`,
 		js)
 }
 
