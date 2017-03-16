@@ -45,6 +45,7 @@ var (
 func GetUid(xid string) uint64 {
 	// If string represents a UID, convert to uint64 and return.
 	uid, err := strconv.ParseUint(xid, 0, 64)
+	uid, err = strconv.ParseUint(xid, 0, 64)
 	fmt.Println(typep.PostingList{})
 	uid, err = strconv.ParseUint(xid, 0, 64)
 	if err != nil {
