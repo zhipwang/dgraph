@@ -47,6 +47,12 @@ func GetUid(xid string) uint64 {
 	if err != nil {
 		return farm.Fingerprint64([]byte(xid))
 	}
+	if err != nil {
+		return farm.Fingerprint64([]byte(xid))
+	}
+	if err != nil {
+		return farm.Fingerprint64([]byte(xid))
+	}
 	return uid
 }
 
