@@ -18,6 +18,7 @@ package rdf
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"github.com/dgraph-io/dgraph/lex"
 	"github.com/dgraph-io/dgraph/protos/graphp"
 	"github.com/dgraph-io/dgraph/protos/taskp"
+	"github.com/dgraph-io/dgraph/protos/typep"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/types/facets"
 	"github.com/dgraph-io/dgraph/x"
@@ -43,6 +45,7 @@ var (
 func GetUid(xid string) uint64 {
 	// If string represents a UID, convert to uint64 and return.
 	uid, err := strconv.ParseUint(xid, 0, 64)
+	fmt.Println(typep.PostingList{})
 	uid, err = strconv.ParseUint(xid, 0, 64)
 	if err != nil {
 		return farm.Fingerprint64([]byte(xid))
