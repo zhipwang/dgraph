@@ -99,7 +99,6 @@ type FuncType int
 
 const (
 	NotFn FuncType = iota
-	AggregatorFn
 	CompareAttrFn
 	CompareScalarFn
 	GeoFn
@@ -124,8 +123,6 @@ func parseFuncType(arr []string) (FuncType, string) {
 			return CompareScalarFn, f
 		}
 		return CompareAttrFn, f
-	case "min", "max", "sum":
-		return AggregatorFn, f
 	case "checkpwd":
 		return PasswordFn, f
 	case "regexp":
@@ -163,7 +160,7 @@ func processTask(q *taskp.Query, gid uint32) (*taskp.Result, error) {
 
 	for i := 0; i < srcFn.n; i++ {
 		var key []byte
-		if srcFn.fnType == AggregatorFn || srcFn.fnType == CompareScalarFn ||
+		if q.IsAggregator || srcFn.fnType == CompareScalarFn ||
 			srcFn.fnType == PasswordFn {
 			key = x.DataKey(attr, q.UidList.Uids[i])
 		} else if srcFn.fnType != NotFn {
@@ -239,7 +236,7 @@ func processTask(q *taskp.Query, gid uint32) (*taskp.Result, error) {
 		}
 
 		// add uids to uidmatrix..
-		if q.DoCount || srcFn.fnType == AggregatorFn {
+		if q.DoCount || q.IsAggregator {
 			if q.DoCount {
 				out.Counts = append(out.Counts, uint32(pl.Length(0)))
 			}
@@ -392,18 +389,17 @@ func parseSrcFn(q *taskp.Query) (*functionContext, error) {
 	fc := &functionContext{fnType: fnType, fname: f}
 	var err error
 
-	switch fnType {
-	case AggregatorFn:
+	if q.IsAggregator {
 		// confirm agrregator could apply on the attributes
-		typ, err := schema.State().TypeOf(attr)
+		_, err := schema.State().TypeOf(attr)
 		if err != nil {
 			return nil, x.Errorf("Attribute %q is not scalar-type", attr)
 		}
-		if !CouldApplyAggregatorOn(f, typ) {
-			return nil, x.Errorf("Aggregator %q could not apply on %v",
-				f, attr)
-		}
 		fc.n = len(q.UidList.Uids)
+		return fc, nil
+	}
+
+	switch fnType {
 	case CompareAttrFn:
 		if len(q.SrcFunc) != 2 {
 			return nil, x.Errorf("Function requires 2 arguments, but got %d %v",

@@ -22,17 +22,18 @@ message Query {
 	int32 offset = 4;       // Skip this many elements.
 	fixed64 after_uid = 5;  // Only return UIDs greater than this.
 	bool do_count = 6;      // Are we just getting lengths?
+	bool is_aggregator = 7;
 
 	// Exactly one of uids and terms is populated.
-	List uid_list = 7;
+	List uid_list = 8;
 
 	// Function to generate or filter UIDs.
-	repeated string src_func = 8;
+	repeated string src_func = 9;
 	
-	bool reverse = 9;  // Whether this is a reverse edge.
+	bool reverse = 10;  // Whether this is a reverse edge.
 
-	facetsp.Param facet_param = 10; // which facets to fetch
-	facetsp.FilterTree facets_filter = 11; // filtering on facets : has Op (and/or/not) tree
+	facetsp.Param facet_param = 11; // which facets to fetch
+	facetsp.FilterTree facets_filter = 12; // filtering on facets : has Op (and/or/not) tree
 }
 
 message Result {

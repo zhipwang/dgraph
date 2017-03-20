@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -1034,11 +1035,14 @@ func TestMinMulti(t *testing.T) {
 			name
 			friend {
 				min(dob)
+				max(dob)
+				dob
 			}
 		}
 	}
 `
 	js := processToFastJSON(t, query)
+	fmt.Println(string(js))
 	require.JSONEq(t,
 		`{"me":[{"friend":[{"min(dob)":"1901-01-15"}],"name":"Michonne"},{"friend":[{"min(dob)":"1910-01-01"}],"name":"Rick Grimes"},{"friend":[{"min(dob)":"1909-05-05"}],"name":"Andrea"}]}`,
 		js)

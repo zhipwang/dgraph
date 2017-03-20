@@ -120,26 +120,27 @@ func (l *Latency) ToMap() map[string]string {
 }
 
 type params struct {
-	Alias          string
-	Count          int
-	Offset         int
-	AfterUID       uint64
-	DoCount        bool
-	GetUID         bool
-	Order          string
-	OrderDesc      bool
-	isDebug        bool
-	Var            string
-	NeedsVar       []string
-	ParentVars     map[string]*taskp.List
-	uidToVal       map[uint64]types.Val
-	Langs          []string
-	Normalize      bool
-	From           uint64
-	To             uint64
-	Facet          *facetsp.Param
-	RecurseDepth   uint64
-	isPartOfresult bool
+	Alias         string
+	Count         int
+	Offset        int
+	AfterUID      uint64
+	DoCount       bool
+	GetUID        bool
+	Order         string
+	OrderDesc     bool
+	isDebug       bool
+	Var           string
+	NeedsVar      []string
+	ParentVars    map[string]*taskp.List
+	uidToVal      map[uint64]types.Val
+	Langs         []string
+	Normalize     bool
+	From          uint64
+	To            uint64
+	Facet         *facetsp.Param
+	RecurseDepth  uint64
+	typesRequired map[string]struct{}
+	IsAggregator  bool
 }
 
 // SubGraph is the way to represent data internally. It contains both the
@@ -260,15 +261,15 @@ func (sg *SubGraph) preTraverse(uid uint64, dst, parent outputNode) error {
 			uc.AddValue("count", c)
 			dst.AddListChild(pc.Attr, uc)
 		} else if len(pc.SrcFunc) > 0 && isAggregatorFn(pc.SrcFunc[0]) {
-			if !pc.Params.isPartOfresult {
-				continue
-			}
 			// add sg.Attr as child on 'parent' instead of 'dst', otherwise
 			// within output, aggregator will messed with other attrs
 			uc := dst.New(pc.Params.Alias)
 			name := fmt.Sprintf("%s(%s)", pc.SrcFunc[0], pc.Attr)
 			sv, err := convertWithBestEffort(pc.values[idx], pc.Attr)
 			if err != nil {
+				if err == ErrEmptyVal {
+					continue
+				}
 				return err
 			}
 			uc.AddValue(name, sv)
@@ -448,49 +449,82 @@ func treeCopy(ctx context.Context, gq *gql.GraphQuery, sg *SubGraph) error {
 	// node, because of the way we're dealing with the root node.
 	// So, we work on the children, and then recurse for grand children.
 	attrsSeen := make(map[string]struct{})
+	NodesSeen := make(map[string]*SubGraph)
 	for _, gchild := range gq.Children {
-		if !gchild.IsCount { // ignore count subgraphs..
-			if _, ok := attrsSeen[gchild.Attr]; ok {
-				return x.Errorf("%s not allowed multiple times in same sub-query.",
-					gchild.Attr)
-			}
-			attrsSeen[gchild.Attr] = struct{}{}
-		}
 		if gchild.Attr == "_uid_" {
 			sg.Params.GetUID = true
+			continue
 		}
 
-		args := params{
-			Alias:     gchild.Alias,
-			Langs:     gchild.Langs,
-			isDebug:   sg.Params.isDebug,
-			Var:       gchild.Var,
-			Normalize: sg.Params.Normalize,
-		}
-		if gchild.Facets != nil {
-			args.Facet = &facetsp.Param{gchild.Facets.AllKeys, gchild.Facets.Keys}
+		var isNewNode bool
+		dst, ok := NodesSeen[gchild.Attr]
+		if !ok {
+			dst = &SubGraph{
+				Attr: gchild.Attr,
+				Params: params{
+					Alias:         gchild.Alias,
+					Langs:         gchild.Langs,
+					isDebug:       sg.Params.isDebug,
+					Var:           gchild.Var,
+					Normalize:     sg.Params.Normalize,
+					typesRequired: make(map[string]struct{}),
+				},
+			}
+			isNewNode = true
 		}
 
-		args.NeedsVar = append(args.NeedsVar, gchild.NeedsVar...)
+		if gchild.Func != nil && gchild.Func.IsAggregator() {
+			fn := gchild.Func.Name
+			key := fmt.Sprintf("%s|%s", gchild.Attr, fn)
+			if _, ok := attrsSeen[key]; ok {
+				return x.Errorf("%s not allowed wih same function multiple times in a sub-query.",
+					gchild.Attr)
+			}
+			attrsSeen[key] = struct{}{}
+			dst.Params.IsAggregator = true
+			dst.Params.typesRequired[key] = struct{}{}
+			isNewNode = true
+		} else if gchild.Func == nil {
+			key := gchild.Attr
+			if _, ok := attrsSeen[key]; ok {
+				return x.Errorf("%s not allowed wih same function multiple times in a sub-query.",
+					gchild.Attr)
+			}
+			attrsSeen[key] = struct{}{}
+			dst.Params.IsAggregator = true
+			dst.Params.typesRequired[key] = struct{}{}
+			isNewNode = true
+		}
+
+		if !isNewNode {
+			return x.Errorf("Repeated attrs not allowed in a block.")
+		}
+
 		if gchild.IsCount {
 			if len(gchild.Children) != 0 {
-				return errors.New("Node with count cannot have child attributes")
+				return errors.New("Node with count cannot have child attributes.")
 			}
-			args.DoCount = true
+			if ok {
+				// NOTE: Count cannot appear with aggregation functions.
+				return x.Errorf("Count cannot be retrieved with other aggregate functions.")
+			}
+			dst.Params.DoCount = true
 		}
 
+		if gchild.Facets != nil {
+			dst.Params.Facet = &facetsp.Param{gchild.Facets.AllKeys, gchild.Facets.Keys}
+		}
+
+		dst.Params.NeedsVar = append(dst.Params.NeedsVar, gchild.NeedsVar...)
+
+		NodesSeen[gchild.Attr] = dst
 		for argk, _ := range gchild.Args {
 			if !isValidArg(argk) {
 				return x.Errorf("Invalid argument : %s", argk)
 			}
 		}
-		if err := args.fill(gchild); err != nil {
+		if err := dst.Params.fill(gchild); err != nil {
 			return err
-		}
-
-		dst := &SubGraph{
-			Attr:   gchild.Attr,
-			Params: args,
 		}
 
 		if gchild.Func != nil &&
@@ -745,6 +779,7 @@ func createTaskQuery(sg *SubGraph) *taskp.Query {
 		DoCount:      len(sg.Filters) == 0 && sg.Params.DoCount,
 		FacetParam:   sg.Params.Facet,
 		FacetsFilter: sg.facetsFilter,
+		IsAggregator: sg.Params.IsAggregator,
 	}
 	if sg.SrcUIDs != nil {
 		out.UidList = sg.SrcUIDs
@@ -758,7 +793,8 @@ type values struct {
 }
 
 func (sg *SubGraph) populateAggregation(parent *SubGraph) error {
-	for _, child := range sg.Children {
+	var removeIdx []int
+	for childIdx, child := range sg.Children {
 		err := child.populateAggregation(sg)
 		if err != nil {
 			return err
@@ -767,39 +803,59 @@ func (sg *SubGraph) populateAggregation(parent *SubGraph) error {
 			continue
 		}
 
-		sibling := new(SubGraph)
-		*sibling = *child // Sibling of sg.
-		sibling.Children = []*SubGraph{}
-		sibling.SrcUIDs = sg.SrcUIDs // Point the new Subgraphs srcUids
-		parent.Children = append(parent.Children, sibling)
-		sibling.values = make([]*taskp.Value, 0, 1)
-		sibling.Params.Alias = sg.Attr
-		sibling.Params.isPartOfresult = true
-		child.Params.isPartOfresult = false
-		typ, _ := schema.State().TypeOf(child.Attr)
-		for _, list := range sg.uidMatrix {
-			ag := aggregator{
-				name: child.SrcFunc[0],
-				typ:  typ,
+		for k := range child.Params.typesRequired {
+			if k == child.Attr {
+				continue
 			}
-			for _, uid := range list.Uids {
-				idx := sort.Search(len(child.SrcUIDs.Uids), func(i int) bool {
-					return child.SrcUIDs.Uids[i] >= uid
-				})
-				if idx < len(child.SrcUIDs.Uids) && child.SrcUIDs.Uids[idx] == uid {
-					ag.Apply(child.values[idx])
-					if err != nil {
-						return err
+			fns := strings.SplitN(k, "|", -1)
+			fn := fns[len(fns)-1]
+			sibling := new(SubGraph)
+			*sibling = *child // Sibling of sg.
+			sibling.Children = []*SubGraph{}
+			sibling.SrcUIDs = sg.SrcUIDs // Point the new Subgraphs srcUids
+			parent.Children = append(parent.Children, sibling)
+			sibling.values = make([]*taskp.Value, 0, 1)
+			sibling.Params.Alias = sg.Attr
+			sibling.SrcFunc[0] = fn
+			sibling.Params.IsAggregator = true
+			typ, _ := schema.State().TypeOf(child.Attr)
+			for _, list := range sg.uidMatrix {
+				ag := aggregator{
+					name: child.SrcFunc[0],
+					typ:  typ,
+				}
+				for _, uid := range list.Uids {
+					idx := sort.Search(len(child.SrcUIDs.Uids), func(i int) bool {
+						return child.SrcUIDs.Uids[i] >= uid
+					})
+					if idx < len(child.SrcUIDs.Uids) && child.SrcUIDs.Uids[idx] == uid {
+						ag.Apply(child.values[idx])
+						if err != nil {
+							return err
+						}
 					}
 				}
+				v, err := ag.Value()
+				if err != nil {
+					return err
+				}
+				sibling.values = append(sibling.values, v)
 			}
-			v, err := ag.Value()
-			if err != nil {
-				return err
+
+			if _, ok := child.Params.typesRequired[child.Attr]; !ok {
+				// Remove the child node.
+				removeIdx = append(removeIdx, childIdx)
 			}
-			sibling.values = append(sibling.values, v)
+			child.Params.IsAggregator = false
 		}
 	}
+
+	for _, idx := range removeIdx {
+		l := len(sg.Children)
+		sg.Children[idx] = sg.Children[l-1]
+		sg.Children = sg.Children[:l-1]
+	}
+
 	return nil
 }
 
