@@ -275,7 +275,7 @@ func (sg *SubGraph) preTraverse(uid uint64, dst, parent outputNode) error {
 
 		if len(pc.counts) > 0 {
 			c := types.ValueForType(types.IntID)
-			c.Value = int32(pc.counts[idx])
+			c.Value = int64(pc.counts[idx])
 			uc := dst.New(pc.Attr)
 			uc.AddValue("count", c)
 			dst.AddListChild(pc.Attr, uc)
@@ -1107,7 +1107,7 @@ AssignStep:
 				//val, _ := getValue(sg.values[idx])
 				val := types.Val{
 					Tid:   types.IntID,
-					Value: int32(sg.counts[idx]),
+					Value: int64(sg.counts[idx]),
 				}
 				doneVars[sg.Params.Var].vals[uid] = val
 			}
