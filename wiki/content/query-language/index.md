@@ -1026,6 +1026,73 @@ curl localhost:8080/query -XPOST -d $'{
 ```
 Note that the first result with the name "Unexpected Passion" is either not a film entity, or it is a film entity with no genre.
 
+### Regex search 
+`regexp` function allows a regular expression match on the values. It requires exact index to be present for working.
+
+```
+curl localhost:8080/query -XPOST -d $'{
+  directors(func: regexp(name, "^Steven Sp.*$")) {
+    name@en
+    director.film @filter(regexp(name, "Ryan")) {
+      name@en
+    }
+  }
+}
+' | jq
+```
+Output:
+```
+{
+  "directors": [
+    {
+      "director.film": [
+        {
+          "name@en": "Saving Private Ryan"
+        }
+      ],
+      "name@en": "Steven Spielberg"
+    },
+    {
+      "name@en": "Steven Spurrier"
+    },
+    {
+      "name@en": "Steven Spurrier"
+    },
+    {
+      "name@en": "Steven Spencer"
+    },
+    {
+      "name@en": "Steve Spurrier"
+    },
+    {
+      "name@en": "Steven Spieldal"
+    },
+    {
+      "name@en": "Steven Spielberg And The Return To Film School"
+    },
+    {
+      "name@en": "Steven Sperling"
+    },
+    {
+      "name@en": "Steven Spohn"
+    },
+    {
+      "name@en": "Steven Spielberg"
+    },
+    {
+      "name@en": "Steven Spielberg"
+    },
+    {
+      "name@en": "Steven Spencer"
+    },
+    {
+      "name@en": "Steven Spielberg"
+    }
+  ]
+}
+```
+
+{{% notice "note" %}}Regex function requires full index scan as of v0.7.4 which is slow. So it's recommended to use them only if absolutely necessary {{% /notice %}}
 
 ### Full Text Search
 There are two functions for full text search - `alloftext` and `anyoftext`.
