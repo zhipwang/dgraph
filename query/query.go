@@ -336,6 +336,9 @@ func (sg *SubGraph) preTraverse(uid uint64, dst, parent outputNode) error {
 				}
 			}
 		} else {
+			if len(pc.Params.Langs) > 0 {
+				fieldName += fmt.Sprintf("%v", pc.Params.Langs)
+			}
 			tv := pc.values[idx]
 			v, err := getValue(tv)
 			if err != nil {
@@ -460,19 +463,22 @@ func treeCopy(ctx context.Context, gq *gql.GraphQuery, sg *SubGraph) error {
 	// So, we work on the children, and then recurse for grand children.
 	attrsSeen := make(map[string]struct{})
 	for _, gchild := range gq.Children {
-		if !gchild.IsCount { // ignore count subgraphs..
-			key := gchild.Attr
-			if gchild.Func != nil && gchild.Func.IsAggregator() {
-				key += gchild.Func.Name
-			} else if gchild.Attr == "var" {
-				key += fmt.Sprintf("%v", gchild.NeedsVar)
-			}
-			if _, ok := attrsSeen[key]; ok {
-				return x.Errorf("%s not allowed multiple times in same sub-query.",
-					key)
-			}
-			attrsSeen[key] = struct{}{}
+		key := gchild.Attr
+		if gchild.Func != nil && gchild.Func.IsAggregator() {
+			key += gchild.Func.Name
+		} else if gchild.Attr == "var" {
+			key += fmt.Sprintf("%v", gchild.NeedsVar)
+		} else if gchild.IsCount { // ignore count subgraphs..
+			key += "count"
+		} else if len(gchild.Langs) > 0 {
+			key += fmt.Sprintf("%v", gchild.Langs)
 		}
+		if _, ok := attrsSeen[key]; ok {
+			return x.Errorf("%s not allowed multiple times in same sub-query.",
+				key)
+		}
+		attrsSeen[key] = struct{}{}
+
 		if gchild.Attr == "_uid_" {
 			sg.Params.GetUID = true
 		}

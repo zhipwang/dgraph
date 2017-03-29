@@ -4395,6 +4395,22 @@ func TestLangDefault(t *testing.T) {
 		js)
 }
 
+func TestLangMultiple(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id:0x1001) {
+				name@pl
+				name
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"name":"Badger","name[pl]":"Borsuk europejski"}]}`,
+		js)
+}
+
 func TestLangSingle(t *testing.T) {
 	populateGraph(t)
 	query := `
