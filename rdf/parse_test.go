@@ -536,7 +536,7 @@ var testNQuads = []struct {
 				},
 				{"key2",
 					[]byte("\r\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil,
 				}},
 		},
@@ -559,7 +559,7 @@ var testNQuads = []struct {
 				},
 				{"key2",
 					[]byte("\r\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil,
 				}},
 		},
@@ -582,7 +582,7 @@ var testNQuads = []struct {
 				},
 				{"key2",
 					[]byte("\r\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil,
 				}},
 		},
@@ -600,7 +600,7 @@ var testNQuads = []struct {
 			Facets: []*facetsp.Facet{
 				{"key1",
 					[]byte("\014\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil},
 				{"key2",
 					[]byte("value2"),
@@ -628,7 +628,7 @@ var testNQuads = []struct {
 			ObjectType:  0,
 			Facets: []*facetsp.Facet{
 				{"key1", []byte("\014\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil},
 				{"key2", []byte("value2"),
 					facets.ValTypeForTypeID(facets.StringID),
@@ -673,7 +673,7 @@ var testNQuads = []struct {
 					facets.ValTypeForTypeID(facets.StringID),
 					[]string{"\001false"}},
 				{"key5", []byte("\001\000\000\000"),
-					facets.ValTypeForTypeID(facets.Int32ID),
+					facets.ValTypeForTypeID(facets.IntID),
 					nil},
 				{"key6", []byte("t"),
 					facets.ValTypeForTypeID(facets.StringID),
@@ -776,7 +776,7 @@ var testNQuads = []struct {
 	},
 	{
 		input:       `_:alice <knows> "stuff" (k=111111111111111111888888) .`,
-		expectedErr: true, // integer can not fit in int32.
+		expectedErr: true, // integer can not fit in int64.
 	},
 	// Facet tests end
 	{

@@ -274,7 +274,7 @@ func (sg *SubGraph) preTraverse(uid uint64, dst, parent outputNode) error {
 		}
 
 		if len(pc.counts) > 0 {
-			c := types.ValueForType(types.Int32ID)
+			c := types.ValueForType(types.IntID)
 			c.Value = int32(pc.counts[idx])
 			uc := dst.New(pc.Attr)
 			uc.AddValue("count", c)
@@ -1106,7 +1106,7 @@ AssignStep:
 			for idx, uid := range sg.SrcUIDs.Uids {
 				//val, _ := getValue(sg.values[idx])
 				val := types.Val{
-					Tid:   types.Int32ID,
+					Tid:   types.IntID,
 					Value: int32(sg.counts[idx]),
 				}
 				doneVars[sg.Params.Var].vals[uid] = val

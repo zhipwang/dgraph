@@ -175,7 +175,7 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				*res = vc
 			case BinaryID:
 				// Marshal Binary
-				var bs [4]byte
+				var bs [8]byte
 				binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 				*res = bs[:]
 			case FloatID:
@@ -432,7 +432,7 @@ func Marshal(from Val, to *Val) error {
 			*res = strconv.FormatInt(int64(vc), 10)
 		case BinaryID:
 			// Marshal Binary
-			var bs [4]byte
+			var bs [8]byte
 			binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 			*res = bs[:]
 		default:
