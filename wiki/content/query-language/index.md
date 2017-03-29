@@ -311,7 +311,7 @@ The following types are supported by Dgraph.
 
 | Dgraph Type | Go type |
 | ------------|:--------|
-|  `int`      | int32   |
+|  `int`      | int64   |
 |  `float`    | float   |
 |  `string`   | string  |
 |  `bool`     | bool    |
@@ -495,7 +495,7 @@ The following table lists all the supported [RDF datatypes](https://www.w3.org/T
 |  <xs:string> | String |
 |  <xs:dateTime> |                               DateTime |
 |  <xs:date> |                                   Date |
-|  <xs:int> |                                    Int32 |
+|  <xs:int> |                                    Int |
 |  <xs:boolean> |                                Bool |
 |  <xs:double> |                                 Float |
 |  <xs:float> |                                  Float |
@@ -503,7 +503,7 @@ The following table lists all the supported [RDF datatypes](https://www.w3.org/T
 |  <http://www.w3.org/2001/XMLSchema#string> |   String |
 |  <http://www.w3.org/2001/XMLSchema#dateTime> | DateTime |
 |  <http://www.w3.org/2001/XMLSchema#date> |     Date |
-|  <http://www.w3.org/2001/XMLSchema#int> |      Int32 |
+|  <http://www.w3.org/2001/XMLSchema#int> |      Int |
 |  <http://www.w3.org/2001/XMLSchema#boolean> |  Bool |
 |  <http://www.w3.org/2001/XMLSchema#double> |   Float |
 |  <http://www.w3.org/2001/XMLSchema#float> |    Float |
