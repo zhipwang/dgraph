@@ -4407,7 +4407,7 @@ func TestLangMultiple(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Badger","name[pl]":"Borsuk europejski"}]}`,
+		`{"me":[{"name":"Badger","name@pl":"Borsuk europejski"}]}`,
 		js)
 }
 
@@ -4422,7 +4422,7 @@ func TestLangSingle(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Borsuk europejski"}]}`,
+		`{"me":[{"name@pl":"Borsuk europejski"}]}`,
 		js)
 }
 
@@ -4437,7 +4437,7 @@ func TestLangSingleFallback(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Badger"}]}`,
+		`{"me":[{"name@cn":"Badger"}]}`,
 		js)
 }
 
@@ -4452,7 +4452,7 @@ func TestLangMany1(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Барсук"}]}`,
+		`{"me":[{"name@ru:en:fr":"Барсук"}]}`,
 		js)
 }
 
@@ -4467,7 +4467,7 @@ func TestLangMany2(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Blaireau européen"}]}`,
+		`{"me":[{"name@hu:fi:fr":"Blaireau européen"}]}`,
 		js)
 }
 
@@ -4482,7 +4482,7 @@ func TestLangMany3(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Blaireau européen"}]}`,
+		`{"me":[{"name@hu:fr:fi":"Blaireau européen"}]}`,
 		js)
 }
 
@@ -4497,7 +4497,7 @@ func TestLangManyFallback(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Badger"}]}`,
+		`{"me":[{"name@hu:fi:cn":"Badger"}]}`,
 		js)
 }
 
