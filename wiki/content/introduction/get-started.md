@@ -1,6 +1,12 @@
-+++
-title = "Get Started"
-+++
+---
+date: "2017-03-20T22:25:17+11:00"
+title: "Get Started"
+
+menu:
+  main:
+    parent: users
+    weight: 1
+---
 
 **New to Dgraph? Here's a 5 step tutorial to get you up and running.**
 

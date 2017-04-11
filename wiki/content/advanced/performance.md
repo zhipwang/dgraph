@@ -1,6 +1,11 @@
-+++
-title = "Performance"
-+++
+---
+title: "Performance"
+
+menu:
+  main:
+    parent: users
+    weight: 1
+---
 
 ## General
 ### Dgraphloader

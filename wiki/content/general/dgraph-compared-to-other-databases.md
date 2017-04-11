@@ -1,6 +1,12 @@
-+++
-title = "Dgraph compared to other databases"
-+++
+---
+title: "Dgraph compared to other databases"
+
+menu:
+  main:
+    parent: users
+    weight: 4
+---
+
 
 {{% notice "incomplete" %}}Needs a summarized view on graph databases.{{% /notice %}}
 

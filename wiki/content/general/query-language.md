@@ -1,6 +1,11 @@
-+++
-title = "Query Language"
-+++
+---
+title: "Query Language"
+
+menu:
+  main:
+    parent: users
+    weight: 4
+---
 
 ## GraphQL+-
 Dgraph uses a variation of [GraphQL](https://facebook.github.io/graphql/) as the primary language of communication.

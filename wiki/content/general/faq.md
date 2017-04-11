@@ -1,7 +1,12 @@
-+++
-date = "2017-03-20T19:35:35+11:00"
-title = "FAQ"
-+++
+---
+date: "2017-03-20T19:35:35+11:00"
+title: "FAQ"
+
+menu:
+  main:
+    parent: users
+    weight: 1
+---
 
 ## General
 

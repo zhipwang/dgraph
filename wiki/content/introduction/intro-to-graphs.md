@@ -1,6 +1,11 @@
-+++
-title = "Introduction to Graphs & Dgraph"
-+++
+---
+title: "Introduction to Graphs & Dgraph"
+
+menu:
+  main:
+    parent: users
+    weight: 4
+---
 
 ## What is a graph?
 
