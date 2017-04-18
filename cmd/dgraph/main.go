@@ -71,7 +71,7 @@ var (
 	bindall    = flag.Bool("bindall", false,
 		"Use 0.0.0.0 instead of localhost to bind to all addresses on local machine.")
 	nomutations    = flag.Bool("nomutations", false, "Don't allow mutations on this server.")
-	noshare        = flag.Bool("noshare", false, "Don't allow sharing queries through the UI.")
+	nointernal     = flag.Bool("nointernal", false, "Don't allow mutations on predicates marked as internal")
 	tracing        = flag.Float64("trace", 0.0, "The ratio of queries to trace.")
 	cpuprofile     = flag.String("cpu", "", "write cpu profile to file")
 	memprofile     = flag.String("mem", "", "write memory profile to file")
@@ -231,26 +231,28 @@ func applyMutations(ctx context.Context, m *taskp.Mutations) error {
 	return nil
 }
 
-const INTERNAL_SHARE = "_share_"
+// INTERNAL_PRED_PREFIX is a prefix for predicates that are considered 'internal'
+// See 'nointernal' flag for more info
+const INTERNAL_PRED_PREFIX = "_internal_"
 
-func ismutationAllowed(mutation *graphp.Mutation) error {
+func checkMutationAllowed(mutation *graphp.Mutation) error {
 	if *nomutations {
-		if *noshare {
+		if *nointernal {
 			return x.Errorf("Mutations are forbidden on this server.")
 		}
 
 		// Sharing is allowed, lets check that mutation should have only internal
 		// share predicate.
-		if !hasOnlySharePred(mutation) {
-			return x.Errorf("Only mutations with: %v as predicate are allowed ",
-				INTERNAL_SHARE)
+		if !hasOnlyInternalPred(mutation) {
+			return x.Errorf("Only mutations with internal predicates beginning with '%v' are allowed ",
+				INTERNAL_PRED_PREFIX)
 		}
 	}
 	// Mutations are allowed but sharing isn't allowed.
-	if *noshare {
-		if hasSharePred(mutation) {
-			return x.Errorf("Mutations with: %v as predicate are not allowed ",
-				INTERNAL_SHARE)
+	if *nointernal {
+		if hasInternalPred(mutation) {
+			return x.Errorf("Mutations on internal predicates beginning with '%v' are not allowed ",
+				INTERNAL_PRED_PREFIX)
 		}
 	}
 	return nil
@@ -262,7 +264,7 @@ func convertAndApply(ctx context.Context, mutation *graphp.Mutation) (map[string
 	var err error
 	var mr mutationResult
 
-	if err := ismutationAllowed(mutation); err != nil {
+	if err := checkMutationAllowed(mutation); err != nil {
 		return nil, err
 	}
 

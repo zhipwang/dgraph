@@ -12,7 +12,7 @@ import {
   getQuery,
   updateInitialQuery,
   queryFound,
-  initialServerState
+  initApp
 } from "../actions";
 
 import "../assets/css/App.css";
@@ -77,10 +77,20 @@ class App extends React.Component {
   };
 
   componentDidMount = () => {
-    this.props.initialServerState();
-    let id = this.props.match.params.id;
-    if (id !== undefined) {
-      this.props.getQuery(id);
+    const { initApp, getQuery, location, match: { params } } = this.props;
+
+    initApp();
+
+    // If id param is present, fetch the query
+    if (params.id) {
+      getQuery(params.id);
+    }
+
+    // If session query param is present, fetch the query for that session
+    const searchParams = new URLSearchParams(location.search);
+    const session = searchParams.get('session');
+    if (session) {
+      getQuery(session, 'session');
     }
   };
 
@@ -105,8 +115,8 @@ const mapDispatchToProps = dispatch => ({
   updateFs: fs => {
     dispatch(updateFullscreen(fs));
   },
-  getQuery: id => {
-    dispatch(getQuery(id));
+  getQuery: (id, idType) => {
+    dispatch(getQuery(id, idType));
   },
   updateInitialQuery: () => {
     dispatch(updateInitialQuery());
@@ -114,8 +124,8 @@ const mapDispatchToProps = dispatch => ({
   queryFound: found => {
     dispatch(queryFound(found));
   },
-  initialServerState: () => {
-    dispatch(initialServerState());
+  initApp: () => {
+    dispatch(initApp());
   }
 });
 

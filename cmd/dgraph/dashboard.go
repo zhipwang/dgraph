@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/dgraph-io/dgraph/protos/graphp"
 	"github.com/dgraph-io/dgraph/x"
@@ -108,39 +109,40 @@ func keywordHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(js)
 }
 
-func hasOnlySharePred(mutation *graphp.Mutation) bool {
+func hasOnlyInternalPred(mutation *graphp.Mutation) bool {
 	for _, nq := range mutation.Set {
-		if nq.Predicate != INTERNAL_SHARE {
-			return false
+		if strings.HasPrefix(nq.Predicate, INTERNAL_PRED_PREFIX) {
+			return true
 		}
 	}
 
 	for _, nq := range mutation.Del {
-		if nq.Predicate != INTERNAL_SHARE {
-			return false
+		if strings.HasPrefix(nq.Predicate, INTERNAL_PRED_PREFIX) {
+			return true
 		}
 	}
-	return true
+
+	return false
 }
 
-func hasSharePred(mutation *graphp.Mutation) bool {
+func hasInternalPred(mutation *graphp.Mutation) bool {
 	for _, nq := range mutation.Set {
-		if nq.Predicate == INTERNAL_SHARE {
+		if strings.HasPrefix(nq.Predicate, INTERNAL_PRED_PREFIX) {
 			return true
 		}
 	}
 
 	for _, nq := range mutation.Del {
-		if nq.Predicate == INTERNAL_SHARE {
+		if strings.HasPrefix(nq.Predicate, INTERNAL_PRED_PREFIX) {
 			return true
 		}
 	}
+
 	return false
 }
 
 type dashboardState struct {
-	Share     bool   `json:"share"`
-	SharePred string `json:"share_pred"`
+	Share bool `json:"share"`
 }
 
 func initialState(w http.ResponseWriter, r *http.Request) {
@@ -151,8 +153,7 @@ func initialState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ds := dashboardState{
-		Share:     !*noshare,
-		SharePred: INTERNAL_SHARE,
+		Share: !*nointernal,
 	}
 
 	js, err := json.Marshal(ds)

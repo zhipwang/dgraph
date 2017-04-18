@@ -241,11 +241,11 @@ export const getShareId = (dispatch, getState) => {
     if (query === "") {
         return;
     }
-    let stringifiedQuery = JSON.stringify(encodeURI(query)),
+    let stringifiedQuery = JSON.stringify(encodeURI(query));
         // Considering that index is already set on the pred, schema mutation
         // should be a no-op. Lets see if we have already stored this query by
         // performing an exact match.
-        checkQuery = `
+    let checkQuery = `
 mutation {
     schema {
         _share_: string @index(exact) .
@@ -287,7 +287,25 @@ mutation {
     });
 };
 
-export const getQuery = shareId => {
+/**
+ * getQuery gets the query from Dgraph based on either sharedId or sessionId
+ * @params id {String} - shareId or sessionId
+ * @params idType {String} - the type of id. Either `share`, or `session`
+ */
+export const getQuery = (id, idType = 'query') => {
+    let queryPredicate;
+    if (idType === 'session') {
+        queryPredicate = '_internal_.query';
+    } else {
+        queryPredicate = '_share_';
+    }
+
+    const queryBody = `{
+      ${idType}(id: ${id}) {
+          ${queryPredicate}
+    }
+}`;
+
     return dispatch => {
         timeout(
             6000,
@@ -297,18 +315,14 @@ export const getQuery = shareId => {
                 headers: {
                     Accept: "application/json"
                 },
-                body: `{
-                    query(id: ${shareId}) {
-                        _share_
-                    }
-                }`
+                body: queryBody
             })
                 .then(checkStatus)
                 .then(response => response.json())
                 .then(function(result) {
-                    if (result.query && result.query.length > 0) {
+                    if (result[idType] && result[idType].length > 0) {
                         dispatch(
-                            selectQuery(decodeURI(result.query[0]["_share_"]))
+                            selectQuery(decodeURI(result[idType][0][queryPredicate]))
                         );
                         return;
                     }
@@ -317,7 +331,7 @@ export const getQuery = shareId => {
         ).catch(function(error) {
             dispatch(
                 saveErrorResponse(
-                    `Got error while getting query for id: ${shareId}, err: ` +
+                    `Got error while getting query for ${idType} id: ${id}, err: ` +
                         error.message
                 )
             );
@@ -330,7 +344,7 @@ const updateAllowed = allowed => ({
     allowed: allowed
 });
 
-export const initialServerState = () => {
+export const initApp = () => {
     const endpoint = [dgraphAddress(), "ui/init"].join("/");
     return dispatch => {
         timeout(
