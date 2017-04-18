@@ -10,7 +10,8 @@ import Response from "./Response";
 import {
   updateFullscreen,
   getQuery,
-  updateInitialQuery,
+  runQuery,
+  handleUpdateInitialQuery,
   queryFound,
   initApp
 } from "../actions";
@@ -60,7 +61,7 @@ class App extends React.Component {
                   <div
                     title="Enter full screen mode"
                     className="pull-right App-fullscreen"
-                    onClick={() => this.enterFullScreen(this.props.updateFs)}
+                    onClick={() => this.enterFullScreen(this.props.handleUpdateFullscreen)}
                   >
                     <span
                       className="App-fs-icon glyphicon glyphicon-glyphicon glyphicon-resize-full"
@@ -77,7 +78,7 @@ class App extends React.Component {
   };
 
   componentDidMount = () => {
-    const { initApp, getQuery, location, match: { params } } = this.props;
+    const { initApp, handleRunQuery, handleGetQuery, location, match: { params }, currentQuery } = this.props;
 
     initApp();
 
@@ -86,11 +87,18 @@ class App extends React.Component {
       getQuery(params.id);
     }
 
-    // If session query param is present, fetch the query for that session
+    // If sessionId query param is present, fetch the query for that session
     const searchParams = new URLSearchParams(location.search);
-    const session = searchParams.get('session');
-    if (session) {
-      getQuery(session, 'session');
+    const sessionId = searchParams.get('sessionId');
+    if (sessionId) {
+      handleGetQuery(sessionId, 'session').then(() => {
+          console.log('yeah');
+          return handleRunQuery(currentQuery);
+        })
+        .catch(e => {
+          // TODO: move error handling out of getQuery and runQuery to here
+          console.log(e);
+        });
     }
   };
 
@@ -108,18 +116,19 @@ class App extends React.Component {
 }
 
 const mapStateToProps = state => ({
-  found: state.share.found
+  found: state.share.found,
+  currentQuery: state.query.text
 });
 
 const mapDispatchToProps = dispatch => ({
-  updateFs: fs => {
+  handleUpdateFullscreen: fs => {
     dispatch(updateFullscreen(fs));
   },
-  getQuery: (id, idType) => {
-    dispatch(getQuery(id, idType));
+  handleGetQuery: (id, idType) => {
+    return dispatch(getQuery(id, idType));
   },
-  updateInitialQuery: () => {
-    dispatch(updateInitialQuery());
+  handleRunQuery: (query) => {
+    return dispatch(runQuery(query));
   },
   queryFound: found => {
     dispatch(queryFound(found));
