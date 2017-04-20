@@ -1,13 +1,5 @@
 import React, { Component } from "react";
 import { connect } from "react-redux";
-import {
-  Button,
-  Form,
-  FormControl,
-  FormGroup,
-  ControlLabel,
-  Col
-} from "react-bootstrap";
 
 import { runQuery, updateRegex, selectQuery, updateShareId } from "../actions";
 import { timeout, checkStatus, sortStrings, dgraphAddress } from "./Helpers";
@@ -22,45 +14,12 @@ class Editor extends Component {
 
   render() {
     return (
-      <div>
-        <Form horizontal bsSize="sm" style={{ marginBottom: "10px" }}>
-          <FormGroup bsSize="sm">
-            <Col xs={2}>
-              <ControlLabel>Query</ControlLabel>
-            </Col>
-            <Col xs={8}>
-              <FormControl
-                type="text"
-                placeholder="Regex to choose property for display"
-                value={this.props.regex}
-                onChange={e => {
-                  e.preventDefault();
-                  this.props.updateRegex(e.target.value);
-                }}
-              />
-            </Col>
-            <Col xs={2}>
-              <Button
-                type="submit"
-                className="btn btn-primary pull-right"
-                onClick={e => {
-                  e.preventDefault();
-                  this.props.onRunQuery(this.getValue());
-                }}
-              >
-                Run
-              </Button>
-            </Col>
-          </FormGroup>
-        </Form>
-
-        <div
-          className="Editor-basic"
-          ref={editor => {
-            this._editor = editor;
-          }}
-        />
-      </div>
+      <div
+        className="Editor-basic"
+        ref={editor => {
+          this._editor = editor;
+        }}
+      />
     );
   }
 
@@ -258,8 +217,11 @@ class Editor extends Component {
     };
 
     this.editor.on("change", cm => {
-      this.props.updateShareId("");
-      this.props.updateQuery(this.editor.getValue());
+      const { onQueryUpdate, updateShareId } = this.props;
+      const val = this.editor.getValue();
+
+      updateShareId("");
+      onQueryUpdate(val);
     });
 
     this.editor.on("keydown", function(cm, event) {

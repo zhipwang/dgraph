@@ -4,16 +4,17 @@ import { connect } from "react-redux";
 import screenfull from "screenfull";
 import { Alert } from "react-bootstrap";
 
-import NavbarContainer from "../containers/NavbarContainer";
-import PreviousQueryListContainer from "./PreviousQueryListContainer";
-import Editor from "./Editor";
-import Response from "./Response";
+import Sidebar from '../components/Sidebar';
+import EditorPanel from '../components/EditorPanel';
+
 import {
   updateFullscreen,
   getQuery,
   updateInitialQuery,
   queryFound,
-  initialServerState
+  initialServerState,
+  selectQuery,
+  runQuery
 } from "../actions";
 
 import "../assets/css/App.css";
@@ -28,14 +29,20 @@ class App extends React.Component {
     screenfull.request(responseEl);
   };
 
+  toggleSidebarOpen = () => {
+    this.setState({ sidebarOpen: !this.state.sidebarOpen });
+  }
+
   render = () => {
+    const { handleQueryRun } = this.props;
+
     return (
-      <div>
-        <NavbarContainer />
-        <div className="container-fluid">
-          <div className="row justify-content-md-center">
-            <div className="col-sm-12">
-              <div className="col-sm-8 col-sm-offset-2">
+      <div className="app-layout">
+        <Sidebar />
+        <div className="main-content">
+          <div className="container-fluid">
+            <div className="row justify-content-md-center">
+              <div className="col-sm-12">
                 {!this.props.found &&
                   <Alert
                     ref={alert => {
@@ -49,24 +56,10 @@ class App extends React.Component {
                     Couldn't find query with the given id.
                   </Alert>}
               </div>
-              <div className="col-sm-5">
-                <Editor />
-                <PreviousQueryListContainer xs="hidden-xs" />
-              </div>
-              <div className="col-sm-7">
-                <label style={{ marginLeft: "5px" }}> Response </label>
-                {screenfull.enabled &&
-                  <div
-                    title="Enter full screen mode"
-                    className="pull-right App-fullscreen"
-                    onClick={this.enterFullScreen}
-                  >
-                    <span
-                      className="App-fs-icon glyphicon glyphicon-glyphicon glyphicon-resize-full"
-                    />
-                  </div>}
-                <Response ref="response" />
-                <PreviousQueryListContainer xs="visible-xs-block" />
+              <div>
+                <EditorPanel
+                  onQueryRun={handleQueryRun}
+                />
               </div>
             </div>
           </div>
@@ -76,14 +69,27 @@ class App extends React.Component {
   };
 
   componentDidMount = () => {
+
     const { handleUpdateFullscreen } = this.props;
     this.props.initialServerState();
+
+    const { handleQuerySelect, handleQueryRun } = this.props;
+
     let id = this.props.match.params.id;
     if (id !== undefined) {
       this.props.getQuery(id);
     }
 
-    document.addEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
+    // If playQuery cookie is set, run the query and erase the cookie
+    // The cookie is used to communicate the query string between docs and play
+    const playQuery = readCookie('playQuery');
+    if (playQuery) {
+      const queryString = decodeURI(playQuery);
+      handleQuerySelect(queryString);
+      handleQueryRun(queryString).then(() => {
+        eraseCookie('playQuery', { crossDomain: true });
+      });
+    }
   };
 
   componentWillUnmount = () => {
@@ -125,6 +131,12 @@ const mapDispatchToProps = dispatch => ({
   },
   initialServerState: () => {
     dispatch(initialServerState());
+  },
+  handleQuerySelect: (queryText) => {
+    dispatch(selectQuery(queryText));
+  },
+  handleQueryRun: (query) => {
+    return dispatch(runQuery(query));
   }
 });
 
