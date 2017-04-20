@@ -1,4 +1,5 @@
 import React from "react";
+import ReactDOM from 'react-dom';
 import { connect } from "react-redux";
 import screenfull from "screenfull";
 import { Alert } from "react-bootstrap";
@@ -20,15 +21,13 @@ import { readCookie, eraseCookie } from './Helpers';
 import "../assets/css/App.css";
 
 class App extends React.Component {
-  enterFullScreen = updateFullscreen => {
+  enterFullScreen = () => {
     if (!screenfull.enabled) {
       return;
     }
 
-    document.addEventListener(screenfull.raw.fullscreenchange, () => {
-      updateFullscreen(screenfull.isFullscreen);
-    });
-    screenfull.request(document.getElementById("response"));
+    const responseEl = ReactDOM.findDOMNode(this.refs.response);
+    screenfull.request(responseEl);
   };
 
   render = () => {
@@ -62,13 +61,13 @@ class App extends React.Component {
                   <div
                     title="Enter full screen mode"
                     className="pull-right App-fullscreen"
-                    onClick={() => this.enterFullScreen(this.props.updateFs)}
+                    onClick={this.enterFullScreen}
                   >
                     <span
                       className="App-fs-icon glyphicon glyphicon-glyphicon glyphicon-resize-full"
                     />
                   </div>}
-                <Response />
+                <Response ref="response" />
                 <PreviousQueryListContainer xs="visible-xs-block" />
               </div>
             </div>
@@ -79,7 +78,7 @@ class App extends React.Component {
   };
 
   componentDidMount = () => {
-    const { handleSelectQuery, handleRunQuery } = this.props;
+    const { handleSelectQuery, handleRunQuery, handleUpdateFullscreen } = this.props;
 
     let id = this.props.match.params.id;
     if (id !== undefined) {
@@ -96,7 +95,15 @@ class App extends React.Component {
         eraseCookie('playQuery', { crossDomain: true });
       });
     }
+
+    document.addEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
   };
+
+  componentWillUnmount = () => {
+    const { handleUpdateFullscreen } = this.props;
+
+    document.removeEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
+  }
 
   componentWillReceiveProps = nextProps => {
     if (!nextProps.found) {
@@ -116,8 +123,9 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-  updateFs: fs => {
-    dispatch(updateFullscreen(fs));
+  handleUpdateFullscreen: () => {
+    const fsState = screenfull.isFullscreen;
+    dispatch(updateFullscreen(fsState));
   },
   getQuery: id => {
     dispatch(getQuery(id));
