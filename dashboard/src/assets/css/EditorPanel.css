@@ -1,0 +1,20 @@
+.editor-panel {
+  /*padding: 12px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  border: 1px solid #eaeaea;*/
+}
+
+.action-list {
+  list-style: none;
+}
+
+.action-list .action {
+  display: inline-block;
+}
+
+.btn-dgraph {
+  border: 1px solid #d2d1d1;
+  background-color: white;
+  color: #8a8a8a;
+}

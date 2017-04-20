@@ -1,3 +1,5 @@
+import SHA256 from "crypto-js/sha256";
+
 import {
     timeout,
     checkStatus,
@@ -6,7 +8,8 @@ import {
     processGraph,
     getEndpoint
 } from "../containers/Helpers";
-import SHA256 from "crypto-js/sha256";
+
+import { receiveSession } from './session';
 
 // TODO - Check if its better to break this file down into multiple files.
 
@@ -137,14 +140,25 @@ export const runQuery = query => {
                             // This is the case in which user sends a mutation.
                             // We display the response from server.
                         } else {
-                            dispatch(addQuery(query));
-                            dispatch(saveSuccessResponse("", result, true));
+                            // dispatch(addQuery(query));
+                            // dispatch(saveSuccessResponse("", result, true));
+                            const session = {
+                              query,
+                              result
+                            };
+                            dispatch(receiveSession(session));
                         }
                     } else if (isNotEmpty(result)) {
-                        dispatch(addQuery(query));
-                        let mantainSortOrder = showTreeView(query);
-                        dispatch(saveSuccessResponse("", result, false));
-                        dispatch(renderGraph(query, result, mantainSortOrder));
+                        // dispatch(addQuery(query));
+                        // let mantainSortOrder = showTreeView(query);
+                        // dispatch(saveSuccessResponse("", result, false));
+                        // dispatch(renderGraph(query, result, mantainSortOrder));
+
+                        const session = {
+                          query,
+                          result
+                        };
+                        dispatch(receiveSession(session));
                     } else {
                         dispatch(
                             saveErrorResponse(
