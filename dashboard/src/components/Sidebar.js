@@ -56,6 +56,18 @@ class Sidebar extends React.Component {
                 <i className="fa fa-star" />
               </a>
             </li>
+            <li>
+              <a
+                href="#"
+                className={classnames('link', { active: currentMenu === 'help' })}
+                onClick={(e) => {
+                  e.preventDefault();
+                  this.handleToggleMenu('help')
+                }}
+              >
+                <i className="fa fa-question-circle-o" />
+              </a>
+            </li>
           </ul>
         </div>
         <div className={classnames('sidebar-content', { open: Boolean(currentMenu) })}>
@@ -63,6 +75,8 @@ class Sidebar extends React.Component {
             <div>favorite</div> : null}
           {currentMenu === 'about' ?
             <div>about</div> : null}
+          {currentMenu === 'help' ?
+            <div>help</div> : null}
         </div>
       </div>
     );

@@ -1,8 +1,53 @@
 .editor-panel {
-  /*padding: 12px;
-  border-radius: 8px;
-  background: #f7f7f7;
-  border: 1px solid #eaeaea;*/
+  border: 1px solid #d2d2d2;
+  border-radius: 1px;
+  margin-bottom: 13px;
+
+  .header {
+    border-bottom: 1px solid #d2d2d2;
+    overflow-y: auto;
+    background-color: #ffffff;
+  }
+
+  .actions {
+    float: right;
+  }
+
+  .status {
+    float: left;
+    padding-top: 11px;
+    padding-left: 13px;
+    color: #98d452;
+    font-size: 12px;
+
+    .icon {
+      margin-right: 3px;
+      font-size: 9px;
+      vertical-align: middle;
+    }
+    .text {
+      vertical-align: middle;
+    }
+  }
+
+  .action {
+    padding: 8px 10px;
+    display: inline-block;
+    border-left: 1px solid #d2d2d2;
+    color: #d4d4d4;
+    transition: color 0.2s ease-out;
+
+
+    &:hover {
+      background: #f7f7f7;
+      color: gray;
+    }
+  }
+
+  #run-btn.dirty {
+    color: gray;
+    transition: color 0.2s ease-in;
+  }
 }
 
 .action-list {

@@ -24,7 +24,7 @@
 
 .CodeMirror-gutters {
   border-right: 1px solid #ddd;
-  background-color: #f7f7f7;
+  background-color: rgb(243, 243, 243);
   white-space: nowrap;
 }
 .CodeMirror-linenumbers {}
@@ -32,7 +32,7 @@
   padding: 0 3px 0 5px;
   min-width: 20px;
   text-align: right;
-  color: #999;
+  color: #484848;
   white-space: nowrap;
 }
 
@@ -364,11 +364,23 @@ span.CodeMirror-selectedtext { background: none; }
 /* Custom styles */
 
 .CodeMirror {
-    min-height: 230px;
+    min-height: 20px;
     /*height: auto;*/
-    font-size: 12px;
 }
 
 .cm-invalidchar {
     color: black;
+}
+
+.editor-panel .CodeMirror-gutters {
+  background-color: rgb(243, 243, 243);
+}
+.editor-panel .CodeMirror-linenumber {
+  color: #484848;
+}
+.editor-panel .CodeMirror-cursor {
+  background: rgba(40, 41, 41, 0.67);
+}
+.CodeMirror-scroll {
+  max-height: 280px;
 }

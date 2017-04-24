@@ -1,0 +1,125 @@
+.session-list {
+  list-style: none;
+  padding-left: 0;
+  perspective: 100px;
+}
+
+.session-item {
+  border: 1px solid #d2d2d2;
+  border-radius: 1px;
+  margin-bottom: 14px;
+  transition: all 0.6s ease-in;
+  opacity: 0;
+  background-color: #fcfcfc;
+  max-height: 0;
+  overflow: hidden;
+
+  &.shown {
+    transition: max-height 0.6s ease-in;
+    max-height: 2300px;
+    opacity: 1;
+  }
+
+  .header {
+    border-bottom: 1px solid #d2d2d2;
+    overflow-y: auto;
+    background-color: #ffffff;
+  }
+
+  .actions {
+    float: right;
+  }
+
+  .action {
+    padding: 8px 10px;
+    display: inline-block;
+    border-left: 1px solid #d2d2d2;
+    color: inherit;
+  }
+
+  .query pre {
+    border: 0;
+    border-radius: 0;
+    margin-bottom: 0;
+  }
+
+  .content-container {
+    display: flex;
+
+    .sidebar {
+      flex: 0.02;
+      background: #f9f9f9;
+      border-right: 1px solid #d4d4d4;
+    }
+
+    .content {
+      flex: 1;
+    }
+
+    pre {
+      height: 509px;
+      overflow: auto;
+      margin: 0;
+      padding: 13px 17px;
+      border: 0;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+      padding-left: 0;
+
+      .sidebar-nav-item {
+        text-align: center;
+        padding: 13px 11px;
+        display: block;
+        color: gray;
+        border-bottom: 1px solid #d4d4d4;
+        text-decoration: none;
+
+        .menu-label {
+          margin-top: 6px;
+          display: block;
+          text-transform: uppercase;
+          font-size: 11px;
+        }
+
+        .fa {
+          font-size: 23px;
+        }
+
+        svg {
+          fill: gray;
+        }
+
+        &.active {
+          color: #000000;
+
+          svg {
+            fill: #000000;
+          }
+
+          .menu-label {
+            font-weight: 600;
+          }
+        }
+
+        &:hover {
+          text-decoration: none;
+        }
+
+        &:not(.active):hover {
+          background: #d2d0d0;
+          color: #000000;
+
+          svg {
+            fill: #000000;
+          }
+        }
+      }
+
+      .icon {
+        display: block;
+      }
+    }
+  }
+}

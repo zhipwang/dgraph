@@ -129,7 +129,7 @@ export const runQuery = query => {
             })
                 .then(checkStatus)
                 .then(response => response.json())
-                .then(function handleResponse(result) {
+                .then((result) => {
                     dispatch(fetchedResponse());
                     if (
                         result.code !== undefined &&
@@ -142,9 +142,24 @@ export const runQuery = query => {
                         } else {
                             // dispatch(addQuery(query));
                             // dispatch(saveSuccessResponse("", result, true));
+                            let [ nodes, edges, labels, nodesIdx, edgesIdx ] = processGraph(
+                              result,
+                              query,
+                              false
+                            );
                             const session = {
                               query,
-                              result
+                              response: {
+                                plotAxis: labels,
+                                allNodes: nodes,
+                                allEdges: edges,
+                                numNodes: nodes.length,
+                                numEdges: edges.length,
+                                nodes: nodes.slice(0, nodesIdx),
+                                edges: edges.slice(0, edgesIdx),
+                                treeView: false,
+                                data: result
+                              }
                             };
                             dispatch(receiveSession(session));
                         }
@@ -153,10 +168,26 @@ export const runQuery = query => {
                         // let mantainSortOrder = showTreeView(query);
                         // dispatch(saveSuccessResponse("", result, false));
                         // dispatch(renderGraph(query, result, mantainSortOrder));
+                        const { nodes, edges, labels, nodesIdx, edgesIdx } = processGraph(
+                          result,
+                          false,
+                          query,
+                          ""
+                        );
 
                         const session = {
                           query,
-                          result
+                          response: {
+                            plotAxis: labels,
+                            allNodes: nodes,
+                            allEdges: edges,
+                            numNodes: nodes.length,
+                            numEdges: edges.length,
+                            nodes: nodes.slice(0, nodesIdx),
+                            edges: edges.slice(0, edgesIdx),
+                            treeView: false,
+                            data: result
+                          }
                         };
                         dispatch(receiveSession(session));
                     } else {

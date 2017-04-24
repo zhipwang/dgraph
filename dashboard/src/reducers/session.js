@@ -10,7 +10,7 @@ const session = (state = defaultState, action) => {
         case RECEIVE_SESSION:
             return {
                 ...state,
-                items: [ ...state.items, action.session ]
+                items: [ action.session, ...state.items ]
             };
         default:
             return state;

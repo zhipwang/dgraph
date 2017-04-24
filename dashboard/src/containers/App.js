@@ -6,6 +6,7 @@ import { Alert } from "react-bootstrap";
 
 import Sidebar from '../components/Sidebar';
 import EditorPanel from '../components/EditorPanel';
+import SessionList from '../components/SessionList';
 
 import {
   updateFullscreen,
@@ -20,54 +21,6 @@ import { readCookie, eraseCookie } from './Helpers';
 import "../assets/css/App.css";
 
 class App extends React.Component {
-  enterFullScreen = () => {
-    if (!screenfull.enabled) {
-      return;
-    }
-
-    const responseEl = ReactDOM.findDOMNode(this.refs.response);
-    screenfull.request(responseEl);
-  };
-
-  toggleSidebarOpen = () => {
-    this.setState({ sidebarOpen: !this.state.sidebarOpen });
-  }
-
-  render = () => {
-    const { handleQueryRun } = this.props;
-
-    return (
-      <div className="app-layout">
-        <Sidebar />
-        <div className="main-content">
-          <div className="container-fluid">
-            <div className="row justify-content-md-center">
-              <div className="col-sm-12">
-                {!this.props.found &&
-                  <Alert
-                    ref={alert => {
-                      this.alert = alert;
-                    }}
-                    bsStyle="danger"
-                    onDismiss={() => {
-                      this.props.queryFound(true);
-                    }}
-                  >
-                    Couldn't find query with the given id.
-                  </Alert>}
-              </div>
-              <div>
-                <EditorPanel
-                  onQueryRun={handleQueryRun}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   componentDidMount = () => {
     const { handleSelectQuery, handleRunQuery, handleUpdateFullscreen } = this.props;
 
@@ -106,11 +59,65 @@ class App extends React.Component {
         3000
       );
     }
+  }
+
+  enterFullScreen = () => {
+    if (!screenfull.enabled) {
+      return;
+    }
+
+    const responseEl = ReactDOM.findDOMNode(this.refs.response);
+    screenfull.request(responseEl);
+  };
+
+  toggleSidebarOpen = () => {
+    this.setState({ sidebarOpen: !this.state.sidebarOpen });
+  }
+
+  render = () => {
+    const { handleRunQuery, sessions } = this.props;
+
+    return (
+      <div className="app-layout">
+        <Sidebar />
+        <div className="main-content">
+          <div className="container-fluid">
+            <div className="row justify-content-md-center">
+              <div className="col-sm-12">
+                {!this.props.found &&
+                  <Alert
+                    ref={alert => {
+                      this.alert = alert;
+                    }}
+                    bsStyle="danger"
+                    onDismiss={() => {
+                      this.props.queryFound(true);
+                    }}
+                  >
+                    Couldn't find query with the given id.
+                  </Alert>}
+              </div>
+
+              <div className="col-sm-12">
+                <EditorPanel
+                  onRunQuery={handleRunQuery}
+                />
+              </div>
+
+              <div className="col-sm-12">
+                <SessionList sessions={sessions} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 }
 
 const mapStateToProps = state => ({
-  found: state.share.found
+  found: state.share.found,
+  sessions: state.session.items
 });
 
 const mapDispatchToProps = dispatch => ({

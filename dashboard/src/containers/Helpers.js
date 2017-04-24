@@ -266,6 +266,7 @@ function findAndMerge(nodes, n) {
   nodes[idx] = node;
 }
 
+// processGraph returns graph properties from response
 export function processGraph(
   response: Object,
   treeView: boolean,
@@ -525,7 +526,13 @@ export function processGraph(
     }
   }
 
-  return [nodes, edges, createAxisPlot(groups), nodesIndex, edgesIndex];
+  return {
+    nodes,
+    edges,
+    axisPlot: createAxisPlot(groups),
+    nodesIndex,
+    edgesIndex
+  };
 }
 
 export function sortStrings(a, b) {

@@ -116,7 +116,7 @@ class Editor extends Component {
       tabSize: 2,
       lineWrapping: true,
       mode: "graphql",
-      theme: "graphiql",
+      theme: "neo",
       keyMap: "sublime",
       autoCloseBrackets: true,
       completeSingle: false,
@@ -217,11 +217,11 @@ class Editor extends Component {
     };
 
     this.editor.on("change", cm => {
-      const { onQueryUpdate, updateShareId } = this.props;
+      const { onUpdateQuery, updateShareId } = this.props;
       const val = this.editor.getValue();
 
       updateShareId("");
-      onQueryUpdate(val);
+      onUpdateQuery(val);
     });
 
     this.editor.on("keydown", function(cm, event) {
