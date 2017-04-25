@@ -2,9 +2,11 @@ import React, { Component } from "react";
 import vis from 'vis';
 import { connect } from "react-redux";
 import _ from "lodash/object";
+import classnames from 'classnames';
 
 import { renderNetwork } from '../lib/graph';
 import Label from '../components/Label';
+import Progress from '../components/Progress';
 import { outgoingEdges } from './Helpers';
 
 import "../assets/css/Graph.css";
@@ -18,14 +20,16 @@ class GraphContainer extends Component {
         super(props);
 
         this.state = {
-          renderTime: null
+          renderProgress: 0
         };
     }
 
     componentDidMount() {
-      const { response, treeView, onRendered } = this.props;
+      const { response, treeView, onBeforeRender, onRendered } = this.props;
 
-      const { renderTime, network } = renderNetwork({
+      onBeforeRender();
+
+      const { network } = renderNetwork({
         nodes: response.nodes,
         edges: response.edges,
         allNodes: response.allNodes,
@@ -34,11 +38,17 @@ class GraphContainer extends Component {
         treeView,
       });
 
-      this.configNetworkBehavior(network);
-
-      if (onRendered) {
-        onRendered(renderTime);
+      // In tree view, physics is disabled and stabilizationIterationDone is not fired.
+      if (treeView) {
+        this.setState({ renderProgress: 100 }, () => {
+          onRendered();
+          // FIXME: tree does not fit because when it is rendered at the initial render, it is not visible
+          // maybe lazy render
+          // network.fit();
+        });
       }
+
+      this.configNetworkBehavior(network);
     }
 
     /**
@@ -53,6 +63,7 @@ class GraphContainer extends Component {
       const allEdgeSet = new vis.DataSet(allEdges);
       const allNodeSet = new vis.DataSet(allNodes);
 
+      // multiLevelExpand recursively expands all edges outgoing from the node
       function multiLevelExpand(nodeId) {
         let nodes = [nodeId], nodeStack = [nodeId], adjEdges = [];
         while (nodeStack.length !== 0) {
@@ -73,6 +84,22 @@ class GraphContainer extends Component {
         data.nodes.update(allNodeSet.get(nodes));
         data.edges.update(adjEdges);
       }
+
+      network.on("stabilizationProgress", (params) => {
+        var widthFactor = params.iterations / params.total;
+
+        this.setState({
+          renderProgress: widthFactor * 100
+        });
+      });
+
+      network.once("stabilizationIterationsDone", () => {
+        const { onRendered } = this.props;
+        this.setState({ renderProgress: 100 }, () => {
+          network.fit();
+          onRendered();
+        });
+      });
 
       network.on("click", (params) => {
         const t0 = new Date();
@@ -161,6 +188,9 @@ class GraphContainer extends Component {
 
     render() {
         const { response } = this.props;
+        const { renderProgress } = this.state;
+
+        const isRendering = renderProgress !== 100;
 
         return (
           <div className="graph-container content">
@@ -176,7 +206,10 @@ class GraphContainer extends Component {
                 );
               })}
             </div>
-            <div ref="graph" className="graph" />
+
+            {isRendering ? <Progress perc={renderProgress} /> :null}
+            <div ref="graph" className={classnames('graph', { hidden: isRendering })} />
+
           </div>
         );
     }

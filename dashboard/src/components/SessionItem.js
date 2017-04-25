@@ -17,18 +17,28 @@ class SessionItem extends React.Component {
     this.state = {
       // tabs: query, graph, tree, json
       currentTab: 'graph',
-      graphRenderTime: null,
-      treeRenderTime: null,
+      graphRenderStart: null,
+      graphRenderEnd: null,
+      treeRenderStart: null,
+      treeRenderEnd: null,
       currentNode: null
     };
   }
 
-  handleGraphRendered = (renderTime) => {
-    this.setState({ graphRenderTime: renderTime });
+  handleBeforeGraphRender = () => {
+    this.setState({ graphRenderStart: new Date() });
   }
 
-  handleTreeRendered = (renderTime) => {
-    this.setState({ treeRenderTime: renderTime });
+  handleGraphRendered = () => {
+    this.setState({ graphRenderEnd: new Date() });
+  }
+
+  handleBeforeTreeRender = () => {
+    this.setState({ treeRenderStart: new Date() });
+  }
+
+  handleTreeRendered = () => {
+    this.setState({ treeRenderEnd: new Date() });
   }
 
   handleNodeSelected = (node) => {
@@ -43,9 +53,27 @@ class SessionItem extends React.Component {
     });
   }
 
+  getGraphRenderTime = () => {
+    const { graphRenderStart, graphRenderEnd } = this.state;
+    if (!graphRenderStart || !graphRenderEnd) {
+      return
+    }
+
+    return graphRenderEnd.getTime() - graphRenderStart.getTime();
+  }
+
+  getTreeRenderTime = () => {
+    const { treeRenderStart, treeRenderEnd } = this.state;
+    if (!treeRenderStart || !treeRenderEnd) {
+      return
+    }
+
+    return treeRenderEnd.getTime() - treeRenderStart.getTime();
+  }
+
   render() {
     const { session } = this.props;
-    const { isShown, currentTab, graphRenderTime, treeRenderTime, currentNode } = this.state;
+    const { isShown, currentTab, currentNode } = this.state;
 
     return (
       <li className={classnames('session-item', { shown: isShown })}>
@@ -122,6 +150,7 @@ class SessionItem extends React.Component {
             <SessionGraphTab
               session={session}
               active={currentTab === 'graph'}
+              onBeforeGraphRender={this.handleBeforeGraphRender}
               onGraphRendered={this.handleGraphRendered}
               onNodeSelected={this.handleNodeSelected}
               currentNode={currentNode}
@@ -129,6 +158,7 @@ class SessionItem extends React.Component {
             <SessionTreeTab
               session={session}
               active={currentTab === 'tree'}
+              onBeforeTreeRender={this.handleBeforeTreeRender}
               onTreeRendered={this.handleTreeRendered}
               onNodeSelected={this.handleNodeSelected}
               currentNode={currentNode}
@@ -142,8 +172,8 @@ class SessionItem extends React.Component {
               session={session}
               currentTab={currentTab}
               currentNode={currentNode}
-              graphRenderTime={graphRenderTime}
-              treeRenderTime={treeRenderTime}
+              graphRenderTime={this.getGraphRenderTime()}
+              treeRenderTime={this.getTreeRenderTime()}
             />
           </div>
         </div>

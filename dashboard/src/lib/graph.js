@@ -93,10 +93,7 @@ export function renderNetwork({ nodes, edges, treeView, allNodes, allEdges, cont
 
     const network = new vis.Network(containerEl, data, options);
 
-    var end = new Date();
-    var renderTime = (end.getTime() - start.getTime());
     return {
-      network,
-      renderTime
+      network
     };
 }
