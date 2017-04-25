@@ -1,74 +1,59 @@
 // @flow
 
 import React, { Component } from "react";
-import { Button, Glyphicon } from "react-bootstrap";
 
 import "../assets/css/Properties.css";
 
 class Properties extends Component {
     render() {
-        let nodeProperties = this.props.currentNode !== "{}" &&
-            JSON.parse(this.props.currentNode.title),
-            { name, uid } = this.props.currentNode,
-            // Nodes have facets and attrs keys.
-            isEdge = Object.keys(nodeProperties).length === 1,
-            attrs = nodeProperties["attrs"] || {},
-            facets = nodeProperties["facets"] || {};
+        const { node } = this.props;
+        const nodeProperties = JSON.parse(node.title)
+
+        // Nodes have facets and attrs keys.
+        const isEdge = Object.keys(nodeProperties).length === 1;
+        const attrs = nodeProperties.attrs || {};
+        const facets = nodeProperties.facets || {};
 
         return (
             <div id="properties">
-                {isEdge
-                    ? <span>Edge Attributes:</span>
-                    : <div>
-                          <span>Node Attributes:</span>
-                          <Button
-                              title="Add uid to scratchpad"
-                              style={{ marginLeft: "5px" }}
-                              bsSize="xsmall"
-                              onClick={() => {
-                                  this.props.addEntry(uid, name);
-                              }}
-                          >
-                              <Glyphicon glyph="save" />
-                          </Button>
-                      </div>}
+                <span>Selected {isEdge ? 'edge' : 'node'}:</span>
                 {!isEdge &&
                     <div>
-                        <div className="Properties">
+                        <ul className="Properties">
                             {Object.keys(attrs).map(function(key, idx) {
                                 return (
-                                    <div
+                                    <li
                                         className="Properties-key-val"
                                         key={idx}
                                     >
-                                        <div className="Properties-key">
-                                            {key}:&nbsp;
-                                        </div>
-                                        <div className="Properties-val">
+                                        <span className="Properties-key">
+                                            {key}:
+                                        </span>
+                                        <span className="Properties-val">
                                             {String(attrs[key])}
-                                        </div>
-                                    </div>
+                                        </span>
+                                    </li>
                                 );
                             })}
-                        </div>
+                        </ul>
                     </div>}
                 {Object.keys(facets).length > 0 &&
                     !isEdge &&
                     <span className="Properties-facets">Facets</span>}
-                <div className="Properties">
+                <ul className="Properties">
                     {Object.keys(facets).map(function(key, idx) {
                         return (
-                            <div className="Properties-key-val" key={idx}>
-                                <div className="Properties-key">
-                                    {key}:&nbsp;
-                                </div>
-                                <div className="Properties-val">
+                            <li className="Properties-key-val" key={idx}>
+                                <span className="Properties-key">
+                                    {key}:
+                                </span>
+                                <span className="Properties-val">
                                     {String(facets[key])}
-                                </div>
-                            </div>
+                                </span>
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             </div>
         );
     }
