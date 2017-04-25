@@ -529,7 +529,7 @@ export function processGraph(
   return {
     nodes,
     edges,
-    axisPlot: createAxisPlot(groups),
+    labels: createAxisPlot(groups),
     nodesIndex,
     edgesIndex
   };

@@ -3,6 +3,7 @@ import { connect } from "react-redux";
 import _ from "lodash/object";
 
 import { renderNetwork } from '../lib/graph';
+import Label from '../components/Label';
 
 import "../assets/css/Graph.css";
 import "vis/dist/vis.min.css";
@@ -31,8 +32,24 @@ class GraphContainer extends Component {
     }
 
     render() {
+        const { response } = this.props;
+
         return (
-            <div ref="graph" className="content" />
+          <div className="graph-container content">
+            <div className="labels">
+              {response.plotAxis.map((label, i) => {
+                return (
+                  <Label
+                    key={i}
+                    color={label.color}
+                    pred={label.pred}
+                    label={label.label}
+                  />
+                );
+              })}
+            </div>
+            <div ref="graph" className="graph" />
+          </div>
         );
     }
 }
