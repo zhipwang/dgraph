@@ -1,29 +1,29 @@
 import React from "react";
-import { Nav, NavItem } from "react-bootstrap";
+// import { Nav, NavItem } from "react-bootstrap";
 
-import Label from "../components/Label";
-import ProgressBarContainer from "../containers/ProgressBarContainer";
+// import Label from "../components/Label";
 
 import "../assets/css/Graph.css";
 
-function Graph(props) {
+class Graph extends React.Component {
+  render() {
     let {
         text,
         success,
-        plotAxis,
+        // plotAxis,
         fs,
         isFetching,
-        json,
-        selectTab,
+        // json,
+        // selectTab,
         selectedTab,
-        saveGraphRef
-    } = props,
+        // saveGraphRef
+    } = this.props,
         graphClass = fs ? "Graph-fs" : "Graph-s",
         bgColor,
         hourglass = isFetching ? "Graph-hourglass" : "",
         graphHeight = fs ? "Graph-full-height" : "Graph-fixed-height",
-        showGraph = selectedTab === "1" ? "" : "Graph-hide",
-        showJSON = selectedTab === "2" ? "" : "Graph-hide";
+        showGraph = selectedTab === "1" ? "" : "Graph-hide";
+        // showJSON = selectedTab === "2" ? "" : "Graph-hide";
 
     if (success) {
         if (text !== "") {
@@ -38,29 +38,13 @@ function Graph(props) {
     return (
         <div className="Graph-wrapper">
             <div className="Graph-outer">
-                <div className={`${graphHeight} ${showGraph}`}>
-                    <ProgressBarContainer />
-                    <div
-                        ref={saveGraphRef}
-                        className={
-                            `Graph ${graphClass} ${bgColor} ${hourglass}`
-                        }
-                    >
-                        {text}
-                    </div>
-                </div>
-            </div>
-            <div className={`${graphHeight} ${showJSON} Graph-json`}>
-                <div>
-                    <pre>
-                        <code>
-                            {JSON.stringify(json, null, 2)}
-                        </code>
-                    </pre>
+                <div id="graph">
+                  
                 </div>
             </div>
         </div>
     );
+  }
 }
 
 export default Graph;

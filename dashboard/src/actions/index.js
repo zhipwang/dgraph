@@ -4,7 +4,7 @@ import {
     timeout,
     checkStatus,
     isNotEmpty,
-    showTreeView,
+    // showTreeView,
     processGraph,
     getEndpoint
 } from "../containers/Helpers";
@@ -37,10 +37,10 @@ export const setCurrentNode = node => ({
     node
 });
 
-const addQuery = text => ({
-    type: "ADD_QUERY",
-    text
-});
+// const addQuery = text => ({
+//     type: "ADD_QUERY",
+//     text
+// });
 
 const isFetching = () => ({
     type: "IS_FETCHING",
@@ -52,12 +52,12 @@ const fetchedResponse = () => ({
     fetching: false
 });
 
-const saveSuccessResponse = (text, data, isMutation) => ({
-    type: "SUCCESS_RESPONSE",
-    text,
-    data,
-    isMutation
-});
+// const saveSuccessResponse = (text, data, isMutation) => ({
+//     type: "SUCCESS_RESPONSE",
+//     text,
+//     data,
+//     isMutation
+// });
 
 const saveErrorResponse = (text, json = {}) => ({
     type: "ERROR_RESPONSE",

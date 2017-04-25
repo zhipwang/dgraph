@@ -1,11 +1,12 @@
 import React from 'react';
+import classnames from 'classnames';
 
 import Highlight from './Highlight';
 
-const SessionJSONTab = ({ session }) => {
+const SessionJSONTab = ({ session, active }) => {
   return (
-    <div>
-      <Highlight preClass="json-response">
+    <div className={classnames('content-container', { hidden: !active})}>
+      <Highlight preClass="content">
         {JSON.stringify(session.response.data, null, 2)}
       </Highlight>
     </div>

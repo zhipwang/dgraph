@@ -43,7 +43,7 @@
     margin-bottom: 0;
   }
 
-  .content-container {
+  .body {
     display: flex;
 
     .sidebar {
@@ -52,12 +52,22 @@
       border-right: 1px solid #d4d4d4;
     }
 
+    .main {
+      flex: 1;
+      display: flex;
+      height: 400px;
+    }
+
+    .content-container {
+      flex: 1;
+      display: flex;
+    }
+
     .content {
       flex: 1;
     }
 
     pre {
-      height: 509px;
       overflow: auto;
       margin: 0;
       padding: 13px 17px;

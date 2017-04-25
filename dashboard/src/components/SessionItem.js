@@ -4,6 +4,7 @@ import classnames from 'classnames';
 import SessionQueryTab from './SessionQueryTab';
 import SessionGraphTab from './SessionGraphTab';
 import SessionJSONTab from './SessionJSONTab';
+import SessionTreeTab from './SessionTreeTab';
 import GraphIcon from './GraphIcon';
 import TreeIcon from './TreeIcon';
 
@@ -50,7 +51,7 @@ class SessionItem extends React.Component {
           </div>
         </div>
 
-        <div className="content-container">
+        <div className="body">
           <div className="sidebar">
             <ul className="sidebar-nav">
               <li>
@@ -100,10 +101,12 @@ class SessionItem extends React.Component {
               </li>
             </ul>
           </div>
-          <div className="content">
-            {currentTab === 'query' ? <SessionQueryTab session={session} /> : null }
-            {currentTab === 'graph' ? <SessionGraphTab session={session} /> : null }
-            {currentTab === 'json' ? <SessionJSONTab session={session} /> : null }
+
+          <div className="main">
+            <SessionQueryTab session={session} active={currentTab === 'query'} />
+            <SessionGraphTab session={session} active={currentTab === 'graph'} />
+            <SessionTreeTab session={session} active={currentTab === 'tree'} />
+            <SessionJSONTab session={session} active={currentTab === 'json'} />
           </div>
         </div>
       </li>
