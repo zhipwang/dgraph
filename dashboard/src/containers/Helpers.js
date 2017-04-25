@@ -93,6 +93,8 @@ function getNodeLabel(properties: Object, regex: string): string {
   return properties[nameKey] || "";
 }
 
+// outgoingEdges gets edges coming out from the node with the given nodeId in
+// given set of edges
 export function outgoingEdges(nodeId, edgeSet) {
   return edgeSet.get({
     filter: function(edge) {

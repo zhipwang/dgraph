@@ -5,6 +5,7 @@ import _ from "lodash/object";
 
 import { renderNetwork } from '../lib/graph';
 import Label from '../components/Label';
+import { outgoingEdges } from './Helpers';
 
 import "../assets/css/Graph.css";
 import "vis/dist/vis.min.css";
@@ -44,13 +45,36 @@ class GraphContainer extends Component {
      * configNetworkBehavior configures the custom behaviors for a vis.Network
      */
     configNetworkBehavior = (network) => {
-      const { response: { nodes, edges }, onNodeSelected } = this.props;
-      const data = {
-        nodes: new vis.DataSet(nodes),
-        edges: new vis.DataSet(edges)
-    };
+      const {
+        response: { allNodes, allEdges },
+        onNodeSelected
+      } = this.props;
+      const { data } = network.body;
+      const allEdgeSet = new vis.DataSet(allEdges);
+      const allNodeSet = new vis.DataSet(allNodes);
 
-      network.on("click", (params, allNode) => {
+      function multiLevelExpand(nodeId) {
+        let nodes = [nodeId], nodeStack = [nodeId], adjEdges = [];
+        while (nodeStack.length !== 0) {
+            let nodeId = nodeStack.pop();
+
+            let outgoing = outgoingEdges(nodeId, allEdgeSet),
+                adjNodeIds = outgoing.map(function(edge) {
+                    return edge.to;
+                });
+
+            nodeStack = nodeStack.concat(adjNodeIds);
+            nodes = nodes.concat(adjNodeIds);
+            adjEdges = adjEdges.concat(outgoing);
+            if (adjNodeIds.length > 3) {
+                break;
+            }
+        }
+        data.nodes.update(allNodeSet.get(nodes));
+        data.edges.update(adjEdges);
+      }
+
+      network.on("click", (params) => {
         const t0 = new Date();
 
         if (t0 - doubleClickTime > threshold) {
@@ -76,6 +100,61 @@ class GraphContainer extends Component {
             },
             threshold
           );
+        }
+      });
+
+      network.on("doubleClick", (params) => {
+        if (params.nodes && params.nodes.length > 0) {
+            const clickedNodeUid = params.nodes[0];
+            const clickedNode = data.nodes.get(clickedNodeUid);
+
+            network.unselectAll();
+            onNodeSelected(clickedNode);
+
+            const outgoing = outgoingEdges(clickedNodeUid, data.edges);
+            const allOutgoingEdges = outgoingEdges(clickedNodeUid, allEdgeSet);
+            const expanded = outgoing.length > 0 || allOutgoingEdges.length === 0;
+
+            let adjacentNodeIds: Array<string> = allOutgoingEdges.map(
+                function(edge) {
+                    return edge.to;
+                }
+            );
+
+            let adjacentNodes = allNodeSet.get(adjacentNodeIds);
+
+            // TODO -See if we can set a meta property to a node to know that its
+            // expanded or closed and avoid this computation.
+            if (expanded) {
+                // Collapse all child nodes recursively.
+                let allEdges = outgoing.map(function(edge) {
+                    return edge.id;
+                });
+
+                let allNodes = adjacentNodes.slice();
+
+                while (adjacentNodeIds.length > 0) {
+                    let node = adjacentNodeIds.pop();
+                    let connectedEdges = outgoingEdges(node, data.edges);
+
+                    let connectedNodes = connectedEdges.map(function(edge) {
+                        return edge.to;
+                    });
+
+                    allNodes = allNodes.concat(connectedNodes);
+                    allEdges = allEdges.concat(connectedEdges);
+                    adjacentNodeIds = adjacentNodeIds.concat(connectedNodes);
+                }
+
+                data.nodes.remove(allNodes);
+                data.edges.remove(allEdges);
+            } else {
+                multiLevelExpand(clickedNodeUid);
+                if (data.nodes.length === allNodeSet.length) {
+                    // TODO: what is partial?
+                    // dispatch(updatePartial(false));
+                }
+            }
         }
       });
     }
