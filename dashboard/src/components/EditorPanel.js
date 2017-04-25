@@ -17,6 +17,7 @@ class EditorPanel extends React.Component {
 
   handleQueryUpdate = (val) => {
     const dirty = val.trim() !== '';
+    console.log('updating query to ',val);
 
     this.setState({ query: val, dirty });
   }
@@ -24,13 +25,13 @@ class EditorPanel extends React.Component {
   handleRunQuery = (query) => {
     const { onRunQuery } = this.props;
 
-    // TODO: setState should be a callback to onRunQuery
-    this.setState({ dirty: false });
-    onRunQuery(query);
+    onRunQuery(query, () => {
+      this.setState({ dirty: false, query: '' });
+    });
   }
 
   render() {
-    const { dirty } = this.state;
+    const { query, dirty } = this.state;
 
     return (
       <div className="editor-panel">
@@ -61,6 +62,7 @@ class EditorPanel extends React.Component {
         <Editor
           onUpdateQuery={this.handleQueryUpdate}
           onRunQuery={this.handleRunQuery}
+          query={query}
         />
       </div>
     );

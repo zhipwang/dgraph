@@ -235,7 +235,6 @@ class Editor extends Component {
 }
 
 const mapStateToProps = state => ({
-  query: state.query.text,
   regex: state.query.propertyRegex
 });
 

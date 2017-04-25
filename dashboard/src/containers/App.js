@@ -137,8 +137,9 @@ const mapDispatchToProps = dispatch => ({
   handleSelectQuery: (queryText) => {
     dispatch(selectQuery(queryText));
   },
-  handleRunQuery: (query) => {
-    return dispatch(runQuery(query));
+  handleRunQuery: (query, done = () => {}) => {
+    return dispatch(runQuery(query))
+      .then(done);
   }
 });
 
