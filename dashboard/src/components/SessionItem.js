@@ -7,6 +7,7 @@ import SessionJSONTab from './SessionJSONTab';
 import SessionTreeTab from './SessionTreeTab';
 import GraphIcon from './GraphIcon';
 import TreeIcon from './TreeIcon';
+import { humanizeTime } from '../containers/Helpers';
 
 class SessionItem extends React.Component {
   constructor(props) {
@@ -15,7 +16,9 @@ class SessionItem extends React.Component {
     this.state = {
       isShown: false,
       // tabs: query, graph, tree, json
-      currentTab: 'graph'
+      currentTab: 'graph',
+      graphRenderTime: null,
+      treeRenderTime: null
     };
   }
 
@@ -23,6 +26,14 @@ class SessionItem extends React.Component {
     setTimeout(() => {
       this.setState({ isShown: true });
     }, 50);
+  }
+
+  handleGraphRendered = (renderTime) => {
+    this.setState({ graphRenderTime: renderTime });
+  }
+
+  handleTreeRendered = (renderTime) => {
+    this.setState({ treeRenderTime: renderTime });
   }
 
   navigateTab = (tabName) => {
@@ -33,7 +44,7 @@ class SessionItem extends React.Component {
 
   render() {
     const { session } = this.props;
-    const { isShown, currentTab } = this.state;
+    const { isShown, currentTab, graphRenderTime, treeRenderTime } = this.state;
 
     return (
       <li className={classnames('session-item', { shown: isShown })}>
@@ -103,10 +114,41 @@ class SessionItem extends React.Component {
           </div>
 
           <div className="main">
-            <SessionQueryTab session={session} active={currentTab === 'query'} />
-            <SessionGraphTab session={session} active={currentTab === 'graph'} />
-            <SessionTreeTab session={session} active={currentTab === 'tree'} />
-            <SessionJSONTab session={session} active={currentTab === 'json'} />
+            <SessionQueryTab
+              session={session}
+              active={currentTab === 'query'}
+             />
+            <SessionGraphTab
+              session={session}
+              active={currentTab === 'graph'}
+              onGraphRendered={this.handleGraphRendered}
+             />
+            <SessionTreeTab
+              session={session}
+              active={currentTab === 'tree'}
+              onTreeRendered={this.handleTreeRendered}
+            />
+            <SessionJSONTab
+              session={session}
+              active={currentTab === 'json'}
+            />
+
+            <div className="footer">
+              <ul className="stats">
+                {session.response.data.server_latency ?
+                  <li className="stat">Server latency: <span className="value">{session.response.data.server_latency.total}</span></li> : null}
+                {graphRenderTime && currentTab === 'graph' ?
+                  <li className="stat">Rendering latency: <span className="value">{humanizeTime(graphRenderTime)}</span></li> : null}
+                {treeRenderTime && currentTab === 'tree' ?
+                  <li className="stat">Rendering latency: <span className="value">{humanizeTime(treeRenderTime)}</span></li> : null}
+                <li className="stat">
+                  Nodes: <span className="value">{session.response.numNodes}</span>
+                </li>
+                <li className="stat">
+                  Edges: <span className="value">{session.response.numEdges}</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </li>

@@ -599,3 +599,10 @@ export function readCookie(name) {
 export function eraseCookie(name, options) {
   createCookie(name, '', -1, options);
 }
+
+export function humanizeTime(time) {
+  if (time > 1000) {
+      return time.toFixed(1) + "s";
+  }
+  return time.toFixed(0) + "ms";
+}

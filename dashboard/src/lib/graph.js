@@ -10,6 +10,8 @@ import _ from "lodash";
  * containerEl {HTMLElement}
  */
 export function renderNetwork({ nodes, edges, treeView, allNodes, allEdges, containerEl}) {
+    var start = new Date();
+
     var data = {
         nodes: new vis.DataSet(nodes),
         edges: new vis.DataSet(edges)
@@ -90,5 +92,11 @@ export function renderNetwork({ nodes, edges, treeView, allNodes, allEdges, cont
     }
 
     const network = new vis.Network(containerEl, data, options);
-    return network;
+
+    var end = new Date();
+    var renderTime = (end.getTime() - start.getTime());
+    return {
+      network,
+      renderTime
+    };
 }

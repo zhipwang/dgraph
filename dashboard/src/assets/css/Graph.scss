@@ -156,7 +156,8 @@
   display: flex;
   flex: 0.1;
   padding: 0 13px;
-  background: #dadada;
+  background: #f9f9f9;
+  border-bottom: 1px solid #d4d4d4;
 }
 
 .plot-label {
@@ -165,8 +166,9 @@
   border-radius: 9px;
   margin-right: 9px;
   font-size: 15px;
+  font-weight: 600;
 
   .shorthand {
-    font-weight: 300;
+    font-weight: 400;
   }
 }

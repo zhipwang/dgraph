@@ -14,14 +14,15 @@ class GraphContainer extends Component {
         super(props);
 
         this.state = {
-            selectedNode: false,
+          selectedNode: false,
+          renderTime: null
         };
     }
 
     componentDidMount() {
-      const { response, treeView } = this.props;
+      const { response, treeView, onRendered } = this.props;
 
-      renderNetwork({
+      const { renderTime } = renderNetwork({
         nodes: response.nodes,
         edges: response.edges,
         allNodes: response.allNodes,
@@ -29,6 +30,10 @@ class GraphContainer extends Component {
         containerEl: this.refs.graph,
         treeView,
       });
+
+      if (onRendered) {
+        onRendered(renderTime);
+      }
     }
 
     render() {
