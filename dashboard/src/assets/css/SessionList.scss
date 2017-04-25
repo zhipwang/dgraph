@@ -4,21 +4,22 @@
   perspective: 100px;
 }
 
+.session-item-enter {
+  opacity: 0.01;
+  max-height: 0;
+}
+
+.session-item-enter.session-item-enter-active {
+  opacity: 1;
+  max-height: 2300px;
+  transition: opacity,max-height 0.8s ease-in;
+}
+
 .session-item {
   border: 1px solid #d2d2d2;
   border-radius: 1px;
   margin-bottom: 14px;
-  transition: all 0.6s ease-in;
-  opacity: 0;
   background-color: #fcfcfc;
-  max-height: 0;
-  overflow: hidden;
-
-  &.shown {
-    transition: max-height 0.6s ease-in;
-    max-height: 2300px;
-    opacity: 1;
-  }
 
   .header {
     border-bottom: 1px solid #d2d2d2;

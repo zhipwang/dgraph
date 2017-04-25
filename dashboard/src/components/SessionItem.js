@@ -15,19 +15,12 @@ class SessionItem extends React.Component {
     super(props);
 
     this.state = {
-      isShown: false,
       // tabs: query, graph, tree, json
       currentTab: 'graph',
       graphRenderTime: null,
       treeRenderTime: null,
       currentNode: null
     };
-  }
-
-  componentDidMount() {
-    setTimeout(() => {
-      this.setState({ isShown: true });
-    }, 50);
   }
 
   handleGraphRendered = (renderTime) => {
@@ -42,7 +35,9 @@ class SessionItem extends React.Component {
     this.setState({ currentNode: node });
   }
 
-  navigateTab = (tabName) => {
+  navigateTab = (tabName, e) => {
+    e.preventDefault();
+
     this.setState({
       currentTab: tabName
     });
@@ -73,6 +68,17 @@ class SessionItem extends React.Component {
             <ul className="sidebar-nav">
               <li>
                 <a
+                  href="#query"
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
+                  onClick={this.navigateTab.bind(this, 'query')}
+                >
+                  <i className="icon fa fa-search" />
+                  <span className="menu-label">Query</span>
+
+                </a>
+              </li>
+              <li>
+                <a
                   href="#graph"
                   className={classnames('sidebar-nav-item', { active: currentTab === 'graph' })}
                   onClick={this.navigateTab.bind(this, 'graph')}
@@ -91,17 +97,6 @@ class SessionItem extends React.Component {
                 >
                   <TreeIcon />
                   <span className="menu-label">Tree</span>
-
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#query"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
-                  onClick={this.navigateTab.bind(this, 'query')}
-                >
-                  <i className="icon fa fa-search" />
-                  <span className="menu-label">Query</span>
 
                 </a>
               </li>
@@ -143,13 +138,13 @@ class SessionItem extends React.Component {
               active={currentTab === 'json'}
             />
 
-          <SessionFooter
-            session={session}
-            currentTab={currentTab}
-            currentNode={currentNode}
-            graphRenderTime={graphRenderTime}
-            treeRenderTime={treeRenderTime}
-          />
+            <SessionFooter
+              session={session}
+              currentTab={currentTab}
+              currentNode={currentNode}
+              graphRenderTime={graphRenderTime}
+              treeRenderTime={treeRenderTime}
+            />
           </div>
         </div>
       </li>

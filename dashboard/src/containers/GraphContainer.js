@@ -81,7 +81,7 @@ class GraphContainer extends Component {
     }
 
     render() {
-        const { response, currentNode } = this.props;
+        const { response } = this.props;
 
         return (
           <div className="graph-container content">
@@ -98,9 +98,6 @@ class GraphContainer extends Component {
               })}
             </div>
             <div ref="graph" className="graph" />
-            <div>
-
-            </div>
           </div>
         );
     }

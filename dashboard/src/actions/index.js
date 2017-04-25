@@ -1,4 +1,5 @@
 import SHA256 from "crypto-js/sha256";
+import uuid from "uuid";
 
 import {
     timeout,
@@ -176,6 +177,7 @@ export const runQuery = query => {
                         );
 
                         const session = {
+                          id: uuid(),
                           query,
                           response: {
                             plotAxis: labels,
