@@ -22,7 +22,8 @@ class SessionItem extends React.Component {
       treeRenderStart: null,
       treeRenderEnd: null,
       selectedNode: null,
-      hoveredNode: null
+      hoveredNode: null,
+      isTreePartial: false
     };
   }
 
@@ -148,32 +149,35 @@ class SessionItem extends React.Component {
           </div>
 
           <div className="main">
-            <SessionQueryTab
-              session={session}
-              active={currentTab === 'query'}
-             />
-            <SessionGraphTab
-              session={session}
-              active={currentTab === 'graph'}
-              onBeforeGraphRender={this.handleBeforeGraphRender}
-              onGraphRendered={this.handleGraphRendered}
-              onNodeSelected={this.handleNodeSelected}
-              onNodeHovered={this.handleNodeHovered}
-              selectedNode={selectedNode}
-            />
-            <SessionTreeTab
-              session={session}
-              active={currentTab === 'tree'}
-              onBeforeTreeRender={this.handleBeforeTreeRender}
-              onTreeRendered={this.handleTreeRendered}
-              onNodeSelected={this.handleNodeSelected}
-              onNodeHovered={this.handleNodeHovered}
-              selectedNode={selectedNode}
-            />
-            <SessionJSONTab
-              session={session}
-              active={currentTab === 'json'}
-            />
+            {currentTab === 'query' ?
+              <SessionQueryTab
+                session={session}
+               /> :null}
+
+             {currentTab === 'graph' ?
+               <SessionGraphTab
+                 session={session}
+                 onBeforeGraphRender={this.handleBeforeGraphRender}
+                 onGraphRendered={this.handleGraphRendered}
+                 onNodeSelected={this.handleNodeSelected}
+                 onNodeHovered={this.handleNodeHovered}
+                 selectedNode={selectedNode}
+               /> : null}
+
+             {currentTab === 'tree' ?
+               <SessionTreeTab
+                 session={session}
+                 onBeforeTreeRender={this.handleBeforeTreeRender}
+                 onTreeRendered={this.handleTreeRendered}
+                 onNodeSelected={this.handleNodeSelected}
+                 onNodeHovered={this.handleNodeHovered}
+                 selectedNode={selectedNode}
+               /> : null}
+
+             {currentTab === 'json' ?
+               <SessionJSONTab
+                 session={session}
+               /> : null}
 
             <SessionFooter
               session={session}

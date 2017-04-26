@@ -5,7 +5,7 @@ import Highlight from './Highlight';
 
 const SessionJSONTab = ({ session, active }) => {
   return (
-    <div className={classnames('content-container', { hidden: !active})}>
+    <div className={classnames('content-container')}>
       <Highlight preClass="content">
         {JSON.stringify(session.response.data, null, 2)}
       </Highlight>

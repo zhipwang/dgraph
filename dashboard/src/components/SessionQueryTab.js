@@ -5,7 +5,7 @@ import Highlight from './Highlight';
 
 const SessionQueryTab = ({ session, active }) => {
   return (
-    <div className={classnames('content-container', { hidden: !active})}>
+    <div className={classnames('content-container')}>
       <Highlight preClass="content">
         {session.query}
       </Highlight>

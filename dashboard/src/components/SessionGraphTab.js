@@ -8,7 +8,7 @@ const SessionGraphTab = ({
   onNodeHovered, selectedNode
 }) => {
   return (
-    <div className={classnames('content-container', { hidden: !active})}>
+    <div className={classnames('content-container')}>
       <GraphContainer
         response={session.response}
         onBeforeRender={onBeforeGraphRender}

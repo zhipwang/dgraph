@@ -7,7 +7,8 @@ import classnames from 'classnames';
 import { renderNetwork } from '../lib/graph';
 import Label from '../components/Label';
 import Progress from '../components/Progress';
-import { outgoingEdges } from './Helpers';
+import PartialGraphFooter from '../components/PartialGraphFooter';
+import { outgoingEdges, childNodes } from './Helpers';
 
 import "../assets/css/Graph.css";
 import "vis/dist/vis.min.css";
@@ -20,7 +21,8 @@ class GraphContainer extends Component {
         super(props);
 
         this.state = {
-          renderProgress: 0
+          renderProgress: 0,
+          partiallyRendered: false
         };
     }
 
@@ -48,7 +50,7 @@ class GraphContainer extends Component {
         });
       }
 
-      this.configNetworkBehavior(network);
+      this.configNetwork(network);
 
       this.setState({ network }, () => {
         window.addEventListener('resize', this.fitNetwork);
@@ -68,8 +70,8 @@ class GraphContainer extends Component {
       }
     }
 
-    // configNetworkBehavior configures the custom behaviors for a a network
-    configNetworkBehavior = (network) => {
+    // configNetwork configures the custom behaviors for a a network
+    configNetwork = (network) => {
       const {
         response: { allNodes, allEdges },
         onNodeSelected, onNodeHovered
@@ -77,6 +79,13 @@ class GraphContainer extends Component {
       const { data } = network.body;
       const allEdgeSet = new vis.DataSet(allEdges);
       const allNodeSet = new vis.DataSet(allNodes);
+
+      if (
+        allNodeSet.length !== data.nodes.length ||
+        allEdgeSet.length !== data.edges.length
+      ) {
+        this.setState({ partiallyRendered: true })
+      }
 
       // multiLevelExpand recursively expands all edges outgoing from the node
       function multiLevelExpand(nodeId) {
@@ -193,8 +202,7 @@ class GraphContainer extends Component {
             } else {
                 multiLevelExpand(clickedNodeUid);
                 if (data.nodes.length === allNodeSet.length) {
-                    // TODO: what is partial?
-                    // dispatch(updatePartial(false));
+                  this.setState({ partiallyRendered: false });
                 }
             }
         }
@@ -229,11 +237,95 @@ class GraphContainer extends Component {
       });
     }
 
+    // collapse the network
+    handleCollapseNetwork = (e) => {
+      e.preventDefault();
+
+      const { network, partiallyRendered } = this.state;
+      const { response: { nodes, edges } } = this.props;
+
+      const { data } = network.body;
+
+      if (partiallyRendered) {
+        return;
+      }
+
+      data.nodes.remove(data.nodes.getIds());
+      data.edges.remove(data.edges.getIds());
+      // Since we don't mutate the nodes and edges passed as props initially,
+      // this still holds the initial state that was rendered and we can collapse
+      // back the graph to that state.
+      data.nodes.update(nodes);
+      data.edges.update(edges);
+      this.setState({ partiallyRendered: true });
+      network.fit();
+    }
+
+    handleExpandNetwork = (e) => {
+      e.preventDefault();
+
+      const { response: { allNodes, allEdges } } = this.props;
+      const { network } = this.state;
+
+      const { data } = network.body;
+      const allEdgeSet = new vis.DataSet(allEdges);
+      const allNodeSet = new vis.DataSet(allNodes);
+
+      let nodeIds = data.nodes.getIds(),
+          nodeSet = data.nodes,
+          edgeSet = data.edges,
+          // We add nodes and edges that have to be updated to these arrays.
+          nodesBatch = new Set(),
+          edgesBatch = [],
+          batchSize = 500;
+
+      while (nodeIds.length > 0) {
+          let nodeId = nodeIds.pop();
+          // If is expanded, do nothing, else put child nodes and edges into array for
+          // expansion.
+          if (outgoingEdges(nodeId, edgeSet).length ===
+              outgoingEdges(nodeId, allEdgeSet).length) {
+              continue;
+          }
+
+          let outEdges = outgoingEdges(nodeId, allEdgeSet),
+              outNodeIds = childNodes(outEdges);
+
+          nodeIds = nodeIds.concat(outNodeIds);
+
+          for (let id of outNodeIds) {
+              nodesBatch.add(id);
+          }
+
+          edgesBatch = edgesBatch.concat(outEdges);
+
+          if (nodesBatch.size > batchSize) {
+              nodeSet.update(allNodeSet.get(Array.from(nodesBatch)));
+              edgeSet.update(edgesBatch);
+              nodesBatch = new Set();
+              edgesBatch = [];
+              return;
+          }
+      }
+
+      if (nodeIds.length === 0) {
+        this.setState({ partiallyRendered: false });
+      }
+
+      if (nodesBatch.size > 0 || edgesBatch.length > 0) {
+        nodeSet.update(allNodeSet.get(Array.from(nodesBatch)));
+        edgeSet.update(edgesBatch);
+      }
+
+      network.fit();
+    }
+
     render() {
         const { response } = this.props;
-        const { renderProgress } = this.state;
+        const { renderProgress, partiallyRendered } = this.state;
 
         const isRendering = renderProgress !== 100;
+        const canToggleExpand = response.nodes.length !== response.numNodes && response.edges.length !== response.numEdges;
 
         return (
           <div className="graph-container content">
@@ -252,6 +344,14 @@ class GraphContainer extends Component {
 
             {isRendering ? <Progress perc={renderProgress} /> :null}
             <div ref="graph" className={classnames('graph', { hidden: isRendering })} />
+
+            {canToggleExpand ?
+              <PartialGraphFooter
+                partiallyRendered={partiallyRendered}
+                onExpandNetwork={this.handleExpandNetwork}
+                onCollapseNetwork={this.handleCollapseNetwork}
+              />
+              : null}
 
           </div>
         );

@@ -554,7 +554,8 @@ export function getEndpointBaseURL() {
   }
 
   // For development, we just connect to the Dgraph server at http://localhost:8080.
-  return "http://localhost:8080";
+  // return "http://localhost:8080";
+  return "https://play.dgraph.io";
 }
 
 // getEndpoint returns a URL for the dgraph endpoint, optionally followed by
@@ -607,4 +608,11 @@ export function humanizeTime(time) {
       return time.toFixed(1) + "s";
   }
   return time.toFixed(0) + "ms";
+}
+
+// childNodes returns nodes that given edges point to
+export function childNodes(edges) {
+  return edges.map(function(edge) {
+    return edge.to;
+  });
 }

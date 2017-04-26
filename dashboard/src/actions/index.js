@@ -169,7 +169,7 @@ export const runQuery = query => {
                         // let mantainSortOrder = showTreeView(query);
                         // dispatch(saveSuccessResponse("", result, false));
                         // dispatch(renderGraph(query, result, mantainSortOrder));
-                        const { nodes, edges, labels, nodesIdx, edgesIdx } = processGraph(
+                        const { nodes, edges, labels, nodesIndex, edgesIndex } = processGraph(
                           result,
                           false,
                           query,
@@ -185,8 +185,8 @@ export const runQuery = query => {
                             allEdges: edges,
                             numNodes: nodes.length,
                             numEdges: edges.length,
-                            nodes: nodes.slice(0, nodesIdx),
-                            edges: edges.slice(0, edgesIdx),
+                            nodes: nodes.slice(0, nodesIndex),
+                            edges: edges.slice(0, edgesIndex),
                             treeView: false,
                             data: result
                           }
