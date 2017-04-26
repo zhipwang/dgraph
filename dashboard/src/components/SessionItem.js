@@ -21,7 +21,8 @@ class SessionItem extends React.Component {
       graphRenderEnd: null,
       treeRenderStart: null,
       treeRenderEnd: null,
-      currentNode: null
+      selectedNode: null,
+      hoveredNode: null
     };
   }
 
@@ -42,7 +43,11 @@ class SessionItem extends React.Component {
   }
 
   handleNodeSelected = (node) => {
-    this.setState({ currentNode: node });
+    this.setState({ selectedNode: node });
+  }
+
+  handleNodeHovered = (node) => {
+    this.setState({ hoveredNode: node });
   }
 
   navigateTab = (tabName, e) => {
@@ -73,7 +78,7 @@ class SessionItem extends React.Component {
 
   render() {
     const { session } = this.props;
-    const { isShown, currentTab, currentNode } = this.state;
+    const { isShown, currentTab, selectedNode, hoveredNode } = this.state;
 
     return (
       <li className={classnames('session-item', { shown: isShown })}>
@@ -153,7 +158,8 @@ class SessionItem extends React.Component {
               onBeforeGraphRender={this.handleBeforeGraphRender}
               onGraphRendered={this.handleGraphRendered}
               onNodeSelected={this.handleNodeSelected}
-              currentNode={currentNode}
+              onNodeHovered={this.handleNodeHovered}
+              selectedNode={selectedNode}
             />
             <SessionTreeTab
               session={session}
@@ -161,7 +167,8 @@ class SessionItem extends React.Component {
               onBeforeTreeRender={this.handleBeforeTreeRender}
               onTreeRendered={this.handleTreeRendered}
               onNodeSelected={this.handleNodeSelected}
-              currentNode={currentNode}
+              onNodeHovered={this.handleNodeHovered}
+              selectedNode={selectedNode}
             />
             <SessionJSONTab
               session={session}
@@ -171,7 +178,8 @@ class SessionItem extends React.Component {
             <SessionFooter
               session={session}
               currentTab={currentTab}
-              currentNode={currentNode}
+              selectedNode={selectedNode}
+              hoveredNode={hoveredNode}
               graphRenderTime={this.getGraphRenderTime()}
               treeRenderTime={this.getTreeRenderTime()}
             />

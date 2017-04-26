@@ -4,7 +4,8 @@ import classnames from 'classnames';
 import GraphContainer from "../containers/GraphContainer";
 
 const SessionGraphTab = ({
-  session, active, onBeforeGraphRender, onGraphRendered, onNodeSelected, currentNode
+  session, active, onBeforeGraphRender, onGraphRendered, onNodeSelected,
+  onNodeHovered, selectedNode
 }) => {
   return (
     <div className={classnames('content-container', { hidden: !active})}>
@@ -13,7 +14,8 @@ const SessionGraphTab = ({
         onBeforeRender={onBeforeGraphRender}
         onRendered={onGraphRendered}
         onNodeSelected={onNodeSelected}
-        currentNode={currentNode}
+        onNodeHovered={onNodeHovered}
+        selectedNode={selectedNode}
       />
     </div>
   );

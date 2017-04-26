@@ -49,15 +49,30 @@ class GraphContainer extends Component {
       }
 
       this.configNetworkBehavior(network);
+
+      this.setState({ network }, () => {
+        window.addEventListener('resize', this.fitNetwork);
+      });
     }
 
-    /**
-     * configNetworkBehavior configures the custom behaviors for a vis.Network
-     */
+    componentWillUnmount() {
+      window.removeEventListener('resize', this.fitNetwork);
+    }
+
+    // fitNetwork update the fit of the network
+    fitNetwork = () => {
+      const { network } = this.state;
+
+      if (network) {
+        network.fit();
+      }
+    }
+
+    // configNetworkBehavior configures the custom behaviors for a a network
     configNetworkBehavior = (network) => {
       const {
         response: { allNodes, allEdges },
-        onNodeSelected
+        onNodeSelected, onNodeHovered
       } = this.props;
       const { data } = network.body;
       const allEdgeSet = new vis.DataSet(allEdges);
@@ -113,9 +128,9 @@ class GraphContainer extends Component {
 
               if (params.nodes.length > 0) {
                 const nodeUid = params.nodes[0];
-                const currentNode = data.nodes.get(nodeUid);
+                const selectedNode = data.nodes.get(nodeUid);
 
-                onNodeSelected(currentNode);
+                onNodeSelected(selectedNode);
               } else if (params.edges.length > 0) {
                 const edgeUid = params.edges[0];
                 const currentEdge = data.edges.get(edgeUid);
@@ -182,6 +197,34 @@ class GraphContainer extends Component {
                     // dispatch(updatePartial(false));
                 }
             }
+        }
+      });
+
+      network.on('hoverNode', (params) => {
+        const nodeUID: string = params.node;
+        const currentNode = data.nodes.get(nodeUID);
+
+        onNodeHovered(currentNode);
+      });
+
+      network.on('hoverEdge', (params) => {
+        const edgeUID = params.edge;
+        const currentEdge = data.edges.get(edgeUID);
+
+        onNodeHovered(currentEdge);
+      });
+
+      network.on("dragEnd", function(params) {
+        for (let i = 0; i < params.nodes.length; i++) {
+          let nodeId: string = params.nodes[i];
+          data.nodes.update({ id: nodeId, fixed: { x: true, y: true } });
+        }
+      });
+
+      network.on("dragStart", function(params) {
+        for (let i = 0; i < params.nodes.length; i++) {
+          let nodeId: string = params.nodes[i];
+          data.nodes.update({ id: nodeId, fixed: { x: false, y: false } });
         }
       });
     }

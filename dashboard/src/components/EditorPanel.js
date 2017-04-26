@@ -17,7 +17,6 @@ class EditorPanel extends React.Component {
 
   handleQueryUpdate = (val) => {
     const dirty = val.trim() !== '';
-    console.log('updating query to ',val);
 
     this.setState({ query: val, dirty });
   }

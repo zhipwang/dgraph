@@ -3,7 +3,7 @@ import React from 'react';
 import Properties from '../components/Properties';
 import { humanizeTime } from '../containers/Helpers';
 
-const MetaInfo = ({ session, currentTab, currentNode, graphRenderTime, treeRenderTime }) => {
+const MetaInfo = ({ session, currentTab, graphRenderTime, treeRenderTime }) => {
   return (
     <ul className="stats">
       {session.response.data.server_latency ?
@@ -26,17 +26,20 @@ const NodeInfo = ({ node }) => {
   return <Properties node={node} />;
 }
 
-const SessionFooter = ({ session, currentTab, currentNode, graphRenderTime, treeRenderTime }) => {
+const SessionFooter = ({
+  session, currentTab, selectedNode, hoveredNode, graphRenderTime, treeRenderTime
+}) => {
+  const nodeFocused = selectedNode || hoveredNode;
+
   return (
     <div className="footer">
-      {currentNode ?
+      {nodeFocused ?
         <NodeInfo
-          node={currentNode}
+          node={nodeFocused}
         /> :
         <MetaInfo
           session={session}
           currentTab={currentTab}
-          currentNode={currentNode}
           graphRenderTime={graphRenderTime}
           treeRenderTime={treeRenderTime}
         />}

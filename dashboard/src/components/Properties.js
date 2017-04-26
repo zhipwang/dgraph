@@ -16,7 +16,7 @@ class Properties extends Component {
 
         return (
             <div id="properties">
-                <span>Selected {isEdge ? 'edge' : 'node'}:</span>
+                <span>Showing {isEdge ? 'edge' : 'node'}:</span>
                 {!isEdge &&
                     <div>
                         <ul className="Properties">
