@@ -1,5 +1,6 @@
-export const RECEIVE_FRAME = 'RECEIVE_FRAME';
-export const DISCARD_FRAME = 'DISCARD_FRAME';
+export const RECEIVE_FRAME = 'frames/RECEIVE_FRAME';
+export const DISCARD_FRAME = 'frames/DISCARD_FRAME';
+export const UPDATE_FRAME = 'frames/UPDATE_FRAME';
 
 export function receiveFrame({ id, type, data }) {
   return {
@@ -17,4 +18,15 @@ export function discardFrame(frameID) {
     type: DISCARD_FRAME,
     frameID
   };
+}
+
+export function updateFrame({ id, type, data }) {
+  return {
+    type: UPDATE_FRAME,
+    id,
+    frame: {
+      type,
+      data
+    }
+  }
 }

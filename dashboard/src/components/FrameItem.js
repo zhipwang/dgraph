@@ -1,10 +1,13 @@
 import React from 'react';
 
-import { FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_ERROR } from '../lib/const';
+import {
+  FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING
+} from '../lib/const';
 import FrameLayout from './FrameLayout';
 import FrameSession from './FrameSession';
 import FrameError from './FrameError';
 import FrameSystem from './FrameSystem';
+import FrameLoading from './FrameLoading';
 
 
 // getFrameContent returns React Component for a given frame depending on its type
@@ -27,6 +30,10 @@ function getFrameContent(frame) {
         message={frame.data.message}
       />
     )
+  } else if (frame.type === FRAME_TYPE_LOADING) {
+    return (
+      <FrameLoading />
+    );
   }
 
   return (

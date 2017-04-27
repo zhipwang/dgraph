@@ -554,8 +554,8 @@ export function getEndpointBaseURL() {
   }
 
   // For development, we just connect to the Dgraph server at http://localhost:8080.
-  // return "http://localhost:8080";
-  return "https://play.dgraph.io";
+  return "http://localhost:8080";
+  // return "https://play.dgraph.io";
 }
 
 // getEndpoint returns a URL for the dgraph endpoint, optionally followed by
@@ -569,6 +569,12 @@ export function getEndpoint(path = '', options = { debug: true }) {
   }
 
   return url;
+}
+
+// getShareURL returns a URL for a shared query
+export function getShareURL(shareId) {
+  const baseURL = getEndpointBaseURL();
+  return `${baseURL}/${shareId}`;
 }
 
 function createCookie(name, val, days, options) {

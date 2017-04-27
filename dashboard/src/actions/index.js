@@ -9,9 +9,9 @@ import {
     getEndpoint,
     makeFrame
 } from "../containers/Helpers";
-import { FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM } from '../lib/const';
+import { FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_LOADING } from '../lib/const';
 
-import { receiveFrame } from './frames';
+import { receiveFrame, updateFrame } from './frames';
 
 // TODO - Check if its better to break this file down into multiple files.
 
@@ -118,6 +118,12 @@ export const runQuery = query => {
   const endpoint = getEndpoint('query', { debug: true });
 
   return dispatch => {
+    const frame = makeFrame({
+      type: FRAME_TYPE_LOADING,
+      data: {}
+    });
+    dispatch(receiveFrame(frame));
+
     return timeout(
       60000,
       fetch(endpoint, {
@@ -162,7 +168,8 @@ export const runQuery = query => {
             const { nodes, edges, labels, nodesIndex, edgesIndex } =
               processGraph(result, false, query, '');
 
-            const frame = makeFrame({
+            dispatch(updateFrame({
+              id: frame.id,
               type: FRAME_TYPE_SESSION,
               data: {
                 query,
@@ -178,8 +185,7 @@ export const runQuery = query => {
                   data: result
                 }
               }
-            });
-            dispatch(receiveFrame(frame));
+            }));
         } else {
           const frame = makeFrame({
             type: FRAME_TYPE_SYSTEM,
@@ -237,90 +243,80 @@ export const queryFound = found => ({
     found: found
 });
 
-// createShare posts the query to the server to be persisted
-const createShare = (dispatch, getState) => {
-    const query = getState().query.text;
-    const stringifiedQuery = encodeURI(query);
+// createShare persists the queryText in the database
+const createShare = (queryText) => {
+  const stringifiedQuery = encodeURI(queryText);
 
-    fetch(getEndpoint('share'), {
-        method: "POST",
-        mode: "cors",
-        headers: {
-            Accept: "application/json",
-            "Content-Type": "text/plain"
-        },
-        body: stringifiedQuery
+  return fetch(getEndpoint('share'), {
+    method: "POST",
+    mode: "cors",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "text/plain"
+    },
+    body: stringifiedQuery
+  })
+    .then(checkStatus)
+    .then(response => response.json())
+    .then((result) => {
+      if (result.uids && result.uids.share) {
+        return result.uids.share;
+      }
     })
-        .then(checkStatus)
-        .then(response => response.json())
-        .then((result) => {
-            if (result.uids && result.uids.share) {
-                dispatch(updateShareId(result.uids.share));
-            }
-        })
-        .catch(function(error) {
-            dispatch(
-                saveErrorResponse(
-                    "Got error while saving querying for share: " +
-                        error.message
-                )
-            );
-        });
 };
 
-export const getShareId = (dispatch, getState) => {
-    const query = getState().query.text;
-    if (query === "") {
-        return;
-    }
-    const encodedQuery = encodeURI(query);
-    const queryHash = SHA256(encodedQuery).toString();
-    const checkQuery = `
+/**
+ * getShareId gets the id used to share a query either by fetching one if one
+ * exists, or persisting the queryText into the database.
+ *
+ * @params queryText {String} - A raw query text as entered by the user
+ * @returns {Promise}
+ */
+export const getShareId = (queryText) => {
+  const encodedQuery = encodeURI(queryText);
+  const queryHash = SHA256(encodedQuery).toString();
+  const checkQuery = `
 {
-    query(func:eq(_share_hash_, ${queryHash})) {
-        _uid_
-        _share_
-    }
+  query(func:eq(_share_hash_, ${queryHash})) {
+      _uid_
+      _share_
+  }
 }`;
 
-    return timeout(
-        6000,
-        fetch(getEndpoint('query'), {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "text/plain"
-            },
-            body: checkQuery
-        })
-            .then(checkStatus)
-            .then(response => response.json())
-            .then((result) => {
-                const matchingQueries = result.query;
+  return timeout(
+    6000,
+    fetch(getEndpoint('query'), {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "text/plain"
+      },
+      body: checkQuery
+    })
+      .then(checkStatus)
+      .then(response => response.json())
+      .then((result) => {
+        const matchingQueries = result.query;
 
-                // If no match, store the query
-                if (!matchingQueries) {
-                    return createShare(dispatch, getState);
-                }
-                if (matchingQueries.length === 1) {
-                    return dispatch(updateShareId(result.query[0]._uid_));
-                } else if (matchingQueries.length > 1) {
-                    for (let i = 0; i < matchingQueries.length; i++) {
-                        const q = matchingQueries[i];
-                        if (`"${q._share_}"` === encodedQuery) {
-                            return dispatch(updateShareId(q._uid_));
-                        }
-                    }
-                }
-            })
-    ).catch(function(error) {
-        dispatch(
-            saveErrorResponse(
-                "Got error while saving querying for share: " + error.message
-            )
-        );
-    });
+        // If no match, store the query
+        if (!matchingQueries) {
+          return createShare(queryText);
+        }
+
+        if (matchingQueries.length === 1) {
+          return result.query[0]._uid_;
+        }
+
+        // If more than one result, we have a hash collision. Break it.
+        for (let i = 0; i < matchingQueries.length; i++) {
+          const q = matchingQueries[i];
+          if (`"${q._share_}"` === encodedQuery) {
+            return q._uid_;
+          }
+        }
+      })
+  );
 };
 
 export const getQuery = shareId => {

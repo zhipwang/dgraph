@@ -13,7 +13,7 @@ import {
   updateInitialQuery,
   queryFound,
   selectQuery,
-  runQuery,
+  runQuery
 } from "../actions";
 import { discardFrame } from '../actions/frames';
 import { readCookie, eraseCookie } from './Helpers';
