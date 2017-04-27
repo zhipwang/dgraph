@@ -6,8 +6,7 @@ import { Alert } from "react-bootstrap";
 
 import Sidebar from '../components/Sidebar';
 import EditorPanel from '../components/EditorPanel';
-import SessionList from '../components/SessionList';
-
+import FrameList from '../components/FrameList';
 import {
   updateFullscreen,
   getQuery,
@@ -75,7 +74,7 @@ class App extends React.Component {
   }
 
   render = () => {
-    const { handleRunQuery, sessions } = this.props;
+    const { handleRunQuery, frames } = this.props;
 
     return (
       <div className="app-layout">
@@ -105,7 +104,7 @@ class App extends React.Component {
               </div>
 
               <div className="col-sm-12">
-                <SessionList sessions={sessions} />
+                <FrameList frames={frames} />
               </div>
             </div>
           </div>
@@ -117,7 +116,7 @@ class App extends React.Component {
 
 const mapStateToProps = state => ({
   found: state.share.found,
-  sessions: state.session.items
+  frames: state.frames.items
 });
 
 const mapDispatchToProps = dispatch => ({

@@ -616,3 +616,18 @@ export function childNodes(edges) {
     return edge.to;
   });
 }
+
+/**
+ * makeFrame is a factory function for creating frame object
+ * IDEA: We could use class with flow if it's not an overkill
+ *
+ * @params type {String} - type of the frame as defined in the const
+ * @params data {Objecg} - data for the frame
+ */
+export function makeFrame({ type, data }) {
+  return {
+    id: uuid(),
+    type,
+    data
+  };
+}

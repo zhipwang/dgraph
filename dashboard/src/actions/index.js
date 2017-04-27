@@ -5,12 +5,13 @@ import {
     timeout,
     checkStatus,
     isNotEmpty,
-    // showTreeView,
     processGraph,
-    getEndpoint
+    getEndpoint,
+    makeFrame
 } from "../containers/Helpers";
+import { FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM } from '../lib/const';
 
-import { receiveSession } from './session';
+import { receiveFrame } from './frames';
 
 // TODO - Check if its better to break this file down into multiple files.
 
@@ -114,98 +115,86 @@ export const resetResponseState = () => ({
 });
 
 export const runQuery = query => {
-    return dispatch => {
-        dispatch(resetResponseState());
-        dispatch(isFetching());
+  const endpoint = getEndpoint('query', { debug: true });
 
-        return timeout(
-            60000,
-            fetch(getEndpoint('query', { debug: true }), {
-                method: "POST",
-                mode: "cors",
-                headers: {
-                    "Content-Type": "text/plain"
-                },
-                body: query
-            })
-                .then(checkStatus)
-                .then(response => response.json())
-                .then((result) => {
-                    dispatch(fetchedResponse());
-                    if (
-                        result.code !== undefined &&
-                        result.message !== undefined
-                    ) {
-                        if (result.code.startsWith("Error")) {
-                            dispatch(saveErrorResponse(result.message));
-                            // This is the case in which user sends a mutation.
-                            // We display the response from server.
-                        } else {
-                            // dispatch(addQuery(query));
-                            // dispatch(saveSuccessResponse("", result, true));
-                            let [ nodes, edges, labels, nodesIdx, edgesIdx ] = processGraph(
-                              result,
-                              query,
-                              false
-                            );
-                            const session = {
-                              query,
-                              response: {
-                                plotAxis: labels,
-                                allNodes: nodes,
-                                allEdges: edges,
-                                numNodes: nodes.length,
-                                numEdges: edges.length,
-                                nodes: nodes.slice(0, nodesIdx),
-                                edges: edges.slice(0, edgesIdx),
-                                treeView: false,
-                                data: result
-                              }
-                            };
-                            dispatch(receiveSession(session));
-                        }
-                    } else if (isNotEmpty(result)) {
-                        // dispatch(addQuery(query));
-                        // let mantainSortOrder = showTreeView(query);
-                        // dispatch(saveSuccessResponse("", result, false));
-                        // dispatch(renderGraph(query, result, mantainSortOrder));
-                        const { nodes, edges, labels, nodesIndex, edgesIndex } = processGraph(
-                          result,
-                          false,
-                          query,
-                          ""
-                        );
+  return dispatch => {
+    return timeout(
+      60000,
+      fetch(endpoint, {
+        method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: query
+      })
+        .then(checkStatus)
+        .then(response => response.json())
+        .then((result) => {
+          if (result.code !== undefined && result.message !== undefined) {
+            if (result.code.startsWith("Error")) {
+              // This is the case in which user sends a mutation.
+              // We display the response from server.
+              dispatch(saveErrorResponse(result.message));
+            } else {
+                const [ nodes, edges, labels, nodesIdx, edgesIdx ] = processGraph(
+                  result,
+                  query,
+                  false
+                );
+                const session = {
+                  query,
+                  response: {
+                    plotAxis: labels,
+                    allNodes: nodes,
+                    allEdges: edges,
+                    numNodes: nodes.length,
+                    numEdges: edges.length,
+                    nodes: nodes.slice(0, nodesIdx),
+                    edges: edges.slice(0, edgesIdx),
+                    treeView: false,
+                    data: result
+                  }
+                };
+                dispatch(receiveFrame(session));
+            }
+        } else if (isNotEmpty(result)) {
+            const { nodes, edges, labels, nodesIndex, edgesIndex } =
+              processGraph(result, false, query, '');
 
-                        const session = {
-                          id: uuid(),
-                          query,
-                          response: {
-                            plotAxis: labels,
-                            allNodes: nodes,
-                            allEdges: edges,
-                            numNodes: nodes.length,
-                            numEdges: edges.length,
-                            nodes: nodes.slice(0, nodesIndex),
-                            edges: edges.slice(0, edgesIndex),
-                            treeView: false,
-                            data: result
-                          }
-                        };
-                        dispatch(receiveSession(session));
-                    } else {
-                        dispatch(
-                            saveErrorResponse(
-                                "Your query did not return any results.",
-                                result
-                            )
-                        );
-                    }
-                })
-        ).catch(function(error) {
-            dispatch(fetchedResponse());
-            dispatch(saveErrorResponse(error.message));
-        });
-    };
+            const frame = makeFrame({
+              type: FRAME_TYPE_SESSION,
+              data: {
+                query,
+                response: {
+                  plotAxis: labels,
+                  allNodes: nodes,
+                  allEdges: edges,
+                  numNodes: nodes.length,
+                  numEdges: edges.length,
+                  nodes: nodes.slice(0, nodesIndex),
+                  edges: edges.slice(0, edgesIndex),
+                  treeView: false,
+                  data: result
+                }
+              }
+            });
+            dispatch(receiveFrame(frame));
+        } else {
+          const frame = makeFrame({
+            type: FRAME_TYPE_SYSTEM,
+            data: {
+              message: 'Your query did not return any results'
+            }
+          });
+          dispatch(receiveFrame(frame));
+        }
+      })
+      .catch(function(error) {
+
+      })
+    )
+  };
 };
 
 export const updateFullscreen = fs => ({

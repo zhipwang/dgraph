@@ -1,21 +1,21 @@
-.session-list {
+.frame-list {
   list-style: none;
   padding-left: 0;
   perspective: 100px;
 }
 
-.session-item-enter {
+.frame-item-enter {
   opacity: 0.01;
   max-height: 0;
 }
 
-.session-item-enter.session-item-enter-active {
+.frame-item-enter.frame-item-enter-active {
   opacity: 1;
   max-height: 2300px;
   transition: opacity,max-height 0.8s ease-in;
 }
 
-.session-item {
+.frame-item {
   border: 1px solid #d2d2d2;
   border-radius: 1px;
   margin-bottom: 14px;

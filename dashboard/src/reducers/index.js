@@ -1,4 +1,5 @@
 import { combineReducers } from "redux";
+
 import previousQueries from "./previousQueries";
 import query from "./query";
 import response from "./response";
@@ -7,6 +8,7 @@ import latency from "./latency";
 import scratchpad from "./scratchpad";
 import share from "./share";
 import session from "./session";
+import frames from "./frames";
 
 const rootReducer = combineReducers({
     query,
@@ -16,7 +18,8 @@ const rootReducer = combineReducers({
     latency,
     scratchpad,
     share,
-    session
+    session,
+    frames
 });
 
 export default rootReducer;
