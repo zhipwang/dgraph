@@ -36,11 +36,14 @@ function getFrameContent(frame) {
   );
 }
 
-const FrameItem = ({ frame }) => {
+const FrameItem = ({ frame, onDiscardFrame }) => {
   const content = getFrameContent(frame);
 
   return (
-    <FrameLayout>
+    <FrameLayout
+      frame={frame}
+      onDiscardFrame={onDiscardFrame}
+    >
       {content}
     </FrameLayout>
   );

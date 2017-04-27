@@ -2,14 +2,14 @@ import React from 'react';
 import FrameItem from './FrameItem';
 import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup'
 
-import '../assets/css/SessionList.css';
+import '../assets/css/Frames.css';
 
-const FrameList = ({ frames }) => {
+const FrameList = ({ frames, onDiscardFrame }) => {
   return (
     <ul className="frame-list">
       <CSSTransitionGroup
-        transitionName="session-item"
-        transitionEnterTimeout={800}
+        transitionName="frame-item"
+        transitionEnterTimeout={300}
         transitionLeaveTimeout={300}
       >
         {
@@ -18,6 +18,7 @@ const FrameList = ({ frames }) => {
               <FrameItem
                 key={frame.id}
                 frame={frame}
+                onDiscardFrame={onDiscardFrame}
               />
             )
           })

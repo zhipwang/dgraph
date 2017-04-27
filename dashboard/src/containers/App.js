@@ -13,8 +13,9 @@ import {
   updateInitialQuery,
   queryFound,
   selectQuery,
-  runQuery
+  runQuery,
 } from "../actions";
+import { discardFrame } from '../actions/frames';
 import { readCookie, eraseCookie } from './Helpers';
 
 import "../assets/css/App.css";
@@ -74,7 +75,7 @@ class App extends React.Component {
   }
 
   render = () => {
-    const { handleRunQuery, frames } = this.props;
+    const { handleRunQuery, handleDiscardFrame, frames } = this.props;
 
     return (
       <div className="app-layout">
@@ -104,7 +105,10 @@ class App extends React.Component {
               </div>
 
               <div className="col-sm-12">
-                <FrameList frames={frames} />
+                <FrameList
+                  frames={frames}
+                  onDiscardFrame={handleDiscardFrame}
+                />
               </div>
             </div>
           </div>
@@ -139,6 +143,9 @@ const mapDispatchToProps = dispatch => ({
   handleRunQuery: (query, done = () => {}) => {
     return dispatch(runQuery(query))
       .then(done);
+  },
+  handleDiscardFrame(frameID) {
+    dispatch(discardFrame(frameID));
   }
 });
 

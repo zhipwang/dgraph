@@ -1,26 +1,31 @@
 import React from 'react';
-
-import '../assets/css/Frames.css';
+import ReactDOM from 'react-dom';
+import screenfull from "screenfull";
 
 class FrameLayout extends React.Component {
   handleMaximize = () => {
-    //todo
-  }
+    if (!screenfull.enabled) {
+      return;
+    }
 
-  handleMinimize = () => {
-    //todo
+    const frameEl = ReactDOM.findDOMNode(this.refs.frame);
+    screenfull.request(frameEl);
   }
 
   render() {
-    const { children } = this.props;
+    const { children, onDiscardFrame, frame } = this.props;
 
     return (
-      <div className="frame-item">
+      <div className="frame-item" ref="frame">
         <div className="header">
           <div className="actions">
             <a
               href="#discard"
               className="action"
+              onClick={(e) => {
+                e.preventDefault();
+                onDiscardFrame(frame.id)
+              }}
             >
               <i className="fa fa-close" />
             </a>
