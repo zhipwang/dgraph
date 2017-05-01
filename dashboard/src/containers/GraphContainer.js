@@ -46,7 +46,7 @@ class GraphContainer extends Component {
           onRendered();
           // FIXME: tree does not fit because when it is rendered at the initial render, it is not visible
           // maybe lazy render
-          // network.fit();
+          network.fit();
         });
       }
 

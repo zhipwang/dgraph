@@ -36,13 +36,14 @@ const GraphFooter = ({
             node={focusedNode}
           />
         : null}
-        {canToggleExpand ?
-          <PartialGraphFooter
-            partiallyRendered={partiallyRendered}
-            onExpandNetwork={onExpandNetwork}
-            onCollapseNetwork={onCollapseNetwork}
-          /> : null}
       </CSSTransitionGroup>
+
+      {canToggleExpand ?
+        <PartialGraphFooter
+          partiallyRendered={partiallyRendered}
+          onExpandNetwork={onExpandNetwork}
+          onCollapseNetwork={onCollapseNetwork}
+        /> : null}
     </div>
   );
 };
