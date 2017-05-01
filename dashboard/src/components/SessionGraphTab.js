@@ -5,7 +5,7 @@ import GraphContainer from "../containers/GraphContainer";
 
 const SessionGraphTab = ({
   session, active, onBeforeGraphRender, onGraphRendered, onNodeSelected,
-  onNodeHovered, selectedNode
+  onNodeHovered, selectedNode, hoveredNode
 }) => {
   return (
     <div className="content-container">
@@ -16,6 +16,7 @@ const SessionGraphTab = ({
         onNodeSelected={onNodeSelected}
         onNodeHovered={onNodeHovered}
         selectedNode={selectedNode}
+        hoveredNode={hoveredNode}
       />
     </div>
   );

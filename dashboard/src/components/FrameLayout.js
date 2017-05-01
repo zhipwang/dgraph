@@ -85,7 +85,7 @@ class FrameLayout extends React.Component {
     const { isFullscreen, shareId, shareHidden } = this.state;
 
     return (
-      <div
+      <li
         className={classnames('frame-item', { fullscreen: isFullscreen })}
         ref="frame"
       >
@@ -101,7 +101,7 @@ class FrameLayout extends React.Component {
         />
 
         {children}
-      </div>
+      </li>
     );
   }
 }

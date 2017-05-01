@@ -5,9 +5,9 @@ import _ from "lodash/object";
 import classnames from 'classnames';
 
 import { renderNetwork } from '../lib/graph';
-import Label from '../components/Label';
 import Progress from '../components/Progress';
 import PartialGraphFooter from '../components/PartialGraphFooter';
+import GraphFooter from '../components/GraphFooter';
 import { outgoingEdges, childNodes } from './Helpers';
 
 import "../assets/css/Graph.css";
@@ -137,9 +137,9 @@ class GraphContainer extends Component {
 
               if (params.nodes.length > 0) {
                 const nodeUid = params.nodes[0];
-                const selectedNode = data.nodes.get(nodeUid);
+                const clickedNode = data.nodes.get(nodeUid);
 
-                onNodeSelected(selectedNode);
+                onNodeSelected(clickedNode);
               } else if (params.edges.length > 0) {
                 const edgeUid = params.edges[0];
                 const currentEdge = data.edges.get(edgeUid);
@@ -215,11 +215,19 @@ class GraphContainer extends Component {
         onNodeHovered(currentNode);
       });
 
+      network.on('blurNode', (params) => {
+        onNodeHovered(null);
+      });
+
       network.on('hoverEdge', (params) => {
         const edgeUID = params.edge;
         const currentEdge = data.edges.get(edgeUID);
 
         onNodeHovered(currentEdge);
+      });
+
+      network.on('blurEdge', (params) => {
+        onNodeHovered(null);
       });
 
       network.on("dragEnd", function(params) {
@@ -321,7 +329,7 @@ class GraphContainer extends Component {
     }
 
     render() {
-        const { response } = this.props;
+        const { response, selectedNode, hoveredNode } = this.props;
         const { renderProgress, partiallyRendered } = this.state;
 
         const isRendering = renderProgress !== 100;
@@ -340,18 +348,13 @@ class GraphContainer extends Component {
               />
               : null}
 
-            <div className="labels">
-              {response.plotAxis.map((label, i) => {
-                return (
-                  <Label
-                    key={i}
-                    color={label.color}
-                    pred={label.pred}
-                    label={label.label}
-                  />
-                );
-              })}
-            </div>
+            {!isRendering ?
+              <GraphFooter
+                response={response}
+                selectedNode={selectedNode}
+                hoveredNode={hoveredNode}
+              /> : null}
+
           </div>
         );
     }

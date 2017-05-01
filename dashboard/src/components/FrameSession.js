@@ -44,6 +44,16 @@ class FrameSession extends React.Component {
   }
 
   handleNodeSelected = (node) => {
+    const { selectedNode } = this.state;
+
+    if (!node) {
+      this.setState({
+        selectedNode: null,
+        hoveredNode: null
+      });
+      return;
+    }
+
     this.setState({ selectedNode: node });
   }
 
@@ -157,6 +167,7 @@ class FrameSession extends React.Component {
                  onNodeSelected={this.handleNodeSelected}
                  onNodeHovered={this.handleNodeHovered}
                  selectedNode={selectedNode}
+                 hoveredNode={hoveredNode}
                /> : null}
 
              {currentTab === 'tree' ?

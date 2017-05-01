@@ -6,25 +6,25 @@ import '../assets/css/Frames.css';
 
 const FrameList = ({ frames, onDiscardFrame }) => {
   return (
-    <ul className="frame-list">
-      <CSSTransitionGroup
-        transitionName="frame-item"
-        transitionEnterTimeout={300}
-        transitionLeaveTimeout={300}
-      >
-        {
-          frames.map((frame) => {
-            return (
-              <FrameItem
-                key={frame.id}
-                frame={frame}
-                onDiscardFrame={onDiscardFrame}
-              />
-            )
-          })
-        }
-      </CSSTransitionGroup>
-    </ul>
+    <CSSTransitionGroup
+      transitionName="frame-item"
+      transitionEnterTimeout={300}
+      transitionLeaveTimeout={300}
+      component="ul"
+      className="frame-list"
+    >
+      {
+        frames.map((frame) => {
+          return (
+            <FrameItem
+              key={frame.id}
+              frame={frame}
+              onDiscardFrame={onDiscardFrame}
+            />
+          )
+        })
+      }
+    </CSSTransitionGroup>
   );
 };
 

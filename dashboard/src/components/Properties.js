@@ -15,7 +15,7 @@ class Properties extends Component {
         const facets = nodeProperties.facets || {};
 
         return (
-            <div id="properties">
+            <div className="properties">
                 <span>Showing {isEdge ? 'edge' : 'node'}:</span>
                 {!isEdge &&
                     <div>
