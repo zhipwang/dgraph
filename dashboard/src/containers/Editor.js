@@ -217,10 +217,9 @@ class Editor extends Component {
     };
 
     this.editor.on("change", cm => {
-      const { onUpdateQuery, updateShareId } = this.props;
+      const { onUpdateQuery } = this.props;
       const val = this.editor.getValue();
 
-      updateShareId("");
       onUpdateQuery(val);
     });
 

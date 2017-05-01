@@ -83,96 +83,98 @@ class FrameSession extends React.Component {
 
     return (
       <div className="body">
-        <div className="sidebar">
-          <ul className="sidebar-nav">
-            <li>
-              <a
-                href="#query"
-                className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
-                onClick={this.navigateTab.bind(this, 'query')}
-              >
-                <i className="icon fa fa-search" />
-                <span className="menu-label">Query</span>
+        <div className="content">
+          <div className="sidebar">
+            <ul className="sidebar-nav">
+              <li>
+                <a
+                  href="#query"
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
+                  onClick={this.navigateTab.bind(this, 'query')}
+                >
+                  <i className="icon fa fa-search" />
+                  <span className="menu-label">Query</span>
 
-              </a>
-            </li>
-            <li>
-              <a
-                href="#graph"
-                className={classnames('sidebar-nav-item', { active: currentTab === 'graph' })}
-                onClick={this.navigateTab.bind(this, 'graph')}
-              >
-                <GraphIcon />
-                <span className="menu-label">
-                  Graph
-                </span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="#tree"
-                className={classnames('sidebar-nav-item', { active: currentTab === 'tree' })}
-                onClick={this.navigateTab.bind(this, 'tree')}
-              >
-                <TreeIcon />
-                <span className="menu-label">Tree</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#graph"
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'graph' })}
+                  onClick={this.navigateTab.bind(this, 'graph')}
+                >
+                  <GraphIcon />
+                  <span className="menu-label">
+                    Graph
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#tree"
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'tree' })}
+                  onClick={this.navigateTab.bind(this, 'tree')}
+                >
+                  <TreeIcon />
+                  <span className="menu-label">Tree</span>
 
-              </a>
-            </li>
-            <li>
-              <a
-                href="#tree"
-                className={classnames('sidebar-nav-item', { active: currentTab === 'json' })}
-                onClick={this.navigateTab.bind(this, 'json')}
-              >
-                <i className="icon fa fa-code" />
-                <span className="menu-label">JSON</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#tree"
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'json' })}
+                  onClick={this.navigateTab.bind(this, 'json')}
+                >
+                  <i className="icon fa fa-code" />
+                  <span className="menu-label">JSON</span>
 
-              </a>
-            </li>
-          </ul>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="main">
+            {currentTab === 'query' ?
+              <SessionQueryTab
+                session={session}
+               /> :null}
+
+             {currentTab === 'graph' ?
+               <SessionGraphTab
+                 session={session}
+                 onBeforeGraphRender={this.handleBeforeGraphRender}
+                 onGraphRendered={this.handleGraphRendered}
+                 onNodeSelected={this.handleNodeSelected}
+                 onNodeHovered={this.handleNodeHovered}
+                 selectedNode={selectedNode}
+               /> : null}
+
+             {currentTab === 'tree' ?
+               <SessionTreeTab
+                 session={session}
+                 onBeforeTreeRender={this.handleBeforeTreeRender}
+                 onTreeRendered={this.handleTreeRendered}
+                 onNodeSelected={this.handleNodeSelected}
+                 onNodeHovered={this.handleNodeHovered}
+                 selectedNode={selectedNode}
+               /> : null}
+
+             {currentTab === 'json' ?
+               <SessionJSONTab
+                 session={session}
+               /> : null}
+          </div>
         </div>
 
-        <div className="main">
-          {currentTab === 'query' ?
-            <SessionQueryTab
-              session={session}
-             /> :null}
-
-           {currentTab === 'graph' ?
-             <SessionGraphTab
-               session={session}
-               onBeforeGraphRender={this.handleBeforeGraphRender}
-               onGraphRendered={this.handleGraphRendered}
-               onNodeSelected={this.handleNodeSelected}
-               onNodeHovered={this.handleNodeHovered}
-               selectedNode={selectedNode}
-             /> : null}
-
-           {currentTab === 'tree' ?
-             <SessionTreeTab
-               session={session}
-               onBeforeTreeRender={this.handleBeforeTreeRender}
-               onTreeRendered={this.handleTreeRendered}
-               onNodeSelected={this.handleNodeSelected}
-               onNodeHovered={this.handleNodeHovered}
-               selectedNode={selectedNode}
-             /> : null}
-
-           {currentTab === 'json' ?
-             <SessionJSONTab
-               session={session}
-             /> : null}
-
-          <SessionFooter
-            session={session}
-            currentTab={currentTab}
-            selectedNode={selectedNode}
-            hoveredNode={hoveredNode}
-            graphRenderTime={this.getGraphRenderTime()}
-            treeRenderTime={this.getTreeRenderTime()}
-          />
-        </div>
+        <SessionFooter
+          session={session}
+          currentTab={currentTab}
+          selectedNode={selectedNode}
+          hoveredNode={hoveredNode}
+          graphRenderTime={this.getGraphRenderTime()}
+          treeRenderTime={this.getTreeRenderTime()}
+        />
       </div>
     );
   }

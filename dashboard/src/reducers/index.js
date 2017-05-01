@@ -7,7 +7,6 @@ import interaction from "./interaction";
 import latency from "./latency";
 import scratchpad from "./scratchpad";
 import share from "./share";
-import session from "./session";
 import frames from "./frames";
 
 const rootReducer = combineReducers({
@@ -18,7 +17,6 @@ const rootReducer = combineReducers({
     latency,
     scratchpad,
     share,
-    session,
     frames
 });
 

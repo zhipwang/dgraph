@@ -9,7 +9,9 @@ import {
     getEndpoint,
     makeFrame
 } from "../containers/Helpers";
-import { FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_LOADING } from '../lib/const';
+import {
+  FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_LOADING, FRAME_TYPE_ERROR
+} from '../lib/const';
 
 import { receiveFrame, updateFrame } from './frames';
 
@@ -141,7 +143,13 @@ export const runQuery = query => {
             if (result.code.startsWith("Error")) {
               // This is the case in which user sends a mutation.
               // We display the response from server.
-              dispatch(saveErrorResponse(result.message));
+              dispatch(updateFrame({
+                id: frame.id,
+                type: FRAME_TYPE_ERROR,
+                data: {
+                  message: result.message
+                }
+              }));
             } else {
                 const [ nodes, edges, labels, nodesIdx, edgesIdx ] = processGraph(
                   result,
@@ -196,8 +204,16 @@ export const runQuery = query => {
           dispatch(receiveFrame(frame));
         }
       })
-      .catch(function(error) {
-
+      .catch((error) => {
+         error.response.text().then(text => {
+           dispatch(updateFrame({
+             id: frame.id,
+             type: FRAME_TYPE_ERROR,
+             data: {
+               message: text
+             }
+           }));
+         });
       })
     )
   };

@@ -1,6 +1,6 @@
 import React from 'react';
 import FrameItem from './FrameItem';
-import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup'
+import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup';
 
 import '../assets/css/Frames.css';
 

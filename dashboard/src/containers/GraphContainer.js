@@ -328,20 +328,7 @@ class GraphContainer extends Component {
         const canToggleExpand = response.nodes.length !== response.numNodes && response.edges.length !== response.numEdges;
 
         return (
-          <div className="graph-container content">
-            <div className="labels">
-              {response.plotAxis.map((label, i) => {
-                return (
-                  <Label
-                    key={i}
-                    color={label.color}
-                    pred={label.pred}
-                    label={label.label}
-                  />
-                );
-              })}
-            </div>
-
+          <div className="graph-container">
             {isRendering ? <Progress perc={renderProgress} /> :null}
             <div ref="graph" className={classnames('graph', { hidden: isRendering })} />
 

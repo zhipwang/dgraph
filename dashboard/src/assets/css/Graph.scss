@@ -143,13 +143,13 @@
 
 .graph-container {
   display: flex;
-  flex-direction: column;
   position: relative;
+  flex: 1;
 }
 
 .graph {
-  background-color: #f8ffff;
-  flex: 0.9;
+  background-color: #fdfdfd;
+  flex: 1;
 }
 
 .labels {
