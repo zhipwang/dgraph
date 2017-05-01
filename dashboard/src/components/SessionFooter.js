@@ -18,7 +18,7 @@ const SessionFooter = ({
     <div className="footer">
       <div className="row">
         <div className="col-12 col-sm-8">
-        <i className="fa fa-check check-mark" /> <span className="render-result">{currentAction} <span className="value">{session.response.numNodes}</span> {pluralize('node', session.response.numNodes)} and <span className="value">{session.response.numEdges}</span> {pluralize('edge', session.response.numEdges)}</span>
+        <i className="fa fa-check check-mark" /> <span className="result-message">{currentAction} <span className="value">{session.response.numNodes}</span> {pluralize('node', session.response.numNodes)} and <span className="value">{session.response.numEdges}</span> {pluralize('edge', session.response.numEdges)}</span>
         </div>
         <div className="col-12 col-sm-4">
           <div className="latency stats">

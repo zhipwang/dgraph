@@ -4,7 +4,9 @@ import screenfull from 'screenfull';
 import classnames from 'classnames';
 
 import FrameHeader from './FrameHeader';
-import { FRAME_TYPE_SESSION } from '../lib/const';
+import {
+  FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING
+} from '../lib/const';
 import { getShareId } from '../actions';
 
 class FrameLayout extends React.Component {
@@ -86,7 +88,13 @@ class FrameLayout extends React.Component {
 
     return (
       <li
-        className={classnames('frame-item', { fullscreen: isFullscreen })}
+        className={
+          classnames('frame-item', {
+            fullscreen: isFullscreen,
+            'frame-error': frame.type === FRAME_TYPE_ERROR,
+            'frame-session': frame.type === FRAME_TYPE_SESSION,
+            'frame-loading': frame.type === FRAME_TYPE_LOADING
+          })}
         ref="frame"
       >
         <FrameHeader

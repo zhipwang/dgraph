@@ -1,7 +1,7 @@
 import React from 'react';
 import classnames from 'classnames';
 
-import SessionQueryTab from './SessionQueryTab';
+import FrameQueryTab from './FrameQueryTab';
 import SessionGraphTab from './SessionGraphTab';
 import SessionJSONTab from './SessionJSONTab';
 import SessionTreeTab from './SessionTreeTab';
@@ -155,9 +155,7 @@ class FrameSession extends React.Component {
 
           <div className="main">
             {currentTab === 'query' ?
-              <SessionQueryTab
-                session={session}
-               /> :null}
+              <FrameQueryTab query={session.query} /> :null}
 
              {currentTab === 'graph' ?
                <SessionGraphTab

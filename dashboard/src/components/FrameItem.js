@@ -21,7 +21,7 @@ function getFrameContent(frame) {
   } else if (frame.type === FRAME_TYPE_ERROR) {
     return (
       <FrameError
-        message={frame.data.message}
+        data={frame.data}
       />
     )
   } else if (frame.type === FRAME_TYPE_SYSTEM) {

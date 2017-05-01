@@ -147,7 +147,9 @@ export const runQuery = query => {
                 id: frame.id,
                 type: FRAME_TYPE_ERROR,
                 data: {
-                  message: result.message
+                  query,
+                  message: result.message,
+                  response: result
                 }
               }));
             } else {
@@ -210,7 +212,9 @@ export const runQuery = query => {
              id: frame.id,
              type: FRAME_TYPE_ERROR,
              data: {
-               message: text
+               query,
+               message: text,
+               response: JSON.stringify(error)
              }
            }));
          });
