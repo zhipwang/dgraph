@@ -35,7 +35,10 @@ const FrameHeader = ({
         <a
           href="#fullscreen-toggle"
           className="action"
-          onClick={onToggleFullscreen}
+          onClick={(e) => {
+            e.preventDefault();
+            onToggleFullscreen();
+          }}
         >
           {isFullscreen ?
             <i className="fa fa-compress" /> :

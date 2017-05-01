@@ -1,48 +1,36 @@
 import React from 'react';
+import pluralize from 'pluralize';
 
-import Properties from '../components/Properties';
 import { humanizeTime } from '../containers/Helpers';
 
-const MetaInfo = ({ session, currentTab, graphRenderTime, treeRenderTime }) => {
-  return (
-    <ul className="stats">
-      {session.response.data.server_latency ?
-        <li className="stat">Server latency: <span className="value">{session.response.data.server_latency.total}</span></li> : null}
-      {graphRenderTime && currentTab === 'graph' ?
-        <li className="stat">Rendering latency: <span className="value">{humanizeTime(graphRenderTime)}</span></li> : null}
-      {treeRenderTime && currentTab === 'tree' ?
-        <li className="stat">Rendering latency: <span className="value">{humanizeTime(treeRenderTime)}</span></li> : null}
-      <li className="stat">
-        Nodes: <span className="value">{session.response.numNodes}</span>
-      </li>
-      <li className="stat">
-        Edges: <span className="value">{session.response.numEdges}</span>
-      </li>
-    </ul>
-  );
-}
-
-const NodeInfo = ({ node }) => {
-  return <Properties node={node} />;
-}
-
 const SessionFooter = ({
-  session, currentTab, selectedNode, hoveredNode, graphRenderTime, treeRenderTime
+  session, currentTab, graphRenderTime, treeRenderTime
 }) => {
-  const nodeFocused = selectedNode || hoveredNode;
+
+  let currentAction;
+  if (currentTab === 'graph' || currentTab === 'tree') {
+    currentAction = 'Showing';
+  } else {
+    currentAction = 'Found';
+  }
 
   return (
     <div className="footer">
-      {nodeFocused ?
-        <NodeInfo
-          node={nodeFocused}
-        /> :
-        <MetaInfo
-          session={session}
-          currentTab={currentTab}
-          graphRenderTime={graphRenderTime}
-          treeRenderTime={treeRenderTime}
-        />}
+      <div className="row">
+        <div className="col-12 col-sm-8">
+        <i className="fa fa-check check-mark" /> <span className="render-result">{currentAction} <span className="value">{session.response.numNodes}</span> {pluralize('node', session.response.numNodes)} and <span className="value">{session.response.numEdges}</span> {pluralize('edge', session.response.numEdges)}</span>
+        </div>
+        <div className="col-12 col-sm-4">
+          <div className="latency stats">
+            {session.response.data.server_latency ?
+              <div className="stat">Server latency: <span className="value">{session.response.data.server_latency.total}</span></div> : null}
+            {graphRenderTime && currentTab === 'graph' ?
+              <div className="stat">Rendering latency: <span className="value">{humanizeTime(graphRenderTime)}</span></div> : null}
+            {treeRenderTime && currentTab === 'tree' ?
+              <div className="stat">Rendering latency: <span className="value">{humanizeTime(treeRenderTime)}</span></div> : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

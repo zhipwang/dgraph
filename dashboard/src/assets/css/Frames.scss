@@ -110,9 +110,14 @@
     }
 
     .sidebar {
-      width: 58px;
+      width: 65px;
       background: #f9f9f9;
       border-right: 1px solid #d4d4d4;
+    }
+
+    .icon-container {
+      width: 29px;
+      display: inline-block;
     }
 
     .main {
@@ -138,25 +143,26 @@
 
       .sidebar-nav-item {
         text-align: center;
-        padding: 13px 11px;
         display: block;
-        color: gray;
+        padding: 11px 0;
+        color: #9c9c9c;
         border-bottom: 1px solid #d4d4d4;
         text-decoration: none;
 
         .menu-label {
-          margin-top: 6px;
+          margin-top: 7px;
           display: block;
           text-transform: uppercase;
           font-size: 11px;
+          font-weight: 500;
         }
 
         .fa {
-          font-size: 23px;
+          font-size: 21px;
         }
 
         svg {
-          fill: gray;
+          fill: #9c9c9c;
         }
 
         &.active {
@@ -193,20 +199,18 @@
 }
 
 .footer {
-  // flex: 0.1;
-  // background: white;
-  // display: flex;
-  // align-items: center;
-  // padding: 0 8px;
-  // font-size: 13px;
-  // border-top: 1px solid #d4d4d4;
-  height: 47px;
+  padding: 11px 12px;
   background: white;
   border-top: 1px solid #d2d2d2;
 
-  .stats {
-    list-style: none;
-    padding-left: 0;
+  .render-result {
+    vertical-align: middle;
+  }
+
+  .check-mark {
+    color: #84ca23;
+    font-size: 19px;
+    vertical-align: middle;
   }
 
   .stat {

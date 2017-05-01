@@ -340,6 +340,18 @@ class GraphContainer extends Component {
               />
               : null}
 
+            <div className="labels">
+              {response.plotAxis.map((label, i) => {
+                return (
+                  <Label
+                    key={i}
+                    color={label.color}
+                    pred={label.pred}
+                    label={label.label}
+                  />
+                );
+              })}
+            </div>
           </div>
         );
     }

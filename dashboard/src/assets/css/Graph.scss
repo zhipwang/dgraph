@@ -76,13 +76,13 @@
 }
 
 .vis-network {
-    flex: auto;
+    flex: 1;
     display: flex;
-    flex-direction: column;
+      // flex-direction: column;
 }
 
 .vis-network > canvas {
-    flex: auto;
+    flex: 1;
 }
 
 .progress .progress-bar {
@@ -145,20 +145,17 @@
   display: flex;
   position: relative;
   flex: 1;
+  flex-direction: column;
 }
 
 .graph {
   background-color: #fdfdfd;
   flex: 1;
+  display: flex;
 }
 
 .labels {
-  align-items: center;
-  display: flex;
-  flex: 0.1;
-  padding: 0 13px;
-  background: #f9f9f9;
-  border-bottom: 1px solid #d4d4d4;
+  padding: 7px 11px;
 }
 
 .plot-label {

@@ -92,7 +92,9 @@ class FrameSession extends React.Component {
                   className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
                   onClick={this.navigateTab.bind(this, 'query')}
                 >
-                  <i className="icon fa fa-search" />
+                  <div className="icon-container">
+                    <i className="icon fa fa-search" />
+                  </div>
                   <span className="menu-label">Query</span>
 
                 </a>
@@ -103,7 +105,9 @@ class FrameSession extends React.Component {
                   className={classnames('sidebar-nav-item', { active: currentTab === 'graph' })}
                   onClick={this.navigateTab.bind(this, 'graph')}
                 >
-                  <GraphIcon />
+                  <div className="icon-container">
+                    <GraphIcon />
+                  </div>
                   <span className="menu-label">
                     Graph
                   </span>
@@ -115,7 +119,9 @@ class FrameSession extends React.Component {
                   className={classnames('sidebar-nav-item', { active: currentTab === 'tree' })}
                   onClick={this.navigateTab.bind(this, 'tree')}
                 >
-                  <TreeIcon />
+                  <div className="icon-container">
+                    <TreeIcon />
+                  </div>
                   <span className="menu-label">Tree</span>
 
                 </a>
@@ -126,7 +132,10 @@ class FrameSession extends React.Component {
                   className={classnames('sidebar-nav-item', { active: currentTab === 'json' })}
                   onClick={this.navigateTab.bind(this, 'json')}
                 >
-                  <i className="icon fa fa-code" />
+                  <div className="icon-container">
+                    <i className="icon fa fa-code" />
+                  </div>
+
                   <span className="menu-label">JSON</span>
 
                 </a>
