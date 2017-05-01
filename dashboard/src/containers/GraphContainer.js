@@ -269,9 +269,7 @@ class GraphContainer extends Component {
       network.fit();
     }
 
-    handleExpandNetwork = (e) => {
-      e.preventDefault();
-
+    handleExpandNetwork = () => {
       const { response: { allNodes, allEdges } } = this.props;
       const { network } = this.state;
 
@@ -340,19 +338,15 @@ class GraphContainer extends Component {
             {isRendering ? <Progress perc={renderProgress} /> :null}
             <div ref="graph" className={classnames('graph', { hidden: isRendering })} />
 
-            {canToggleExpand ?
-              <PartialGraphFooter
-                partiallyRendered={partiallyRendered}
-                onExpandNetwork={this.handleExpandNetwork}
-                onCollapseNetwork={this.handleCollapseNetwork}
-              />
-              : null}
-
             {!isRendering ?
               <GraphFooter
                 response={response}
                 selectedNode={selectedNode}
                 hoveredNode={hoveredNode}
+                canToggleExpand={canToggleExpand}
+                partiallyRendered={partiallyRendered}
+                onExpandNetwork={this.handleExpandNetwork}
+                onCollapseNetwork={this.handleCollapseNetwork}
               /> : null}
 
           </div>

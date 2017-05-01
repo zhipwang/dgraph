@@ -3,8 +3,12 @@ import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup';
 
 import NodeOrEdgeInfo from '../components/NodeOrEdgeInfo';
 import Label from '../components/Label';
+import PartialGraphFooter from '../components/PartialGraphFooter';
 
-const GraphFooter = ({ response, selectedNode, hoveredNode }) => {
+const GraphFooter = ({
+  response, selectedNode, hoveredNode, canToggleExpand, partiallyRendered,
+  onExpandNetwork, onCollapseNetwork
+}) => {
   const focusedNode = hoveredNode || selectedNode;
 
   return (
@@ -32,6 +36,12 @@ const GraphFooter = ({ response, selectedNode, hoveredNode }) => {
             node={focusedNode}
           />
         : null}
+        {canToggleExpand ?
+          <PartialGraphFooter
+            partiallyRendered={partiallyRendered}
+            onExpandNetwork={onExpandNetwork}
+            onCollapseNetwork={onCollapseNetwork}
+          /> : null}
       </CSSTransitionGroup>
     </div>
   );
