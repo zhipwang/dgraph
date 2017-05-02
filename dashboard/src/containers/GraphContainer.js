@@ -55,6 +55,12 @@ class GraphContainer extends Component {
       this.setState({ network }, () => {
         window.addEventListener('resize', this.fitNetwork);
       });
+
+      // FIXME: hacky workaround for zoom problem: https://github.com/almende/vis/issues/3021
+      const els = document.getElementsByClassName('vis-network');
+      for (var i = 0; i < els.length; i++) {
+        els[i].style.width = null;
+      }
     }
 
     componentWillUnmount() {
