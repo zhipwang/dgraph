@@ -61,15 +61,6 @@ class App extends React.Component {
     }
   }
 
-  enterFullScreen = () => {
-    if (!screenfull.enabled) {
-      return;
-    }
-
-    const responseEl = ReactDOM.findDOMNode(this.refs.response);
-    screenfull.request(responseEl);
-  };
-
   toggleSidebarOpen = () => {
     this.setState({ sidebarOpen: !this.state.sidebarOpen });
   }

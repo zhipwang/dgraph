@@ -247,7 +247,6 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = {
-  onRunQuery: runQuery,
   updateQuery: selectQuery,
   updateShareId,
   updateRegex

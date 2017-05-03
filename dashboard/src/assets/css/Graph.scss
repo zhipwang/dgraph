@@ -78,7 +78,7 @@
 .vis-network {
     flex: 1;
     display: flex;
-      // flex-direction: column;
+    flex-direction: column;
 }
 
 .vis-network > canvas {
@@ -152,6 +152,7 @@
   background-color: #fdfdfd;
   flex: 1;
   display: flex;
+  flex-direction: column;
 }
 
 .graph-footer {

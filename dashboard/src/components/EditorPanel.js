@@ -51,10 +51,6 @@ class EditorPanel extends React.Component {
             >
               <i className={classnames('fa fa-play', { dirty })} id="run-btn" />
             </a>
-
-            <a href="#" className="action">
-              <i className="fa fa-share-alt" />
-            </a>
           </div>
         </div>
 
