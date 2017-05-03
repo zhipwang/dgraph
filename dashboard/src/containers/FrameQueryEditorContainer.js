@@ -9,8 +9,9 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-  handleRunQuery(query, frameId) {
-    dispatch(runQuery(query, frameId));
+  handleRunQuery(query, frameId, done) {
+    return dispatch(runQuery(query, frameId))
+      .then(done);
   }
 });
 

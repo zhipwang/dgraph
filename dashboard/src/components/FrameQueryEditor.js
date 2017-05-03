@@ -16,10 +16,18 @@ export default class FrameQueryEditor extends React.Component {
     this.setState({ currentQuery: val });
   }
 
+  onRunQuery = () => {
+    const { handleRunQuery, onToggleEditingQuery, frame } = this.props;
+    const { currentQuery } = this.state;
+
+    handleRunQuery(currentQuery, frame.id, () => {
+      onToggleEditingQuery();
+    });
+  }
+
   render() {
     const {
-      query, open, onToggleEditingQuery, saveCodeMirrorInstance, handleRunQuery,
-      frame
+      query, open, onToggleEditingQuery, saveCodeMirrorInstance
     } = this.props;
     const { currentQuery } = this.state;
 
@@ -28,6 +36,7 @@ export default class FrameQueryEditor extends React.Component {
         <Editor
           query={currentQuery}
           onUpdateQuery={this.handleUpdateQuery}
+          onRunQuery={this.onRunQuery}
           saveCodeMirrorInstance={saveCodeMirrorInstance}
         />
         <div className="actions">
@@ -50,7 +59,7 @@ export default class FrameQueryEditor extends React.Component {
             onClick={(e) => {
               e.preventDefault();
 
-              handleRunQuery(currentQuery, frame.id)
+              this.onRunQuery();
             }}
           >
             Run
