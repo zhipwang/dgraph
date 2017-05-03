@@ -1,8 +1,6 @@
 import React from 'react';
 
-import Highlight from './Highlight';
-
-const FrameErrorTab = ({ message }) => {
+const FrameMessageTab = ({ message }) => {
   return (
     <div className="content-container">
       <div className="text-content">
@@ -11,4 +9,4 @@ const FrameErrorTab = ({ message }) => {
     </div>
   );
 };
-export default FrameErrorTab;
+export default FrameMessageTab;

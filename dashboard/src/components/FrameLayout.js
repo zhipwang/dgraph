@@ -5,7 +5,7 @@ import classnames from 'classnames';
 
 import FrameHeader from './FrameHeader';
 import {
-  FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING
+  FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING, FRAME_TYPE_SUCCESS
 } from '../lib/const';
 import { getShareId } from '../actions';
 
@@ -93,8 +93,10 @@ class FrameLayout extends React.Component {
             fullscreen: isFullscreen,
             'frame-error': frame.type === FRAME_TYPE_ERROR,
             'frame-session': frame.type === FRAME_TYPE_SESSION,
-            'frame-loading': frame.type === FRAME_TYPE_LOADING
-          })}
+            'frame-loading': frame.type === FRAME_TYPE_LOADING,
+            'frame-system': frame.type === FRAME_TYPE_SUCCESS
+          })
+        }
         ref="frame"
       >
         <FrameHeader

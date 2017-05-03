@@ -10,7 +10,7 @@ import {
     makeFrame
 } from "../containers/Helpers";
 import {
-  FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_LOADING, FRAME_TYPE_ERROR
+  FRAME_TYPE_SESSION, FRAME_TYPE_SUCCESS, FRAME_TYPE_LOADING, FRAME_TYPE_ERROR
 } from '../lib/const';
 
 import { receiveFrame, updateFrame } from './frames';
@@ -140,41 +140,25 @@ export const runQuery = query => {
         .then(response => response.json())
         .then((result) => {
           if (result.code !== undefined && result.message !== undefined) {
+            // This is the case in which user sends a mutation.
+            // We display the response from server.
+            let frameType;
             if (result.code.startsWith("Error")) {
-              // This is the case in which user sends a mutation.
-              // We display the response from server.
-              dispatch(updateFrame({
-                id: frame.id,
-                type: FRAME_TYPE_ERROR,
-                data: {
-                  query,
-                  message: result.message,
-                  response: result
-                }
-              }));
+              frameType = FRAME_TYPE_ERROR;
             } else {
-                const [ nodes, edges, labels, nodesIdx, edgesIdx ] = processGraph(
-                  result,
-                  query,
-                  false
-                );
-                const session = {
-                  query,
-                  response: {
-                    plotAxis: labels,
-                    allNodes: nodes,
-                    allEdges: edges,
-                    numNodes: nodes.length,
-                    numEdges: edges.length,
-                    nodes: nodes.slice(0, nodesIdx),
-                    edges: edges.slice(0, edgesIdx),
-                    treeView: false,
-                    data: result
-                  }
-                };
-                dispatch(receiveFrame(session));
+              frameType = FRAME_TYPE_SUCCESS;
             }
-        } else if (isNotEmpty(result)) {
+
+            dispatch(updateFrame({
+              id: frame.id,
+              type: frameType,
+              data: {
+                query,
+                message: result.message,
+                response: JSON.stringify(result)
+              }
+            }));
+          } else if (isNotEmpty(result)) {
             const { nodes, edges, labels, nodesIndex, edgesIndex } =
               processGraph(result, false, query, '');
 
@@ -197,27 +181,28 @@ export const runQuery = query => {
               }
             }));
         } else {
-          const frame = makeFrame({
-            type: FRAME_TYPE_SYSTEM,
+          dispatch(updateFrame({
+            id: frame.id,
+            type: FRAME_TYPE_SUCCESS,
             data: {
-              message: 'Your query did not return any results'
+              query,
+              message: 'Your query did not return any results',
+              response: JSON.stringify(result)
             }
-          });
-          dispatch(receiveFrame(frame));
+          }));
         }
       })
       .catch((error) => {
-         error.response.text().then(text => {
-           dispatch(updateFrame({
-             id: frame.id,
-             type: FRAME_TYPE_ERROR,
-             data: {
-               query,
-               message: text,
-               response: JSON.stringify(error)
-             }
-           }));
-         });
+        console.log(error.stack);
+        dispatch(updateFrame({
+          id: frame.id,
+          type: FRAME_TYPE_ERROR,
+          data: {
+            query,
+            message: error.message,
+            response: JSON.stringify(error)
+          }
+        }));
       })
     )
   };

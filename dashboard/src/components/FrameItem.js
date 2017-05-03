@@ -1,12 +1,12 @@
 import React from 'react';
 
 import {
-  FRAME_TYPE_SESSION, FRAME_TYPE_SYSTEM, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING
+  FRAME_TYPE_SESSION, FRAME_TYPE_SUCCESS, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING
 } from '../lib/const';
 import FrameLayout from './FrameLayout';
 import FrameSession from './FrameSession';
 import FrameError from './FrameError';
-import FrameSystem from './FrameSystem';
+import FrameSuccess from './FrameSuccess';
 import FrameLoading from './FrameLoading';
 
 
@@ -24,10 +24,10 @@ function getFrameContent(frame) {
         data={frame.data}
       />
     )
-  } else if (frame.type === FRAME_TYPE_SYSTEM) {
+  } else if (frame.type === FRAME_TYPE_SUCCESS) {
     return (
-      <FrameSystem
-        message={frame.data.message}
+      <FrameSuccess
+        data={frame.data}
       />
     )
   } else if (frame.type === FRAME_TYPE_LOADING) {

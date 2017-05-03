@@ -4,14 +4,13 @@ import classnames from 'classnames';
 import FrameQueryTab from './FrameQueryTab';
 import FrameMessageTab from './FrameMessageTab';
 
-class FrameError extends React.Component {
+class FrameSuccess extends React.Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      // tabs: 'error', 'response', 'query'
-      currentTab: 'error'
-    }
+      currentTab: 'message'
+    };
   }
 
   navigateTab = (tabName, e) => {
@@ -23,7 +22,7 @@ class FrameError extends React.Component {
   }
 
   render() {
-    const { data: { message, query, response } } = this.props;
+    const { data } = this.props;
     const { currentTab } = this.state;
 
     return (
@@ -34,14 +33,13 @@ class FrameError extends React.Component {
               <li>
                 <a
                   href="#query"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'error' })}
-                  onClick={this.navigateTab.bind(this, 'error')}
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'message' })}
+                  onClick={this.navigateTab.bind(this, 'message')}
                 >
                   <div className="icon-container">
-                    <i className="icon fa fa-warning" />
+                    <i className="icon fa fa-check-circle" />
                   </div>
-                  <span className="menu-label">Error</span>
-
+                  <span className="menu-label">Message</span>
                 </a>
               </li>
               <li>
@@ -75,21 +73,17 @@ class FrameError extends React.Component {
           </div>
 
           <div className="main">
-            {currentTab === 'error' ?
-              <FrameMessageTab message={message} /> :null}
+            {currentTab === 'message' ?
+              <FrameMessageTab message={data.message} /> :null}
             {currentTab === 'query' ?
-              <FrameQueryTab query={query} /> :null}
+              <FrameQueryTab query={data.query} /> :null}
             {currentTab === 'response' ?
-              <FrameQueryTab query={response} /> :null}
+              <FrameQueryTab query={data.response} /> :null}
           </div>
-        </div>
-
-        <div className="footer error-footer">
-          <i className="fa fa-warning error-mark" /> <span className="result-message">Error occurred</span>
         </div>
       </div>
     );
   }
 }
 
-export default FrameError;
+export default FrameSuccess;
