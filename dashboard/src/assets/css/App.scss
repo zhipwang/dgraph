@@ -168,3 +168,8 @@ input.form-control {
 .App-hide {
     display: none;
 }
+
+// override the library default
+.hljs {
+  background: none;
+}

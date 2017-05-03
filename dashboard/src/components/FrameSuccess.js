@@ -44,19 +44,6 @@ class FrameSuccess extends React.Component {
               </li>
               <li>
                 <a
-                  href="#query"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
-                  onClick={this.navigateTab.bind(this, 'query')}
-                >
-                  <div className="icon-container">
-                    <i className="icon fa fa-search" />
-                  </div>
-                  <span className="menu-label">Query</span>
-
-                </a>
-              </li>
-              <li>
-                <a
                   href="#tree"
                   className={classnames('sidebar-nav-item', { active: currentTab === 'response' })}
                   onClick={this.navigateTab.bind(this, 'response')}
@@ -75,8 +62,6 @@ class FrameSuccess extends React.Component {
           <div className="main">
             {currentTab === 'message' ?
               <FrameMessageTab message={data.message} /> :null}
-            {currentTab === 'query' ?
-              <FrameQueryTab query={data.query} /> :null}
             {currentTab === 'response' ?
               <FrameQueryTab query={data.response} /> :null}
           </div>

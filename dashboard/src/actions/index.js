@@ -116,95 +116,125 @@ export const resetResponseState = () => ({
     type: "RESET_RESPONSE"
 });
 
-export const runQuery = query => {
+// executeQueryAndUpdateFrame fetches the query response from the server
+// and updates the frame
+function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
   const endpoint = getEndpoint('query', { debug: true });
 
-  return dispatch => {
-    const frame = makeFrame({
-      type: FRAME_TYPE_LOADING,
-      data: {}
-    });
-    dispatch(receiveFrame(frame));
-
-    return timeout(
-      60000,
-      fetch(endpoint, {
-        method: "POST",
-        mode: "cors",
-        headers: {
-          "Content-Type": "text/plain"
-        },
-        body: query
-      })
-        .then(checkStatus)
-        .then(response => response.json())
-        .then((result) => {
-          if (result.code !== undefined && result.message !== undefined) {
-            // This is the case in which user sends a mutation.
-            // We display the response from server.
-            let frameType;
-            if (result.code.startsWith("Error")) {
-              frameType = FRAME_TYPE_ERROR;
-            } else {
-              frameType = FRAME_TYPE_SUCCESS;
-            }
-
-            dispatch(updateFrame({
-              id: frame.id,
-              type: frameType,
-              data: {
-                query,
-                message: result.message,
-                response: JSON.stringify(result)
-              }
-            }));
-          } else if (isNotEmpty(result)) {
-            const { nodes, edges, labels, nodesIndex, edgesIndex } =
-              processGraph(result, false, query, '');
-
-            dispatch(updateFrame({
-              id: frame.id,
-              type: FRAME_TYPE_SESSION,
-              data: {
-                query,
-                response: {
-                  plotAxis: labels,
-                  allNodes: nodes,
-                  allEdges: edges,
-                  numNodes: nodes.length,
-                  numEdges: edges.length,
-                  nodes: nodes.slice(0, nodesIndex),
-                  edges: edges.slice(0, edgesIndex),
-                  treeView: false,
-                  data: result
-                }
-              }
-            }));
+  return timeout(
+    60000,
+    fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: query
+    })
+  )
+    .then(checkStatus)
+    .then(response => response.json())
+    .then((result) => {
+      if (result.code !== undefined && result.message !== undefined) {
+        // This is the case in which user sends a mutation.
+        // We display the response from server.
+        let frameType;
+        if (result.code.startsWith("Error")) {
+          frameType = FRAME_TYPE_ERROR;
         } else {
-          dispatch(updateFrame({
-            id: frame.id,
-            type: FRAME_TYPE_SUCCESS,
-            data: {
-              query,
-              message: 'Your query did not return any results',
-              response: JSON.stringify(result)
-            }
-          }));
+          frameType = FRAME_TYPE_SUCCESS;
         }
-      })
-      .catch((error) => {
-        console.log(error.stack);
+
         dispatch(updateFrame({
-          id: frame.id,
-          type: FRAME_TYPE_ERROR,
+          id: frameId,
+          type: frameType,
           data: {
             query,
-            message: error.message,
-            response: JSON.stringify(error)
+            message: result.message,
+            response: JSON.stringify(result)
           }
         }));
-      })
-    )
+      } else if (isNotEmpty(result)) {
+        const { nodes, edges, labels, nodesIndex, edgesIndex } =
+          processGraph(result, false, query, '');
+
+        dispatch(updateFrame({
+          id: frameId,
+          type: FRAME_TYPE_SESSION,
+          data: {
+            query,
+            response: {
+              plotAxis: labels,
+              allNodes: nodes,
+              allEdges: edges,
+              numNodes: nodes.length,
+              numEdges: edges.length,
+              nodes: nodes.slice(0, nodesIndex),
+              edges: edges.slice(0, edgesIndex),
+              treeView: false,
+              data: result
+            }
+          }
+        }));
+    } else {
+      dispatch(updateFrame({
+        id: frameId,
+        type: FRAME_TYPE_SUCCESS,
+        data: {
+          query,
+          message: 'Your query did not return any results',
+          response: JSON.stringify(result)
+        }
+      }));
+    }
+  })
+  .catch((error) => {
+    console.log(error.stack);
+    dispatch(updateFrame({
+      id: frameId,
+      type: FRAME_TYPE_ERROR,
+      data: {
+        query,
+        message: error.message,
+        response: JSON.stringify(error)
+      }
+    }));
+  })
+}
+
+/**
+ * runQuery runs the query and displays the appropriate result in a frame
+ * @params query {String}
+ * @params [frameId] {String}
+ *
+ * If frameId is not given, It inserts a new frame. Otherwise, it updates the
+ * frame with the id equal to frameId
+ *
+ */
+export const runQuery = (query, frameId) => {
+  return dispatch => {
+    // Either insert a new frame or update
+    let targetFrameId;
+    if (frameId) {
+      dispatch(updateFrame({
+        id: frameId,
+        type: FRAME_TYPE_LOADING,
+        data: {}
+      }));
+      targetFrameId = frameId;
+    } else {
+      const frame = makeFrame({
+        type: FRAME_TYPE_LOADING,
+        data: {}
+      });
+      dispatch(receiveFrame(frame));
+      targetFrameId = frame.id;
+    }
+
+    return executeQueryAndUpdateFrame(dispatch, {
+      frameId: targetFrameId,
+      query
+    });
   };
 };
 

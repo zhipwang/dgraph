@@ -46,19 +46,6 @@ class FrameError extends React.Component {
               </li>
               <li>
                 <a
-                  href="#query"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
-                  onClick={this.navigateTab.bind(this, 'query')}
-                >
-                  <div className="icon-container">
-                    <i className="icon fa fa-search" />
-                  </div>
-                  <span className="menu-label">Query</span>
-
-                </a>
-              </li>
-              <li>
-                <a
                   href="#tree"
                   className={classnames('sidebar-nav-item', { active: currentTab === 'response' })}
                   onClick={this.navigateTab.bind(this, 'response')}
@@ -77,8 +64,6 @@ class FrameError extends React.Component {
           <div className="main">
             {currentTab === 'error' ?
               <FrameMessageTab message={message} /> :null}
-            {currentTab === 'query' ?
-              <FrameQueryTab query={query} /> :null}
             {currentTab === 'response' ?
               <FrameQueryTab query={response} /> :null}
           </div>

@@ -4,6 +4,7 @@ import screenfull from 'screenfull';
 import classnames from 'classnames';
 
 import FrameHeader from './FrameHeader';
+import FrameQueryEditor from '../containers/FrameQueryEditorContainer';
 import {
   FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING, FRAME_TYPE_SUCCESS
 } from '../lib/const';
@@ -16,7 +17,8 @@ class FrameLayout extends React.Component {
     this.state = {
       isFullscreen: false,
       shareId: '',
-      shareHidden: false
+      shareHidden: false,
+      editingQuery: false
     };
   }
 
@@ -82,9 +84,26 @@ class FrameLayout extends React.Component {
     this.shareURLEl = el;
   }
 
+  // saveCodeMirrorInstance saves the codemirror instance initialized in the
+  // <Editor /> component so that we can access it in this component. (e.g. to
+  // focus)
+  saveCodeMirrorInstance = (cm) => {
+    this.queryEditor = cm;
+  }
+
+  handleToggleEditingQuery = () => {
+    this.setState({
+      editingQuery: !this.state.editingQuery
+    }, () => {
+      if (this.state.editingQuery) {
+        this.queryEditor.focus();
+      }
+    });
+  }
+
   render() {
     const { children, onDiscardFrame, frame } = this.props;
-    const { isFullscreen, shareId, shareHidden } = this.state;
+    const { isFullscreen, shareId, shareHidden, editingQuery } = this.state;
 
     return (
       <li
@@ -102,15 +121,28 @@ class FrameLayout extends React.Component {
         <FrameHeader
           shareId={shareId}
           onToggleFullscreen={this.handleToggleFullscreen}
+          onToggleEditingQuery={this.handleToggleEditingQuery}
           onDiscardFrame={onDiscardFrame}
           onShare={this.handleShare}
           shareHidden={shareHidden}
           frame={frame}
           isFullscreen={isFullscreen}
           saveShareURLRef={this.saveShareURLRef}
+          editingQuery={editingQuery}
         />
 
-        {children}
+        <div className="body-container">
+          {frame.data.query ?
+            <FrameQueryEditor
+              frame={frame}
+              query={frame.data.query}
+              open={editingQuery}
+              onToggleEditingQuery={this.handleToggleEditingQuery}
+              saveCodeMirrorInstance={this.saveCodeMirrorInstance}
+            /> : null}
+
+          {children}
+        </div>
       </li>
     );
   }

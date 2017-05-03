@@ -2,15 +2,23 @@ import React from 'react';
 import classnames from 'classnames';
 
 import { getShareURL } from '../containers/Helpers';
+import QueryPreview from './QueryPreview';
 
 const FrameHeader = ({
   frame, shareId, shareHidden, isFullscreen, onShare, onToggleFullscreen,
-  onDiscardFrame, saveShareURLRef
+  onToggleEditingQuery, onDiscardFrame, saveShareURLRef, editingQuery
 }) => {
   const shareURLValue = shareId ? getShareURL(shareId) : '';
 
   return (
     <div className="header">
+      {frame.data.query ?
+        <QueryPreview
+          query={frame.data.query}
+          onToggleEditingQuery={onToggleEditingQuery}
+          editingQuery={editingQuery}
+        /> :
+        null}
       <div className="actions">
         <a
           href="#share"

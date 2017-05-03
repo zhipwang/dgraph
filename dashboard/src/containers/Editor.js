@@ -30,6 +30,8 @@ class Editor extends Component {
   };
 
   componentDidMount = () => {
+    const { saveCodeMirrorInstance } = this.props;
+
     const CodeMirror = require("codemirror");
     require("codemirror/addon/hint/show-hint");
     require("codemirror/addon/comment/comment");
@@ -218,8 +220,11 @@ class Editor extends Component {
 
     this.editor.on("change", cm => {
       const { onUpdateQuery } = this.props;
-      const val = this.editor.getValue();
+      if (!onUpdateQuery) {
+        return;
+      }
 
+      const val = this.editor.getValue();
       onUpdateQuery(val);
     });
 
@@ -230,6 +235,10 @@ class Editor extends Component {
         CodeMirror.commands.autocomplete(cm);
       }
     });
+
+    if (saveCodeMirrorInstance) {
+      saveCodeMirrorInstance(this.editor);
+    }
   };
 }
 

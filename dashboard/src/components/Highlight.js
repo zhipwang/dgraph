@@ -19,7 +19,7 @@ export default class Highlight extends React.Component {
   }
 
   highlightCode() {
-    const domNode = ReactDOM.findDOMNode(this);
+    const domNode = this.refs.code;
     hljs.highlightBlock(domNode);
   }
 
@@ -28,7 +28,7 @@ export default class Highlight extends React.Component {
 
     return (
       <pre className={classnames(preClass)}>
-        <code className={classnames('json', codeClass)}>{children}</code></pre>
+        <code className={classnames('json', codeClass)} ref="code">{children}</code></pre>
     );
   }
 }

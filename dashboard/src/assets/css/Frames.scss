@@ -89,6 +89,39 @@
     background-color: #ffffff;
     display: flex;
     justify-content: flex-end;
+
+    .query-row {
+      flex: 1;
+      display: flex;
+      font-size: 14px;
+      color: #828282;
+      align-items: center;
+      padding: 0 16px;
+
+      &:not(.editing) {
+        cursor: pointer;
+      }
+
+      &:not(.editing):hover {
+        background: #fbffff;
+      }
+    }
+
+    .edit-toggle {
+      display: block;
+      cursor: text;
+      color: inherit;
+    }
+
+    .query-prompt {
+      margin-right: 8px;
+      color: black;
+    }
+
+    .preview {
+      font-weight: 500;
+      font-size: 17px;
+    }
   }
 
   .share-url-holder {
@@ -115,6 +148,39 @@
     border: 0;
     border-radius: 0;
     margin-bottom: 0;
+  }
+
+  .body-container {
+    flex: 1;
+    display: flex;
+    position: relative;
+  }
+
+  .frame-query-editor {
+    position: absolute;
+    top: 0;
+    background: white;
+    left: 0;
+    right: 0;
+    height: 0;
+    transition: height 300ms cubic-bezier(0.55, 0.09, 0.68, 0.53);
+    overflow-y: hidden;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+
+    .Editor-basic {
+      flex: 1;
+    }
+
+    .actions {
+      padding: 7px 10px;
+      text-align: right;
+    }
+  }
+  .frame-query-editor.open {
+    height: 50%;
+    border-bottom: 1px solid #d2d2d2;
   }
 
   .body {

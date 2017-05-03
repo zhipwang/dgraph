@@ -637,3 +637,34 @@ export function makeFrame({ type, data }) {
     data
   };
 }
+
+// CollapseQuery replaces deeply nested blocks in a query with ellipsis
+export function collapseQuery(query) {
+  const depthLimit = 2;
+  let ret = '';
+  let depth = 0;
+
+  for (let i = 0; i < query.length; i++) {
+    let char = query[i];
+
+    if (char === '{') {
+      depth++;
+
+      if (depth === depthLimit) {
+        ret += char;
+        ret += ' ... ';
+        continue;
+      }
+    } else if (char === '}') {
+      depth--;
+    }
+
+    if (depth >= depthLimit) {
+      continue;
+    }
+
+    ret += char;
+  }
+
+  return ret;
+}

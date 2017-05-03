@@ -44,8 +44,6 @@ class FrameSession extends React.Component {
   }
 
   handleNodeSelected = (node) => {
-    const { selectedNode } = this.state;
-
     if (!node) {
       this.setState({
         selectedNode: null,
@@ -98,19 +96,6 @@ class FrameSession extends React.Component {
             <ul className="sidebar-nav">
               <li>
                 <a
-                  href="#query"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'query' })}
-                  onClick={this.navigateTab.bind(this, 'query')}
-                >
-                  <div className="icon-container">
-                    <i className="icon fa fa-search" />
-                  </div>
-                  <span className="menu-label">Query</span>
-
-                </a>
-              </li>
-              <li>
-                <a
                   href="#graph"
                   className={classnames('sidebar-nav-item', { active: currentTab === 'graph' })}
                   onClick={this.navigateTab.bind(this, 'graph')}
@@ -154,9 +139,6 @@ class FrameSession extends React.Component {
           </div>
 
           <div className="main">
-            {currentTab === 'query' ?
-              <FrameQueryTab query={session.query} /> :null}
-
              {currentTab === 'graph' ?
                <SessionGraphTab
                  session={session}
