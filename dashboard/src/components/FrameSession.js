@@ -1,7 +1,6 @@
 import React from 'react';
 import classnames from 'classnames';
 
-import FrameQueryTab from './FrameQueryTab';
 import SessionGraphTab from './SessionGraphTab';
 import SessionJSONTab from './SessionJSONTab';
 import SessionTreeTab from './SessionTreeTab';

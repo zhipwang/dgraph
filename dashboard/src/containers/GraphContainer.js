@@ -6,7 +6,6 @@ import classnames from 'classnames';
 
 import { renderNetwork } from '../lib/graph';
 import Progress from '../components/Progress';
-import PartialGraphFooter from '../components/PartialGraphFooter';
 import GraphFooter from '../components/GraphFooter';
 import { outgoingEdges, childNodes } from './Helpers';
 

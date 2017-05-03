@@ -23,7 +23,7 @@ class FrameError extends React.Component {
   }
 
   render() {
-    const { data: { message, query, response } } = this.props;
+    const { data: { message, response } } = this.props;
     const { currentTab } = this.state;
 
     return (

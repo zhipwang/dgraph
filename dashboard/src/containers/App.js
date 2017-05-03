@@ -1,18 +1,11 @@
 import React from "react";
-import ReactDOM from 'react-dom';
 import { connect } from "react-redux";
-import screenfull from "screenfull";
-import { Alert } from "react-bootstrap";
+import screenfull from "screenfull"
 
 import Sidebar from '../components/Sidebar';
 import EditorPanel from '../components/EditorPanel';
 import FrameList from '../components/FrameList';
 import {
-  updateFullscreen,
-  getQuery,
-  updateInitialQuery,
-  queryFound,
-  selectQuery,
   runQuery
 } from "../actions";
 import { discardFrame } from '../actions/frames';
@@ -49,18 +42,6 @@ class App extends React.Component {
     document.removeEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
   }
 
-  componentWillReceiveProps = nextProps => {
-    if (!nextProps.found) {
-      // Lets auto close the alert after 2 secs.
-      setTimeout(
-        () => {
-          this.props.queryFound(true);
-        },
-        3000
-      );
-    }
-  }
-
   toggleSidebarOpen = () => {
     this.setState({ sidebarOpen: !this.state.sidebarOpen });
   }
@@ -74,21 +55,6 @@ class App extends React.Component {
         <div className="main-content">
           <div className="container-fluid">
             <div className="row justify-content-md-center">
-              <div className="col-sm-12">
-                {!this.props.found &&
-                  <Alert
-                    ref={alert => {
-                      this.alert = alert;
-                    }}
-                    bsStyle="danger"
-                    onDismiss={() => {
-                      this.props.queryFound(true);
-                    }}
-                  >
-                    Couldn't find query with the given id.
-                  </Alert>}
-              </div>
-
               <div className="col-sm-12">
                 <EditorPanel
                   onRunQuery={handleRunQuery}
@@ -110,27 +76,10 @@ class App extends React.Component {
 }
 
 const mapStateToProps = state => ({
-  found: state.share.found,
   frames: state.frames.items
 });
 
 const mapDispatchToProps = dispatch => ({
-  handleUpdateFullscreen: () => {
-    const fsState = screenfull.isFullscreen;
-    dispatch(updateFullscreen(fsState));
-  },
-  getQuery: id => {
-    dispatch(getQuery(id));
-  },
-  updateInitialQuery: () => {
-    dispatch(updateInitialQuery());
-  },
-  queryFound: found => {
-    dispatch(queryFound(found));
-  },
-  handleSelectQuery: (queryText) => {
-    dispatch(selectQuery(queryText));
-  },
   handleRunQuery: (query, done = () => {}) => {
     return dispatch(runQuery(query))
       .then(done);

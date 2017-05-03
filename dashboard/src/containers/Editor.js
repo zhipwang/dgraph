@@ -1,7 +1,6 @@
 import React, { Component } from "react";
 import { connect } from "react-redux";
 
-import { runQuery, updateRegex, selectQuery, updateShareId } from "../actions";
 import { timeout, checkStatus, sortStrings, getEndpointBaseURL } from "./Helpers";
 import "../assets/css/Editor.css";
 
@@ -243,13 +242,9 @@ class Editor extends Component {
 }
 
 const mapStateToProps = state => ({
-  regex: state.query.propertyRegex
 });
 
 const mapDispatchToProps = {
-  updateQuery: selectQuery,
-  updateShareId,
-  updateRegex
 };
 
 export default connect(mapStateToProps, mapDispatchToProps)(Editor);
