@@ -87,16 +87,17 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
       }
     })
     .catch((error) => {
-      console.log(error.stack);
-      dispatch(updateFrame({
-        id: frameId,
-        type: FRAME_TYPE_ERROR,
-        data: {
-          query,
-          message: error.message,
-          response: JSON.stringify(error)
-        }
-      }));
+      error.response.text().then(text => {
+        dispatch(updateFrame({
+          id: frameId,
+          type: FRAME_TYPE_ERROR,
+          data: {
+            query,
+            message: text,
+            response: JSON.stringify(error)
+          }
+        }));
+      })
     })
 }
 
