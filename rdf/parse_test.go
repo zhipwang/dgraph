@@ -22,6 +22,7 @@ import (
 
 	"github.com/dgraph-io/dgraph/protos/facetsp"
 	"github.com/dgraph-io/dgraph/protos/graphp"
+	"github.com/dgraph-io/dgraph/x"
 
 	"github.com/dgraph-io/dgraph/types/facets"
 	"github.com/stretchr/testify/assert"
@@ -189,7 +190,17 @@ var testNQuads = []struct {
 			Subject:     "alice",
 			Predicate:   "knows",
 			ObjectId:    "",
-			ObjectValue: &graphp.Value{&graphp.Value_DefaultVal{"_DELETE_POSTING_"}},
+			ObjectValue: &graphp.Value{&graphp.Value_DefaultVal{x.DeleteAllObjects}},
+		},
+		expectedErr: false,
+	},
+	{
+		input: `<alice> * * .`,
+		nq: graphp.NQuad{
+			Subject:     "alice",
+			Predicate:   x.DeleteAllPredicates,
+			ObjectId:    "",
+			ObjectValue: &graphp.Value{&graphp.Value_DefaultVal{x.DeleteAllObjects}},
 		},
 		expectedErr: false,
 	},
@@ -660,7 +671,7 @@ var testNQuads = []struct {
 	},
 	// Should parse dates
 	{
-		input: `_:alice <knows> "stuff" (key1=2002-10-02T15:00:00.05Z, key2=2006-01-02T15:04:05, key3=2006-01-02) .`,
+		input: `_:alice <knows> "stuff" (key1=2002-10-02T15:00:00.05Z, key2=2006-01-02T15:04:05, key3=2006-01-02T00:00:00Z) .`,
 		nq: graphp.NQuad{
 			Subject:     "_:alice",
 			Predicate:   "knows",

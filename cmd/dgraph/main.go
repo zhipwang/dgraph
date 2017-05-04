@@ -224,8 +224,70 @@ func convertToEdges(ctx context.Context, nquads []*graphp.NQuad) (mutationResult
 	return mr, nil
 }
 
+func AddInternalEdge(ctx context.Context, m *taskp.Mutations) error {
+	newEdges := make([]*taskp.DirectedEdge, 0, 2*len(m.Edges))
+	for _, mu := range m.Edges {
+		x.AssertTrue(mu.Op == taskp.DirectedEdge_DEL || mu.Op == taskp.DirectedEdge_SET)
+		if mu.Op == taskp.DirectedEdge_SET {
+			edge := &taskp.DirectedEdge{
+				Op:     taskp.DirectedEdge_SET,
+				Entity: mu.GetEntity(),
+				Attr:   "_predicate_",
+				Value:  []byte(mu.GetAttr()),
+			}
+			newEdges = append(newEdges, mu)
+			newEdges = append(newEdges, edge)
+		} else if mu.Op == taskp.DirectedEdge_DEL {
+			if mu.Attr != x.DeleteAllPredicates {
+				newEdges = append(newEdges, mu)
+				if string(mu.GetValue()) == x.DeleteAllObjects {
+					// Delete the given predicate from _predicate_.
+					edge := &taskp.DirectedEdge{
+						Op:     taskp.DirectedEdge_DEL,
+						Entity: mu.GetEntity(),
+						Attr:   "_predicate_",
+						Value:  []byte(mu.GetAttr()),
+					}
+					newEdges = append(newEdges, edge)
+				}
+			} else {
+				// Fetch all the predicates and replace them
+				preds, err := query.GetNodePredicates(ctx, &taskp.List{[]uint64{mu.GetEntity()}})
+				if err != nil {
+					return err
+				}
+				val := mu.GetValue()
+				for _, pred := range preds {
+					edge := &taskp.DirectedEdge{
+						Op:     taskp.DirectedEdge_DEL,
+						Entity: mu.GetEntity(),
+						Attr:   string(pred.Val),
+						Value:  val,
+					}
+					newEdges = append(newEdges, edge)
+				}
+				edge := &taskp.DirectedEdge{
+					Op:     taskp.DirectedEdge_DEL,
+					Entity: mu.GetEntity(),
+					Attr:   "_predicate_",
+					Value:  val,
+				}
+				// Delete all the _predicate_ values
+				edge.Attr = "_predicate_"
+				newEdges = append(newEdges, edge)
+			}
+		}
+	}
+	m.Edges = newEdges
+	return nil
+}
+
 func applyMutations(ctx context.Context, m *taskp.Mutations) error {
-	err := worker.MutateOverNetwork(ctx, m)
+	err := AddInternalEdge(ctx, m)
+	if err != nil {
+		return x.Wrapf(err, "While adding internal edges")
+	}
+	err = worker.MutateOverNetwork(ctx, m)
 	if err != nil {
 		x.TraceError(ctx, x.Wrapf(err, "Error while MutateOverNetwork"))
 		return err
@@ -536,7 +598,10 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err = query.ToJson(&l, sgl, w, allocIdsStr)
+	var addLatency bool
+	// If there is an error parsing, then addLatency would remain false.
+	addLatency, _ = strconv.ParseBool(r.URL.Query().Get("latency"))
+	err = query.ToJson(&l, sgl, w, allocIdsStr, addLatency)
 	if err != nil {
 		// since we performed w.Write in ToJson above,
 		// calling WriteHeader with 500 code will be ignored.
