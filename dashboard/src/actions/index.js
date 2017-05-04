@@ -74,30 +74,30 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             }
           }
         }));
-    } else {
+      } else {
+        dispatch(updateFrame({
+          id: frameId,
+          type: FRAME_TYPE_SUCCESS,
+          data: {
+            query,
+            message: 'Your query did not return any results',
+            response: JSON.stringify(result)
+          }
+        }));
+      }
+    })
+    .catch((error) => {
+      console.log(error.stack);
       dispatch(updateFrame({
         id: frameId,
-        type: FRAME_TYPE_SUCCESS,
+        type: FRAME_TYPE_ERROR,
         data: {
           query,
-          message: 'Your query did not return any results',
-          response: JSON.stringify(result)
+          message: error.message,
+          response: JSON.stringify(error)
         }
       }));
-    }
-  })
-  .catch((error) => {
-    console.log(error.stack);
-    dispatch(updateFrame({
-      id: frameId,
-      type: FRAME_TYPE_ERROR,
-      data: {
-        query,
-        message: error.message,
-        response: JSON.stringify(error)
-      }
-    }));
-  })
+    })
 }
 
 /**
