@@ -221,38 +221,81 @@ export const getShareId = (queryText) => {
   );
 };
 
-// export const getQuery = shareId => {
-//     return dispatch => {
-//         timeout(
-//             6000,
-//             fetch(getEndpoint('query'), {
-//                 method: "POST",
-//                 mode: "cors",
-//                 headers: {
-//                     Accept: "application/json"
-//                 },
-//                 body: `{
-//                     query(id: ${shareId}) {
-//                         _share_
-//                     }
-//                 }`
-//             })
-//                 .then(checkStatus)
-//                 .then(response => response.json())
-//                 .then(function(result) {
-//                     if (result.query && result.query.length > 0) {
-//                         dispatch(selectQuery(decodeURI(result.query[0]._share_)));
-//                     } else {
-//                         dispatch(queryFound(false));
-//                     }
-//                 })
-//         ).catch(function(error) {
-//             dispatch(
-//                 saveErrorResponse(
-//                     `Got error while getting query for id: ${shareId}, err: ` +
-//                         error.message
-//                 )
-//             );
-//         });
-//     };
-// };
+/**
+ * getSharedQuery returns a promise that resolves with the query string corresponding
+ * to the given shareId. Concretely, it fetches from the database the query
+ * stored with the shareId. If not found, the promise resolves with an empty string.
+ *
+ * @params shareId {String}
+ * @returns {Promise}
+ *
+ */
+export const getSharedQuery = shareId => {
+  return timeout(
+    6000,
+    fetch(getEndpoint('query'), {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        Accept: "application/json"
+      },
+      body: `{
+          query(id: ${shareId}) {
+              _share_
+          }
+      }`
+    })
+  )
+    .then(checkStatus)
+    .then(response => response.json())
+    .then(function(result) {
+      if (result.query && result.query.length > 0) {
+        const query = decodeURI(result.query[0]._share_);
+        return query;
+      } else {
+        return '';
+      }
+    })
+    .catch(function(error) {
+      console.log(`Got error while getting query for id: ${shareId}, err: ${error.message}`);
+    });
+}
+
+// runQueryByShareId runs the query by the given shareId and displays the frame
+export const runQueryByShareId = shareId => {
+  return (dispatch) => {
+    const frame = makeFrame({
+      type: FRAME_TYPE_LOADING,
+      data: {}
+    });
+    dispatch(receiveFrame(frame));
+
+    return getSharedQuery(shareId)
+      .then(query => {
+        if (!query) {
+          return dispatch(updateFrame({
+            id: frame.id,
+            type: FRAME_TYPE_ERROR,
+            data: {
+              query: '', // TOOD: make query optional
+              message: `No query found for the shareId: ${shareId}`,
+              response: JSON.stringify('{}') // TOOD: make response optional
+            }
+          }));
+        }
+
+        return executeQueryAndUpdateFrame(dispatch, { query, frameId: frame.id });
+      })
+      .catch(error => {
+        return dispatch(updateFrame({
+          id: frame.id,
+          type: FRAME_TYPE_ERROR,
+          data: {
+            query: '',
+            message: error.message,
+            response: JSON.stringify(error)
+          }
+        }));
+      });
+  }
+}

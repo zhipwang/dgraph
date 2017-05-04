@@ -1,13 +1,10 @@
 import React from "react";
 import { connect } from "react-redux";
-import screenfull from "screenfull"
 
 import Sidebar from '../components/Sidebar';
 import EditorPanel from '../components/EditorPanel';
 import FrameList from '../components/FrameList';
-import {
-  runQuery
-} from "../actions";
+import { runQuery, runQueryByShareId } from "../actions";
 import { discardFrame } from '../actions/frames';
 import { readCookie, eraseCookie } from './Helpers';
 
@@ -15,11 +12,11 @@ import "../assets/css/App.css";
 
 class App extends React.Component {
   componentDidMount = () => {
-    const { handleSelectQuery, handleRunQuery, handleUpdateFullscreen } = this.props;
+    const { handleRunQuery, match } = this.props;
 
-    let id = this.props.match.params.id;
-    if (id !== undefined) {
-      this.props.getQuery(id);
+    const { shareId } = match.params;
+    if (shareId) {
+      this.onRunSharedQuery(shareId);
     }
 
     // If playQuery cookie is set, run the query and erase the cookie
@@ -27,23 +24,18 @@ class App extends React.Component {
     const playQuery = readCookie('playQuery');
     if (playQuery) {
       const queryString = decodeURI(playQuery);
-      handleSelectQuery(queryString);
       handleRunQuery(queryString).then(() => {
         eraseCookie('playQuery', { crossDomain: true });
       });
     }
-
-    document.addEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
   };
 
-  componentWillUnmount = () => {
-    const { handleUpdateFullscreen } = this.props;
+  onRunSharedQuery(shareId) {
+    const { handleRunSharedQuery } = this.props;
 
-    document.removeEventListener(screenfull.raw.fullscreenchange, handleUpdateFullscreen);
-  }
-
-  toggleSidebarOpen = () => {
-    this.setState({ sidebarOpen: !this.state.sidebarOpen });
+    handleRunSharedQuery(shareId).catch(e => {
+      console.log(e);
+    })
   }
 
   render = () => {
@@ -80,9 +72,12 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-  handleRunQuery: (query, done = () => {}) => {
+  handleRunQuery(query, done = () => {}) {
     return dispatch(runQuery(query))
       .then(done);
+  },
+  handleRunSharedQuery(shareId) {
+    return dispatch(runQueryByShareId(shareId));
   },
   handleDiscardFrame(frameID) {
     dispatch(discardFrame(frameID));
