@@ -32,6 +32,7 @@ type listMapShard struct {
 	sync.RWMutex
 	m         map[uint64]*List
 	evictList *list.List
+	totalSize uint64
 }
 
 type listMap struct {
@@ -112,13 +113,16 @@ func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 	s.m[key] = val
 	x.AssertTrue(val != nil)
 	val.evictElem = s.evictList.PushFront(val)
-	// ~~~TEMP
-	if s.evictList.Len() > 5000 {
+
+	maxMemKeys := *memKeys / *lhmapNumShards
+	if s.evictList.Len() > maxMemKeys {
 		// Note: Probably no need to stopTheWorld because this map shard is locked and if there is a
 		// GetOrCreate on the same key, it will have to wait for the following to complete.
 		c := newCounters()
 		defer c.ticker.Stop()
-		for i := 0; i < 500 && s.evictList.Len() > 0; i++ {
+		// We delete about 10% of the limit each time. This could be a user-defined parameter.
+		m := maxMemKeys/10 + 10
+		for i := 0; i < m && s.evictList.Len() > 0; i++ {
 			evictElem := s.evictList.Back()
 			if evictElem == nil {
 				continue

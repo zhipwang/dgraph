@@ -46,7 +46,8 @@ var (
 		"If RAM usage exceeds this, we stop the world, and flush our buffers.")
 
 	commitFraction   = flag.Float64("gentlecommit", 0.10, "Fraction of dirty posting lists to commit every few seconds.")
-	lhmapNumShards   = flag.Int("lhmap", 1, "Number of shards for lhmap.")
+	lhmapNumShards   = flag.Int("lhmap", 32, "Number of shards for lhmap.")
+	memKeys          = flag.Int("memkeys", 160000, "Max number of keys in memory / lhmap")
 	dummyPostingList []byte // Used for indexing.
 )
 
