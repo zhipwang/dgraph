@@ -19,6 +19,7 @@ package posting
 
 import (
 	"bytes"
+	clist "container/list"
 	"context"
 	"crypto/md5"
 	"encoding/binary"
@@ -75,6 +76,7 @@ type List struct {
 	deleteMe    int32 // Using atomic for this, to avoid expensive SetForDeletion operation.
 	refcount    int32
 	deleteAll   int32
+	evictElem   *clist.Element // For LRU cache.
 
 	water   *x.WaterMark
 	pending []uint64
@@ -104,6 +106,7 @@ func getNew(key []byte, pstore *store.Store) *List {
 	l.pstore = pstore
 	l.ghash = farm.Fingerprint64(key)
 	l.refcount = 1
+	l.evictElem = nil
 	return l
 }
 

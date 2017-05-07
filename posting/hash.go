@@ -17,11 +17,21 @@
 
 package posting
 
-import "sync"
+import (
+	"container/list"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/dgryski/go-farm"
+
+	"github.com/dgraph-io/dgraph/x"
+)
 
 type listMapShard struct {
 	sync.RWMutex
-	m map[uint64]*List
+	m         map[uint64]*List
+	evictList *list.List
 }
 
 type listMap struct {
@@ -39,7 +49,18 @@ func newShardedListMap(numShards int) *listMap {
 		shard:     make([]*listMapShard, numShards),
 	}
 	for i := 0; i < numShards; i++ {
-		out.shard[i] = &listMapShard{m: make(map[uint64]*List)}
+		out.shard[i] = &listMapShard{
+			m:         make(map[uint64]*List),
+			evictList: list.New(),
+		}
+		go func(s *listMapShard) {
+			for {
+				s.Lock()
+				fmt.Printf("~~~numElem=%d\n", s.evictList.Len())
+				s.Unlock()
+				time.Sleep(time.Second)
+			}
+		}(out.shard[i])
 	}
 	return out
 }
@@ -60,11 +81,14 @@ func (s *listMap) Size() int {
 	return size
 }
 
-// Get returns value for given key. Returns true if found.
+// Get returns value for given key.
 func (s *listMapShard) get(key uint64) *List {
-	s.RLock()
-	defer s.RUnlock()
+	s.Lock()
+	defer s.Unlock()
 	val := s.m[key]
+	if val != nil {
+		s.evictList.MoveToFront(val.evictElem)
+	}
 	return val
 }
 
@@ -78,11 +102,43 @@ func (s *listMap) Get(key uint64) *List {
 func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 	s.Lock()
 	defer s.Unlock()
+	fmt.Printf("~~putIfMissing keyFp=%d\n", key)
 	oldVal := s.m[key]
 	if oldVal != nil {
+		s.evictList.MoveToFront(oldVal.evictElem)
 		return oldVal
 	}
+	// Key is missing. We need to add to evictList.
 	s.m[key] = val
+	x.AssertTrue(val != nil)
+	val.evictElem = s.evictList.PushFront(val)
+	// ~~~TEMP
+	if s.evictList.Len() > 100 {
+		oldLen := s.evictList.Len()
+		c := newCounters()
+		defer c.ticker.Stop()
+		for i := 0; i < 10 && s.evictList.Len() > 0; i++ {
+			evictElem := s.evictList.Back()
+			if evictElem == nil {
+				continue
+			}
+			if evictElem.Value == nil {
+				x.Fatalf("~~~NilValue: key=%d", key)
+			}
+			l := evictElem.Value.(*List)
+			commitOne(l, c)
+
+			evictedFp := farm.Fingerprint64(l.key)
+			x.Printf("~~putIfMissing: evicting list key=%v fp=%d\n", l.key, evictedFp)
+
+			delete(s.m, evictedFp)
+			s.evictList.Remove(evictElem)
+			l.SetForDeletion()
+			l.decr()
+		}
+		newLen := s.evictList.Len()
+		fmt.Printf("~~~~~decrease shard %d -> %d\n", oldLen, newLen)
+	}
 	return val
 }
 
@@ -97,6 +153,7 @@ func (s *listMapShard) eachWithDelete(f func(key uint64, val *List)) {
 	defer s.Unlock()
 	for k, v := range s.m {
 		delete(s.m, k)
+		s.evictList.Remove(v.evictElem)
 		f(k, v)
 	}
 }

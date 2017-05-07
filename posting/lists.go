@@ -46,7 +46,7 @@ var (
 		"If RAM usage exceeds this, we stop the world, and flush our buffers.")
 
 	commitFraction   = flag.Float64("gentlecommit", 0.10, "Fraction of dirty posting lists to commit every few seconds.")
-	lhmapNumShards   = flag.Int("lhmap", 32, "Number of shards for lhmap.")
+	lhmapNumShards   = flag.Int("lhmap", 1, "Number of shards for lhmap.")
 	dummyPostingList []byte // Used for indexing.
 )
 
@@ -428,6 +428,7 @@ func GetOrCreate(key []byte, group uint32) (rlist *List, decr func()) {
 	l := getNew(key, pstore) // This retrieves a new *List and sets refcount to 1.
 	l.water = marks.Get(group)
 
+	x.Printf("~~GetOrCreate: key=%v fp=%d\n", key, fp)
 	lp = lhmapFor(group).PutIfMissing(fp, l)
 	// We are always going to return lp to caller, whether it is l or not. So, let's
 	// increment its reference counter.
