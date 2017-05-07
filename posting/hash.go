@@ -19,9 +19,9 @@ package posting
 
 import (
 	"container/list"
-	"fmt"
+	//	"fmt"
 	"sync"
-	"time"
+	//	"time"
 
 	"github.com/dgryski/go-farm"
 
@@ -53,14 +53,14 @@ func newShardedListMap(numShards int) *listMap {
 			m:         make(map[uint64]*List),
 			evictList: list.New(),
 		}
-		go func(s *listMapShard) {
-			for {
-				s.Lock()
-				fmt.Printf("~~~numElem=%d\n", s.evictList.Len())
-				s.Unlock()
-				time.Sleep(time.Second)
-			}
-		}(out.shard[i])
+		//		go func(s *listMapShard) {
+		//			for {
+		//				s.Lock()
+		//				fmt.Printf("~~~numElem=%d\n", s.evictList.Len())
+		//				s.Unlock()
+		//				time.Sleep(time.Second)
+		//			}
+		//		}(out.shard[i])
 	}
 	return out
 }
@@ -113,11 +113,12 @@ func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 	x.AssertTrue(val != nil)
 	val.evictElem = s.evictList.PushFront(val)
 	// ~~~TEMP
-	if s.evictList.Len() > 1000 {
-		//		oldLen := s.evictList.Len()
+	if s.evictList.Len() > 5000 {
+		// Note: Probably no need to stopTheWorld because this map shard is locked and if there is a
+		// GetOrCreate on the same key, it will have to wait for the following to complete.
 		c := newCounters()
 		defer c.ticker.Stop()
-		for i := 0; i < 100 && s.evictList.Len() > 0; i++ {
+		for i := 0; i < 500 && s.evictList.Len() > 0; i++ {
 			evictElem := s.evictList.Back()
 			if evictElem == nil {
 				continue
@@ -125,17 +126,12 @@ func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 			x.AssertTrue(evictElem.Value != nil)
 			l := evictElem.Value.(*List)
 			commitOne(l, c)
-
 			evictedFp := farm.Fingerprint64(l.key)
-			//			x.Printf("~~putIfMissing: evicting list key=%v fp=%d\n", l.key, evictedFp)
-
 			delete(s.m, evictedFp)
 			s.evictList.Remove(evictElem)
 			l.SetForDeletion()
 			l.decr()
 		}
-		//		newLen := s.evictList.Len()
-		//		fmt.Printf("~~~~~decrease shard %d -> %d\n", oldLen, newLen)
 	}
 	return val
 }

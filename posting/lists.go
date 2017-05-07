@@ -194,6 +194,7 @@ func lhmapFor(group uint32) *listMap {
 func aggressivelyEvict() {
 	stopTheWorld.AssertLock()
 	log.Println("Aggressive evict, committing to RocksDB")
+	x.Printf("==================> Aggressive evict\n")
 
 	// To evict entries belonging to a group no longer served by the server
 	// CommitLists shouldn't have any affect as the entries should have been synced before
