@@ -102,7 +102,7 @@ func (s *listMap) Get(key uint64) *List {
 func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 	s.Lock()
 	defer s.Unlock()
-	fmt.Printf("~~putIfMissing keyFp=%d\n", key)
+	//	fmt.Printf("~~putIfMissing keyFp=%d\n", key)
 	oldVal := s.m[key]
 	if oldVal != nil {
 		s.evictList.MoveToFront(oldVal.evictElem)
@@ -113,31 +113,29 @@ func (s *listMapShard) putIfMissing(key uint64, val *List) *List {
 	x.AssertTrue(val != nil)
 	val.evictElem = s.evictList.PushFront(val)
 	// ~~~TEMP
-	if s.evictList.Len() > 100 {
-		oldLen := s.evictList.Len()
+	if s.evictList.Len() > 1000 {
+		//		oldLen := s.evictList.Len()
 		c := newCounters()
 		defer c.ticker.Stop()
-		for i := 0; i < 10 && s.evictList.Len() > 0; i++ {
+		for i := 0; i < 100 && s.evictList.Len() > 0; i++ {
 			evictElem := s.evictList.Back()
 			if evictElem == nil {
 				continue
 			}
-			if evictElem.Value == nil {
-				x.Fatalf("~~~NilValue: key=%d", key)
-			}
+			x.AssertTrue(evictElem.Value != nil)
 			l := evictElem.Value.(*List)
 			commitOne(l, c)
 
 			evictedFp := farm.Fingerprint64(l.key)
-			x.Printf("~~putIfMissing: evicting list key=%v fp=%d\n", l.key, evictedFp)
+			//			x.Printf("~~putIfMissing: evicting list key=%v fp=%d\n", l.key, evictedFp)
 
 			delete(s.m, evictedFp)
 			s.evictList.Remove(evictElem)
 			l.SetForDeletion()
 			l.decr()
 		}
-		newLen := s.evictList.Len()
-		fmt.Printf("~~~~~decrease shard %d -> %d\n", oldLen, newLen)
+		//		newLen := s.evictList.Len()
+		//		fmt.Printf("~~~~~decrease shard %d -> %d\n", oldLen, newLen)
 	}
 	return val
 }

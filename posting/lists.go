@@ -428,7 +428,7 @@ func GetOrCreate(key []byte, group uint32) (rlist *List, decr func()) {
 	l := getNew(key, pstore) // This retrieves a new *List and sets refcount to 1.
 	l.water = marks.Get(group)
 
-	x.Printf("~~GetOrCreate: key=%v fp=%d\n", key, fp)
+	//	x.Printf("~~GetOrCreate: key=%v fp=%d\n", key, fp)
 	lp = lhmapFor(group).PutIfMissing(fp, l)
 	// We are always going to return lp to caller, whether it is l or not. So, let's
 	// increment its reference counter.
