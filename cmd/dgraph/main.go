@@ -476,6 +476,18 @@ func hasGQLOps(mu *gql.Mutation) bool {
 	return len(mu.Set) > 0 || len(mu.Del) > 0 || len(mu.Schema) > 0
 }
 
+func hasSchemaChanges(mutations []*gql.Mutation) bool {
+	if len(mutations) == 0 {
+		return false
+	}
+	for _, mu := range mutations {
+		if mu.Schema != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func queryHandler(w http.ResponseWriter, r *http.Request) {
 	if !worker.HealthCheck() {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -525,7 +537,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// set timeout if schema mutation not present
-	if res.Mutation == nil || len(res.Mutation.Schema) == 0 {
+	if !hasSchemaChanges(res.Mutations) {
 		// If schema mutation is not present
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Minute)
@@ -535,16 +547,18 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	var allocIds map[string]uint64
 	var allocIdsStr map[string]string
 	// If we have mutations, run them first.
-	if res.Mutation != nil && hasGQLOps(res.Mutation) {
-		if allocIds, err = mutationHandler(ctx, res.Mutation); err != nil {
-			x.TraceError(ctx, x.Wrapf(err, "Error while handling mutations"))
-			x.SetStatus(w, x.Error, err.Error())
-			return
-		}
-		// convert the new UIDs to hex string.
+	for _, mu := range res.Mutations {
 		allocIdsStr = make(map[string]string)
-		for k, v := range allocIds {
-			allocIdsStr[k] = fmt.Sprintf("%#x", v)
+		if hasGQLOps(mu) {
+			if allocIds, err = mutationHandler(ctx, mu); err != nil {
+				x.TraceError(ctx, x.Wrapf(err, "Error while handling mutations"))
+				x.SetStatus(w, x.Error, err.Error())
+				return
+			}
+			// convert the new UIDs to hex string.
+			for k, v := range allocIds {
+				allocIdsStr[k] = fmt.Sprintf("%#x", v)
+			}
 		}
 	}
 
@@ -559,7 +573,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(res.Query) == 0 {
 		mp := map[string]interface{}{}
-		if res.Mutation != nil {
+		if len(res.Mutations) > 0 {
 			mp["code"] = x.Success
 			mp["message"] = "Done"
 			mp["uids"] = allocIdsStr
@@ -775,11 +789,14 @@ func (s *grpcServer) Run(ctx context.Context,
 
 	// If mutations are part of the query, we run them through the mutation handler
 	// same as the http client.
-	if res.Mutation != nil && hasGQLOps(res.Mutation) {
-		if allocIds, err = mutationHandler(ctx, res.Mutation); err != nil {
-			x.TraceError(ctx, x.Wrapf(err, "Error while handling mutations"))
-			return resp, err
+	for _, mu := range res.Mutations {
+		if hasGQLOps(mu) {
+			if allocIds, err = mutationHandler(ctx, mu); err != nil {
+				x.TraceError(ctx, x.Wrapf(err, "Error while handling mutations"))
+				return resp, err
+			}
 		}
+
 	}
 
 	// Mutations are sent as part of the mutation object

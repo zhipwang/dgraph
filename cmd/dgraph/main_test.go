@@ -143,9 +143,10 @@ func runMutation(m string) error {
 	if err != nil {
 		return err
 	}
+	x.AssertTrue(len(res.Mutations) == 1)
 
 	ctx := context.Background()
-	_, err = mutationHandler(ctx, res.Mutation)
+	_, err = mutationHandler(ctx, res.Mutations[0])
 	return err
 }
 
@@ -632,7 +633,7 @@ func TestQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	_, err = mutationHandler(ctx, res.Mutation)
+	_, err = mutationHandler(ctx, res.Mutations[0])
 
 	output := processToFastJSON(q0)
 	require.JSONEq(t, `{"user":[{"name":"Alice"}]}`, output)
@@ -661,7 +662,7 @@ func TestSchemaValidationError(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	_, err = mutationHandler(ctx, res.Mutation)
+	_, err = mutationHandler(ctx, res.Mutations[0])
 
 	require.Error(t, err)
 	output := processToFastJSON(strings.Replace(q5, "<id>", "ram", -1))
@@ -691,7 +692,7 @@ func TestSchemaConversion(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	_, err = mutationHandler(ctx, res.Mutation)
+	_, err = mutationHandler(ctx, res.Mutations[0])
 
 	require.NoError(t, err)
 	output := processToFastJSON(strings.Replace(q6, "<id>", "shyam2", -1))
@@ -718,7 +719,7 @@ func TestMutationError(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	_, err = mutationHandler(ctx, res.Mutation)
+	_, err = mutationHandler(ctx, res.Mutations[0])
 	require.Error(t, err)
 
 }
@@ -739,7 +740,7 @@ func TestAssignUid(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	allocIds, err := mutationHandler(ctx, res.Mutation)
+	allocIds, err := mutationHandler(ctx, res.Mutations[0])
 	require.NoError(t, err)
 
 	require.EqualValues(t, len(allocIds), 2, "Expected two UIDs to be allocated")

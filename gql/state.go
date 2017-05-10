@@ -83,9 +83,6 @@ func lexInsideMutation(l *lex.Lexer) lex.StateFn {
 		case r == leftCurl:
 			l.Depth++
 			l.Emit(itemLeftCurl)
-			if l.Depth >= 2 {
-				return lexTextMutation
-			}
 		case isSpace(r) || isEndOfLine(r):
 			l.Ignore()
 		case isNameBegin(r):
@@ -96,6 +93,32 @@ func lexInsideMutation(l *lex.Lexer) lex.StateFn {
 			return l.Errorf("Unclosed mutation action")
 		default:
 			return l.Errorf("Unrecognized character inside mutation: %#U", r)
+		}
+	}
+}
+
+func lexInsideMutationOp(l *lex.Lexer) lex.StateFn {
+	for {
+		switch r := l.Next(); {
+		case r == rightCurl:
+			l.Depth--
+			l.Emit(itemRightCurl)
+			if l.Depth == 0 {
+				l.Mode = 0 // Set it to default before levaving the mode.
+				return lexText
+			}
+		case r == leftCurl:
+			l.Depth++
+			l.Emit(itemLeftCurl)
+			return lexTextMutation
+		case isSpace(r) || isEndOfLine(r):
+			l.Ignore()
+		case r == '#':
+			return lexComment
+		case r == lex.EOF:
+			return l.Errorf("Incomplete mutation operation definition")
+		default:
+			return l.Errorf("Unrecognized character inside mutation operation: %#U", r)
 		}
 	}
 }
@@ -420,7 +443,7 @@ func lexNameMutation(l *lex.Lexer) lex.StateFn {
 		l.Emit(itemMutationOp)
 		break
 	}
-	return lexText
+	return lexInsideMutationOp
 }
 
 // lexTextMutation lexes and absorbs the text inside a mutation operation block.
@@ -493,6 +516,18 @@ func lexOperationType(l *lex.Lexer) lex.StateFn {
 		if word == "mutation" {
 			l.Emit(itemOpType)
 			l.Mode = mutationMode
+		} else if word == "set" {
+			l.Emit(itemOpType)
+			l.Mode = mutationMode
+			return lexInsideMutationOp
+		} else if word == "delete" {
+			l.Emit(itemMutationOp)
+			l.Mode = mutationMode
+			return lexInsideMutationOp
+		} else if word == "setschema" {
+			l.Emit(itemMutationOp)
+			l.Mode = mutationMode
+			return lexInsideMutationOp
 		} else if word == "fragment" {
 			l.Emit(itemOpType)
 			l.Mode = fragmentMode

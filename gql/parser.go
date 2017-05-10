@@ -448,7 +448,7 @@ type Vars struct {
 type Result struct {
 	Query     []*GraphQuery
 	QueryVars []*Vars
-	Mutation  *Mutation
+	Mutations []*Mutation
 	Schema    *protos.SchemaRequest
 }
 
@@ -463,6 +463,7 @@ func Parse(r Request) (res Result, rerr error) {
 	l := lex.NewLexer(query).Run(lexText)
 
 	var qu *GraphQuery
+	var mutation *Mutation
 	it := l.NewIterator()
 	fmap := make(fragmentMap)
 	for it.Next() {
@@ -471,13 +472,17 @@ func Parse(r Request) (res Result, rerr error) {
 		case lex.ItemError:
 			return res, x.Errorf(item.Val)
 		case itemOpType:
-			if item.Val == "mutation" {
-				if res.Mutation != nil {
-					return res, x.Errorf("Only one mutation block allowed.")
+			if item.Val == "set" || item.Val == "delete" || item.Val == "setschema" {
+				mutation = new(Mutation)
+				if err = parseMutationOp(it, item.Val, mutation); err != nil {
+					return res, err
 				}
-				if res.Mutation, rerr = getMutation(it); rerr != nil {
+				res.Mutations = append(res.Mutations, mutation)
+			} else if item.Val == "mutation" {
+				if mutation, rerr = getMutation(it); rerr != nil {
 					return res, rerr
 				}
+				res.Mutations = append(res.Mutations, mutation)
 			} else if item.Val == "schema" {
 				if res.Schema != nil {
 					return res, x.Errorf("Only one schema block allowed ")
@@ -953,7 +958,7 @@ func parseMutationOp(it *lex.ItemIterator, op string, mu *Mutation) error {
 				mu.Set = item.Val
 			} else if op == "delete" {
 				mu.Del = item.Val
-			} else if op == "schema" {
+			} else if op == "schema" || op == "setschema" {
 				mu.Schema = item.Val
 			} else {
 				return x.Errorf("Invalid mutation operation.")

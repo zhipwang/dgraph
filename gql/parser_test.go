@@ -1331,9 +1331,9 @@ func TestParseMutation(t *testing.T) {
 	`
 	res, err := Parse(Request{Str: query, Http: true})
 	require.NoError(t, err)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<name> <is> <something> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<hometown> <is> <san francisco> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Del, "<name> <is> <something-else> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<name> <is> <something> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<hometown> <is> <san francisco> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Del, "<name> <is> <something-else> ."), -1)
 }
 
 func TestParseMutation_error(t *testing.T) {
@@ -1351,26 +1351,34 @@ func TestParseMutation_error(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseMutation_error2(t *testing.T) {
+func TestParseMutationWithoutMutationKeyword(t *testing.T) {
 	query := `
 		mutation {
 			set {
 				<name> <is> <something> .
 				<hometown> <is> <san francisco> .
 			}
-			delete {
-				<name> <is> <something-else> .
-			}
 		}
-		mutation {
-			set {
-				another one?
-			}
-		}
-
 	`
-	_, err := Parse(Request{Str: query, Http: true})
-	require.Error(t, err)
+
+	res, err := Parse(Request{Str: query, Http: true})
+	require.NoError(t, err)
+
+	query = `
+		set {
+			<name> <is> <something> .
+			<hometown> <is> <san francisco> .
+		}
+	`
+
+	res1, err := Parse(Request{Str: query, Http: true})
+	require.NoError(t, err)
+
+	clearTab := func(s string) string {
+		return strings.Replace(s, "\t", "", -1)
+	}
+
+	require.EqualValues(t, clearTab(res.Mutations[0].Set), clearTab(res1.Mutations[0].Set))
 }
 
 func TestParseMutationAndQueryWithComments(t *testing.T) {
@@ -1397,10 +1405,10 @@ func TestParseMutationAndQueryWithComments(t *testing.T) {
 	`
 	res, err := Parse(Request{Str: query, Http: true})
 	require.NoError(t, err)
-	require.NotNil(t, res.Mutation)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<name> <is> <something> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<hometown> <is> <san francisco> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Del, "<name> <is> <something-else> ."), -1)
+	require.NotEmpty(t, res.Mutations)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<name> <is> <something> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<hometown> <is> <san francisco> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Del, "<name> <is> <something-else> ."), -1)
 
 	require.NotNil(t, res.Query[0])
 	require.Equal(t, 1, len(res.Query[0].UID))
@@ -1427,10 +1435,10 @@ func TestParseMutationAndQuery(t *testing.T) {
 	`
 	res, err := Parse(Request{Str: query, Http: true})
 	require.NoError(t, err)
-	require.NotNil(t, res.Mutation)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<name> <is> <something> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Set, "<hometown> <is> <san francisco> ."), -1)
-	require.NotEqual(t, strings.Index(res.Mutation.Del, "<name> <is> <something-else> ."), -1)
+	require.NotEmpty(t, res.Mutations)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<name> <is> <something> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Set, "<hometown> <is> <san francisco> ."), -1)
+	require.NotEqual(t, strings.Index(res.Mutations[0].Del, "<name> <is> <something-else> ."), -1)
 
 	require.NotNil(t, res.Query[0])
 	require.Equal(t, 1, len(res.Query[0].UID))
@@ -2469,7 +2477,7 @@ func TestMutationSchema(t *testing.T) {
 	`
 	res, err := Parse(Request{Str: query, Http: true})
 	require.NoError(t, err)
-	require.Equal(t, res.Mutation.Schema, "\n           name: string @index(exact)\n\t\t")
+	require.Equal(t, res.Mutations[0].Schema, "\n           name: string @index(exact)\n\t\t")
 }
 
 func TestLangs(t *testing.T) {
