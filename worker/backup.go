@@ -30,13 +30,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgraph-io/badger/badger"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
 	"github.com/dgraph-io/dgraph/group"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/types/facets"
 	"github.com/dgraph-io/dgraph/x"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 const numBackupRoutines = 10
@@ -240,13 +242,14 @@ func backup(gid uint32, bdir string) error {
 	}()
 
 	// Iterate over rocksdb.
-	it := pstore.NewIterator(false)
+	it := pstore.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 	var lastPred string
 	prefix := new(bytes.Buffer)
 	prefix.Grow(100)
 	for it.Rewind(); it.Valid(); {
-		key := it.Key()
+		item := it.Item()
+		key := item.Key()
 		pk := x.Parse(key)
 
 		if pk.IsIndex() {
@@ -267,7 +270,7 @@ func backup(gid uint32, bdir string) error {
 		if pk.IsSchema() {
 			if group.BelongsTo(pk.Attr) == gid {
 				s := &protos.SchemaUpdate{}
-				x.Check(s.Unmarshal(it.Value()))
+				x.Check(s.Unmarshal(item.Value()))
 				chs <- &skv{
 					attr:   pk.Attr,
 					schema: s,
@@ -291,7 +294,7 @@ func backup(gid uint32, bdir string) error {
 		prefix.WriteString(pred)
 		prefix.WriteString("> ")
 		pl := &protos.PostingList{}
-		x.Check(pl.Unmarshal(it.Value()))
+		x.Check(pl.Unmarshal(item.Value()))
 		chkv <- kv{
 			prefix: prefix.String(),
 			list:   pl,
