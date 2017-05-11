@@ -18,11 +18,13 @@
 package posting
 
 import (
+	"bytes"
 	"context"
 	"math"
 
 	"golang.org/x/net/trace"
 
+	"github.com/dgraph-io/badger/badger"
 	"github.com/dgryski/go-farm"
 
 	"github.com/dgraph-io/dgraph/group"
@@ -257,30 +259,32 @@ func DeleteReverseEdges(ctx context.Context, attr string) error {
 	// Delete index entries from data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.ReversePrefix()
-	idxIt := pstore.NewIterator(false)
+	iterOpt := badger.DefaultIteratorOptions
+	iterOpt.FetchValues = false
+	idxIt := pstore.NewIterator(iterOpt)
 	defer idxIt.Close()
 
-	wb := pstore.NewWriteBatch()
-	defer wb.Destroy()
+	var badgerEntries []*badger.Entry
 	var batchSize int
-	for idxIt.Seek(prefix); idxIt.ValidForPrefix(prefix); idxIt.Next() {
-		key := idxIt.Key()
+	for idxIt.Seek(prefix); idxIt.Valid(); idxIt.Next() {
+		key := idxIt.Item().Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
 		batchSize += len(key)
-		wb.Delete(key)
+		badgerEntries = append(badgerEntries, &badger.Entry{
+			Key:  key,
+			Meta: badger.BitDelete,
+		})
 
 		if batchSize >= maxBatchSize {
-			if err := pstore.WriteBatch(wb); err != nil {
-				return err
-			}
-			wb.Clear()
+			pstore.BatchSet(badgerEntries)
+			badgerEntries = badgerEntries[:0]
 			batchSize = 0
 		}
 	}
-	if wb.Count() > 0 {
-		if err := pstore.WriteBatch(wb); err != nil {
-			return err
-		}
-		wb.Clear()
+	if len(badgerEntries) > 0 {
+		pstore.BatchSet(badgerEntries)
 	}
 	return nil
 }
@@ -295,7 +299,7 @@ func RebuildReverseEdges(ctx context.Context, attr string) error {
 	// Add index entries to data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.DataPrefix()
-	it := pstore.NewIterator(false)
+	it := pstore.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 
 	EvictGroup(group.BelongsTo(attr))
@@ -342,10 +346,15 @@ func RebuildReverseEdges(ctx context.Context, attr string) error {
 		}()
 	}
 
-	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-		pki := x.Parse(it.Key())
+	for it.Seek(prefix); it.Valid(); it.Next() {
+		iterItem := it.Item()
+		key := iterItem.Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
+		pki := x.Parse(key)
 		var pl protos.PostingList
-		x.Check(pl.Unmarshal(it.Value()))
+		x.Check(pl.Unmarshal(iterItem.Value()))
 
 		// Posting list contains only values or only UIDs.
 		if len(pl.Postings) != 0 && postingType(pl.Postings[0]) == x.ValueUid {
@@ -360,7 +369,6 @@ func RebuildReverseEdges(ctx context.Context, attr string) error {
 		if err := <-che; err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -369,30 +377,32 @@ func DeleteIndex(ctx context.Context, attr string) error {
 	// Delete index entries from data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.IndexPrefix()
-	idxIt := pstore.NewIterator(false)
+	iterOpt := badger.DefaultIteratorOptions
+	iterOpt.FetchValues = false
+	idxIt := pstore.NewIterator(iterOpt)
 	defer idxIt.Close()
 
-	wb := pstore.NewWriteBatch()
-	defer wb.Destroy()
+	var badgerEntries []*badger.Entry
 	var batchSize int
-	for idxIt.Seek(prefix); idxIt.ValidForPrefix(prefix); idxIt.Next() {
-		key := idxIt.Key()
+	for idxIt.Seek(prefix); idxIt.Valid(); idxIt.Next() {
+		key := idxIt.Item().Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
 		batchSize += len(key)
-		wb.Delete(key)
+		badgerEntries = append(badgerEntries, &badger.Entry{
+			Key:  key,
+			Meta: badger.BitDelete,
+		})
 
 		if batchSize >= maxBatchSize {
-			if err := pstore.WriteBatch(wb); err != nil {
-				return err
-			}
-			wb.Clear()
+			pstore.BatchSet(badgerEntries)
+			badgerEntries = badgerEntries[:0]
 			batchSize = 0
 		}
 	}
-	if wb.Count() > 0 {
-		if err := pstore.WriteBatch(wb); err != nil {
-			return err
-		}
-		wb.Clear()
+	if len(badgerEntries) > 0 {
+		pstore.BatchSet(badgerEntries)
 	}
 	return nil
 }
@@ -407,7 +417,7 @@ func RebuildIndex(ctx context.Context, attr string) error {
 	// Add index entries to data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.DataPrefix()
-	it := pstore.NewIterator(false)
+	it := pstore.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 
 	EvictGroup(group.BelongsTo(attr))
@@ -454,10 +464,15 @@ func RebuildIndex(ctx context.Context, attr string) error {
 		}()
 	}
 
-	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-		pki := x.Parse(it.Key())
+	for it.Seek(prefix); it.Valid(); it.Next() {
+		iterItem := it.Item()
+		key := iterItem.Key()
+		if !bytes.HasPrefix(key, prefix) {
+			break
+		}
+		pki := x.Parse(key)
 		var pl protos.PostingList
-		x.Check(pl.Unmarshal(it.Value()))
+		x.Check(pl.Unmarshal(iterItem.Value()))
 
 		// Posting list contains only values or only UIDs.
 		if len(pl.Postings) != 0 && postingType(pl.Postings[0]) != x.ValueUid {
