@@ -369,26 +369,11 @@ func (sg *SubGraph) preTraverse(uid uint64, dst, parent outputNode) error {
 		if len(pc.counts) > 0 {
 			c := types.ValueForType(types.IntID)
 			c.Value = int64(pc.counts[idx])
-			uc := dst.New(pc.Attr)
-			fieldName = "count"
+			fieldName = fmt.Sprintf("count(%s)", pc.Attr)
 			if pc.Params.Alias != "" {
 				fieldName = pc.Params.Alias
 			}
-			uc.AddValue(fieldName, c)
-			dst.AddListChild(pc.Attr, uc)
-		} else if len(pc.SrcFunc) > 0 && isAggregatorFn(pc.SrcFunc[0]) {
-			// add sg.Attr as child on 'parent' instead of 'dst', otherwise
-			// within output, aggregator will messed with other attrs
-			uc := dst.New(pc.Params.Alias)
-			name := fmt.Sprintf("%s(%s)", pc.SrcFunc[0], pc.Attr)
-			sv, err := convertWithBestEffort(pc.values[idx], pc.Attr)
-			if err == ErrEmptyVal {
-				continue
-			} else if err != nil {
-				return err
-			}
-			uc.AddValue(name, sv)
-			dst.AddListChild(pc.Params.Alias, uc)
+			dst.AddValue(fieldName, c)
 		} else if len(pc.SrcFunc) > 0 && pc.SrcFunc[0] == "checkpwd" {
 			c := types.ValueForType(types.BoolID)
 			c.Value = task.ToBool(pc.values[idx])
@@ -575,6 +560,26 @@ func filterCopy(sg *SubGraph, ft *gql.FilterTree) error {
 	return nil
 }
 
+func uniqueKey(gchild *gql.GraphQuery) string {
+	key := gchild.Attr
+	if gchild.Func != nil {
+		key += fmt.Sprintf("%v", gchild.Func)
+	}
+	if len(gchild.NeedsVar) > 0 {
+		key += fmt.Sprintf("%v", gchild.NeedsVar)
+	}
+	if gchild.IsCount { // ignore count subgraphs..
+		key += "count"
+	}
+	if len(gchild.Langs) > 0 {
+		key += fmt.Sprintf("%v", gchild.Langs)
+	}
+	if gchild.MathExp != nil {
+		key += fmt.Sprintf("%+v", gchild.MathExp)
+	}
+	return key
+}
+
 func treeCopy(ctx context.Context, gq *gql.GraphQuery, sg *SubGraph) error {
 	// Typically you act on the current node, and leave recursion to deal with
 	// children. But, in this case, we don't want to muck with the current
@@ -582,22 +587,16 @@ func treeCopy(ctx context.Context, gq *gql.GraphQuery, sg *SubGraph) error {
 	// So, we work on the children, and then recurse for grand children.
 	attrsSeen := make(map[string]struct{})
 	for _, gchild := range gq.Children {
-		key := gchild.Attr
 		if (sg.Params.Alias == "shortest" || sg.Params.Alias == "recurse") &&
 			gchild.Expand != "" {
 			return x.Errorf("expand() not allowed inside shortest/recurse")
 		}
 
-		if gchild.Func != nil && gchild.Func.IsAggregator() {
-			key += gchild.Func.Name
-		} else if gchild.Attr == "var" {
-			key += fmt.Sprintf("%v", gchild.NeedsVar)
-		} else if gchild.IsCount { // ignore count subgraphs..
-			key += "count"
-		} else if len(gchild.Langs) > 0 {
-			key += fmt.Sprintf("%v", gchild.Langs)
-		} else if gchild.MathExp != nil {
-			key += fmt.Sprintf("%+v", gchild.MathExp)
+		key := ""
+		if gchild.Alias != "" {
+			key = gchild.Alias
+		} else {
+			key = uniqueKey(gchild)
 		}
 		if _, ok := attrsSeen[key]; ok {
 			return x.Errorf("%s not allowed multiple times in same sub-query.",
@@ -945,6 +944,7 @@ func evalLevelAgg(doneVars map[string]varValue, sg, parent *SubGraph) (mp map[ui
 	mp = make(map[uint64]types.Val)
 	// Go over the sibling node and aggregate.
 	for i, list := range relSG.uidMatrix {
+
 		ag := aggregator{
 			name: sg.SrcFunc[0],
 		}
@@ -1523,6 +1523,43 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 	return nil
 }
 
+func (sg *SubGraph) ApplyIneqFunc() error {
+	if sg.Params.uidToVal == nil {
+		return x.Errorf("Expected a vaild value map. But Empty.")
+	}
+	var typ types.TypeID
+	for _, v := range sg.Params.uidToVal {
+		typ = v.Tid
+		break
+	}
+	val := sg.SrcFunc[3]
+	src := types.Val{types.StringID, []byte(val)}
+	dst, err := types.Convert(src, typ)
+	if err != nil {
+		return x.Errorf("Invalid argment %v. Comparing with different type", val)
+	}
+	if sg.SrcUIDs != nil {
+		for _, uid := range sg.SrcUIDs.Uids {
+			curVal, ok := sg.Params.uidToVal[uid]
+			if ok && types.CompareVals(sg.SrcFunc[0], curVal, dst) {
+				sg.DestUIDs.Uids = append(sg.DestUIDs.Uids, uid)
+			}
+		}
+	} else {
+		// This means its a root as SrcUIDs is nil
+		for uid, curVal := range sg.Params.uidToVal {
+			if types.CompareVals(sg.SrcFunc[0], curVal, dst) {
+				sg.DestUIDs.Uids = append(sg.DestUIDs.Uids, uid)
+			}
+		}
+		sort.Slice(sg.DestUIDs.Uids, func(i, j int) bool {
+			return sg.DestUIDs.Uids[i] < sg.DestUIDs.Uids[j]
+		})
+		sg.uidMatrix = []*protos.List{sg.DestUIDs}
+	}
+	return nil
+}
+
 // ProcessGraph processes the SubGraph instance accumulating result for the query
 // from different instances. Note: taskQuery is nil for root node.
 func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
@@ -1556,43 +1593,51 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			rch <- nil
 			return
 		}
-
-		taskQuery := createTaskQuery(sg)
-		result, err := worker.ProcessTaskOverNetwork(ctx, taskQuery)
-		if err != nil {
-			x.TraceError(ctx, x.Wrapf(err, "Error while processing task"))
-			rch <- err
-			return
-		}
-
-		if sg.Attr == "_predicate_" {
-			sg.Params.isListNode = true
-		}
-		sg.uidMatrix = result.UidMatrix
-		sg.values = result.Values
-		sg.facetsMatrix = result.FacetMatrix
-		if len(sg.values) > 0 {
-			v := sg.values[0]
-			x.Trace(ctx, "Sample value for attr: %v Val: %v", sg.Attr, string(v.Val))
-		}
-		sg.counts = result.Counts
-
-		if sg.Params.DoCount && len(sg.Filters) == 0 {
-			// If there is a filter, we need to do more work to get the actual count.
-			x.Trace(ctx, "Zero uids. Only count requested")
-			rch <- nil
-			return
-		}
-
-		if result.IntersectDest {
-			sg.DestUIDs = algo.IntersectSorted(result.UidMatrix)
+		if len(sg.SrcFunc) > 0 && isInequalityFn(sg.SrcFunc[0]) && sg.Attr == "var" {
+			// This is a ineq function which uses a value variable.
+			err = sg.ApplyIneqFunc()
+			if parent != nil {
+				rch <- err
+				return
+			}
 		} else {
-			sg.DestUIDs = algo.MergeSorted(result.UidMatrix)
-		}
+			taskQuery := createTaskQuery(sg)
+			result, err := worker.ProcessTaskOverNetwork(ctx, taskQuery)
+			if err != nil {
+				x.TraceError(ctx, x.Wrapf(err, "Error while processing task"))
+				rch <- err
+				return
+			}
 
-		if parent == nil {
-			// I'm root. We reach here if root had a function.
-			sg.uidMatrix = []*protos.List{sg.DestUIDs}
+			if sg.Attr == "_predicate_" {
+				sg.Params.isListNode = true
+			}
+			sg.uidMatrix = result.UidMatrix
+			sg.values = result.Values
+			sg.facetsMatrix = result.FacetMatrix
+			if len(sg.values) > 0 {
+				v := sg.values[0]
+				x.Trace(ctx, "Sample value for attr: %v Val: %v", sg.Attr, string(v.Val))
+			}
+			sg.counts = result.Counts
+
+			if sg.Params.DoCount && len(sg.Filters) == 0 {
+				// If there is a filter, we need to do more work to get the actual count.
+				x.Trace(ctx, "Zero uids. Only count requested")
+				rch <- nil
+				return
+			}
+
+			if result.IntersectDest {
+				sg.DestUIDs = algo.IntersectSorted(result.UidMatrix)
+			} else {
+				sg.DestUIDs = algo.MergeSorted(result.UidMatrix)
+			}
+
+			if parent == nil {
+				// I'm root. We reach here if root had a function.
+				sg.uidMatrix = []*protos.List{sg.DestUIDs}
+			}
 		}
 	}
 
@@ -1617,6 +1662,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 		filterChan := make(chan error, len(sg.Filters))
 		for _, filter := range sg.Filters {
 			filter.SrcUIDs = sg.DestUIDs
+			// Passing the pointer is okay since the filter only reads.
 			filter.Params.ParentVars = sg.Params.ParentVars // Pass to the child.
 			go ProcessGraph(ctx, filter, sg, filterChan)
 		}
@@ -1747,8 +1793,11 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 	childChan := make(chan error, len(sg.Children))
 	for i := 0; i < len(sg.Children); i++ {
 		child := sg.Children[i]
-		child.Params.ParentVars = sg.Params.ParentVars // Pass to the child.
-		child.SrcUIDs = sg.DestUIDs                    // Make the connection.
+		child.Params.ParentVars = make(map[string]varValue)
+		for k, v := range sg.Params.ParentVars {
+			child.Params.ParentVars[k] = v
+		}
+		child.SrcUIDs = sg.DestUIDs // Make the connection.
 		if child.IsInternal() {
 			// We dont have to execute these nodes.
 			continue
@@ -1913,6 +1962,14 @@ func isValidFuncName(f string) bool {
 func isCompareFn(f string) bool {
 	switch f {
 	case "le", "ge", "lt", "gt", "eq":
+		return true
+	}
+	return false
+}
+
+func isInequalityFn(f string) bool {
+	switch f {
+	case "eq", "le", "ge", "gt", "lt":
 		return true
 	}
 	return false
