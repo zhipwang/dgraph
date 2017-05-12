@@ -327,9 +327,7 @@ func addToEntriesMap(entriesMap map[chan x.Mark][]uint64, entries []SyncEntry) {
 func batchSync() {
 	var entries []SyncEntry
 	var loop uint64
-
-	var badgerEntries []*badger.Entry
-
+	wb := make([]*badger.Entry, 0, 100)
 	for {
 		select {
 		case e := <-syncCh:
@@ -344,13 +342,10 @@ func batchSync() {
 				for _, e := range entries {
 					val, err := e.Schema.Marshal()
 					x.Checkf(err, "Error while marshalling schema description")
-					badgerEntries = append(badgerEntries, &badger.Entry{
-						Key:   x.SchemaKey(e.Attr),
-						Value: val,
-					})
+					wb = badger.EntriesSet(wb, x.SchemaKey(e.Attr), val)
 				}
-				pstore.BatchSet(badgerEntries)
-				badgerEntries = badgerEntries[:0]
+				pstore.BatchSet(wb)
+				wb = wb[:0]
 
 				entriesMap := make(map[chan x.Mark][]uint64)
 				addToEntriesMap(entriesMap, entries)
