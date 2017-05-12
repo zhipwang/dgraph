@@ -197,7 +197,7 @@ func backup(gid uint32, bdir string) error {
 	var wg sync.WaitGroup
 	wg.Add(numBackupRoutines)
 	for i := 0; i < numBackupRoutines; i++ {
-		go func() {
+		go func(i int) {
 			buf := new(bytes.Buffer)
 			buf.Grow(50000)
 			for item := range chkv {
@@ -215,7 +215,7 @@ func backup(gid uint32, bdir string) error {
 				chb <- tmp
 			}
 			wg.Done()
-		}()
+		}(i)
 	}
 
 	// Use a goroutine to convert protos.Schema to string
@@ -247,23 +247,30 @@ func backup(gid uint32, bdir string) error {
 	var lastPred string
 	prefix := new(bytes.Buffer)
 	prefix.Grow(100)
-	for it.Rewind(); it.Valid(); {
+	var debugCount int
+	for it.Rewind(); it.Valid(); debugCount++ {
 		item := it.Item()
 		key := item.Key()
 		pk := x.Parse(key)
 
 		if pk.IsIndex() {
 			// Seek to the end of index keys.
+			it = pstore.NewIterator(badger.DefaultIteratorOptions) // TODO: Remove this.
+			defer it.Close()
 			it.Seek(pk.SkipRangeOfSameType())
 			continue
 		}
 		if pk.IsReverse() {
 			// Seek to the end of reverse keys.
+			it = pstore.NewIterator(badger.DefaultIteratorOptions) // TODO: Remove this.
+			defer it.Close()
 			it.Seek(pk.SkipRangeOfSameType())
 			continue
 		}
 		if pk.Attr == "_uid_" || pk.Attr == "_predicate_" {
 			// Skip the UID mappings.
+			it = pstore.NewIterator(badger.DefaultIteratorOptions) // TODO: Remove this.
+			defer it.Close()
 			it.Seek(pk.SkipPredicate())
 			continue
 		}
@@ -280,10 +287,11 @@ func backup(gid uint32, bdir string) error {
 			it.Next()
 			continue
 		}
-
 		x.AssertTrue(pk.IsData())
 		pred, uid := pk.Attr, pk.Uid
 		if pred != lastPred && group.BelongsTo(pred) != gid {
+			it = pstore.NewIterator(badger.DefaultIteratorOptions) // TODO: Remove this.
+			defer it.Close()
 			it.Seek(pk.SkipPredicate())
 			continue
 		}
