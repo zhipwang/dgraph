@@ -18,9 +18,11 @@
 package worker
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
+	"github.com/dgraph-io/badger/badger"
 	"golang.org/x/net/context"
 
 	"github.com/dgraph-io/dgraph/group"
@@ -148,7 +150,10 @@ func sortWithIndex(ctx context.Context, ts *protos.SortMessage) (*protos.SortRes
 	}
 	r := new(protos.SortResult)
 	// Iterate over every bucket / token.
-	it := pstore.NewIterator(ts.Desc)
+	iterOpt := badger.DefaultIteratorOptions
+	iterOpt.Reverse = ts.Desc
+	iterOpt.FetchValues = false
+	it := pstore.NewIterator(iterOpt)
 	defer it.Close()
 
 	typ, err := schema.State().TypeOf(ts.Attr)
@@ -197,12 +202,16 @@ func sortWithIndex(ctx context.Context, ts *protos.SortMessage) (*protos.SortRes
 BUCKETS:
 
 	// Outermost loop is over index buckets.
-	for it.ValidForPrefix(indexPrefix) {
+	for it.Valid() {
+		key := it.Item().Key()
+		if !bytes.HasPrefix(key, indexPrefix) {
+			break
+		}
 		select {
 		case <-ctx.Done():
 			return nil, nil
 		default:
-			k := x.Parse(it.Key())
+			k := x.Parse(key)
 			x.AssertTrue(k != nil)
 			x.AssertTrue(k.IsIndex())
 			token := k.Term

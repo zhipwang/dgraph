@@ -25,14 +25,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/badger"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/protos"
-	"github.com/dgraph-io/dgraph/rdb"
 	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/store"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -107,14 +106,15 @@ func taskValues(t *testing.T, v []*protos.TaskValue) []string {
 	return out
 }
 
-func initTest(t *testing.T, schemaStr string) (string, store.Store) {
+func initTest(t *testing.T, schemaStr string) (string, *badger.KV) {
 	schema.ParseBytes([]byte(schemaStr), 1)
 
 	dir, err := ioutil.TempDir("", "storetest_")
 	require.NoError(t, err)
 
-	ps, err := rdb.NewStore(dir)
-	require.NoError(t, err)
+	opt := badger.DefaultOptions
+	opt.Dir = dir
+	ps := badger.NewKV(&opt)
 
 	posting.Init(ps)
 	populateGraph(t)
