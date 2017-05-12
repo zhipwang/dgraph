@@ -264,7 +264,7 @@ func DeleteReverseEdges(ctx context.Context, attr string) error {
 	idxIt := pstore.NewIterator(iterOpt)
 	defer idxIt.Close()
 
-	var badgerEntries []*badger.Entry
+	wb := make([]*badger.Entry, 0, 100)
 	var batchSize int
 	for idxIt.Seek(prefix); idxIt.Valid(); idxIt.Next() {
 		key := idxIt.Item().Key()
@@ -272,19 +272,16 @@ func DeleteReverseEdges(ctx context.Context, attr string) error {
 			break
 		}
 		batchSize += len(key)
-		badgerEntries = append(badgerEntries, &badger.Entry{
-			Key:  key,
-			Meta: badger.BitDelete,
-		})
+		wb = badger.EntriesDelete(wb, key)
 
 		if batchSize >= maxBatchSize {
-			pstore.BatchSet(badgerEntries)
-			badgerEntries = badgerEntries[:0]
+			pstore.BatchSet(wb)
+			wb = wb[:0]
 			batchSize = 0
 		}
 	}
-	if len(badgerEntries) > 0 {
-		pstore.BatchSet(badgerEntries)
+	if len(wb) > 0 {
+		pstore.BatchSet(wb)
 	}
 	return nil
 }
@@ -382,7 +379,7 @@ func DeleteIndex(ctx context.Context, attr string) error {
 	idxIt := pstore.NewIterator(iterOpt)
 	defer idxIt.Close()
 
-	var badgerEntries []*badger.Entry
+	wb := make([]*badger.Entry, 0, 100)
 	var batchSize int
 	for idxIt.Seek(prefix); idxIt.Valid(); idxIt.Next() {
 		key := idxIt.Item().Key()
@@ -390,19 +387,16 @@ func DeleteIndex(ctx context.Context, attr string) error {
 			break
 		}
 		batchSize += len(key)
-		badgerEntries = append(badgerEntries, &badger.Entry{
-			Key:  key,
-			Meta: badger.BitDelete,
-		})
+		wb = badger.EntriesDelete(wb, key)
 
 		if batchSize >= maxBatchSize {
-			pstore.BatchSet(badgerEntries)
-			badgerEntries = badgerEntries[:0]
+			pstore.BatchSet(wb)
+			wb = wb[:0]
 			batchSize = 0
 		}
 	}
-	if len(badgerEntries) > 0 {
-		pstore.BatchSet(badgerEntries)
+	if len(wb) > 0 {
+		pstore.BatchSet(wb)
 	}
 	return nil
 }

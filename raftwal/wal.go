@@ -71,7 +71,7 @@ func (w *Wal) prefix(gid uint32) []byte {
 }
 
 func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
-	var badgerEntries []*badger.Entry
+	wb := make([]*badger.Entry, 0, 100)
 	if raft.IsEmptySnap(s) {
 		return nil
 	}
@@ -92,34 +92,24 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 		if bytes.Compare(key, last) > 0 {
 			break
 		}
-		badgerEntries = append(badgerEntries, &badger.Entry{
-			Key:  key,
-			Meta: badger.BitDelete,
-		})
+		wb = badger.EntriesDelete(wb, key)
 	}
-	badgerEntries = append(badgerEntries, &badger.Entry{
-		Key:   w.snapshotKey(gid),
-		Value: data,
-	})
+	wb = badger.EntriesSet(wb, w.snapshotKey(gid), data)
 	fmt.Printf("Writing snapshot to WAL: %+v\n", s)
-
-	w.wals.BatchSet(badgerEntries)
+	w.wals.BatchSet(wb)
 	return nil
 }
 
 // Store stores the snapshot, hardstate and entries for a given RAFT group.
 func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
-	var badgerEntries []*badger.Entry
+	wb := make([]*badger.Entry, 0, 100)
 
 	if !raft.IsEmptyHardState(h) {
 		data, err := h.Marshal()
 		if err != nil {
 			return x.Wrapf(err, "wal.Store: While marshal hardstate")
 		}
-		badgerEntries = append(badgerEntries, &badger.Entry{
-			Key:   w.hardStateKey(gid),
-			Value: data,
-		})
+		wb = badger.EntriesSet(wb, w.hardStateKey(gid), data)
 	}
 
 	var t, i uint64
@@ -130,10 +120,7 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 			return x.Wrapf(err, "wal.Store: While marshal entry")
 		}
 		k := w.entryKey(gid, e.Term, e.Index)
-		badgerEntries = append(badgerEntries, &badger.Entry{
-			Key:   k,
-			Value: data,
-		})
+		wb = badger.EntriesSet(wb, k, data)
 	}
 
 	// If we get no entries, then the default value of t and i would be zero. That would
@@ -153,14 +140,10 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 			if !bytes.HasPrefix(key, prefix) {
 				break
 			}
-			badgerEntries = append(badgerEntries, &badger.Entry{
-				Key:  key,
-				Meta: badger.BitDelete,
-			})
+			wb = badger.EntriesDelete(wb, key)
 		}
 	}
-
-	w.wals.BatchSet(badgerEntries)
+	w.wals.BatchSet(wb)
 	return nil
 }
 

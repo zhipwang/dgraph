@@ -549,7 +549,7 @@ type syncEntry struct {
 func batchSync() {
 	var entries []syncEntry
 	var loop uint64
-	var badgerEntries []*badger.Entry
+	wb := make([]*badger.Entry, 0, 100)
 
 	for {
 		select {
@@ -563,13 +563,10 @@ func batchSync() {
 				loop++
 				fmt.Printf("[%4d] Writing batch of size: %v\n", loop, len(entries))
 				for _, e := range entries {
-					badgerEntries = append(badgerEntries, &badger.Entry{
-						Key:   e.key,
-						Value: e.val,
-					})
+					wb = badger.EntriesSet(wb, e.key, e.val)
 				}
-				pstore.BatchSet(badgerEntries)
-				badgerEntries = badgerEntries[:0]
+				pstore.BatchSet(wb)
+				wb = wb[:0]
 
 				for _, e := range entries {
 					e.sw.Done()
