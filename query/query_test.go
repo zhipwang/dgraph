@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/badger"
 	farm "github.com/dgryski/go-farm"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
@@ -41,9 +42,7 @@ import (
 	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/protos"
 
-	"github.com/dgraph-io/dgraph/rdb"
 	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/store"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/worker"
 	"github.com/dgraph-io/dgraph/x"
@@ -58,7 +57,7 @@ func addPassword(t *testing.T, uid uint64, attr, password string) {
 	addEdgeToTypedValue(t, attr, uid, types.PasswordID, value.Value.([]byte), nil)
 }
 
-var ps store.Store
+var ps *badger.KV
 
 func populateGraph(t *testing.T) {
 	x.AssertTrue(ps != nil)
@@ -302,7 +301,9 @@ func populateGraph(t *testing.T) {
 }
 
 func TestGetUID(t *testing.T) {
+	x.Printf("~~~~~~~graph being populated\n")
 	populateGraph(t)
+	x.Printf("~~~~~~~graph populated\n")
 	query := `
 		{
 			me(id:0x01) {
@@ -5806,21 +5807,29 @@ func TestMain(m *testing.M) {
 	x.Check(err)
 	defer os.RemoveAll(dir)
 
-	ps, err = rdb.NewStore(dir)
-	x.Check(err)
+	opt := badger.DefaultOptions
+	opt.Dir = dir
+	ps = badger.NewKV(&opt)
 	defer ps.Close()
+	time.Sleep(time.Second)
 
+	x.Printf("~~~~~init0\n")
 	group.ParseGroupConfig("")
+	x.Printf("~~~~~init1\n")
 	schema.Init(ps)
+	x.Printf("~~~~~init2\n")
 	posting.Init(ps)
+	x.Printf("~~~~~init3\n")
 	worker.Init(ps)
 
 	dir2, err := ioutil.TempDir("", "wal_")
 	x.Check(err)
 
+	x.Printf("~~~~~init4\n")
 	worker.StartRaftNodes(dir2)
 	// Load schema after nodes have started
 	err = schema.ParseBytes([]byte(schemaStr), 1)
+	x.Printf("~~~~~init5\n")
 	x.Check(err)
 	defer os.RemoveAll(dir2)
 
