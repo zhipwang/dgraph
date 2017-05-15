@@ -20,7 +20,7 @@ package types
 import (
 	"time"
 
-	"github.com/dgraph-io/dgraph/protos/typesp"
+	"github.com/dgraph-io/dgraph/protos"
 	geom "github.com/twpayne/go-geom"
 )
 
@@ -33,17 +33,17 @@ const (
 // data. When adding a new type *always* add to the end of this list.
 // Never delete anything from this list even if it becomes unused.
 const (
-	BinaryID   = TypeID(typesp.Posting_BINARY)
-	IntID      = TypeID(typesp.Posting_INT)
-	FloatID    = TypeID(typesp.Posting_FLOAT)
-	BoolID     = TypeID(typesp.Posting_BOOL)
-	DateTimeID = TypeID(typesp.Posting_DATETIME)
-	StringID   = TypeID(typesp.Posting_STRING)
-	DateID     = TypeID(typesp.Posting_DATE)
-	GeoID      = TypeID(typesp.Posting_GEO)
-	UidID      = TypeID(typesp.Posting_UID)
-	PasswordID = TypeID(typesp.Posting_PASSWORD)
-	DefaultID  = TypeID(typesp.Posting_DEFAULT)
+	BinaryID   = TypeID(protos.Posting_BINARY)
+	IntID      = TypeID(protos.Posting_INT)
+	FloatID    = TypeID(protos.Posting_FLOAT)
+	BoolID     = TypeID(protos.Posting_BOOL)
+	DateTimeID = TypeID(protos.Posting_DATETIME)
+	StringID   = TypeID(protos.Posting_STRING)
+	DateID     = TypeID(protos.Posting_DATE)
+	GeoID      = TypeID(protos.Posting_GEO)
+	UidID      = TypeID(protos.Posting_UID)
+	PasswordID = TypeID(protos.Posting_PASSWORD)
+	DefaultID  = TypeID(protos.Posting_DEFAULT)
 )
 
 var typeNameMap = map[string]TypeID{
@@ -60,7 +60,7 @@ var typeNameMap = map[string]TypeID{
 	"default":  DefaultID,
 }
 
-type TypeID typesp.Posting_ValType
+type TypeID protos.Posting_ValType
 
 func (t TypeID) Name() string {
 	switch t {
@@ -161,6 +161,24 @@ func createDate(y int, m time.Month, d int) time.Time {
 	var dt time.Time
 	dt = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	return dt
+}
+
+func ParseTime(val string) (time.Time, error) {
+	var t time.Time
+	if err := t.UnmarshalText([]byte(val)); err == nil {
+		return t, err
+	}
+	// try without timezone
+	if t, err := time.Parse(dateTimeFormat, val); err == nil {
+		return t, err
+	}
+	if t, err := time.Parse(dateFormatYMD, val); err == nil {
+		return t, err
+	}
+	if t, err := time.Parse(dateFormatYM, val); err == nil {
+		return t, err
+	}
+	return time.Parse(dateFormatY, val)
 }
 
 const dateFormatYMD = "2006-01-02"

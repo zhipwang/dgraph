@@ -1,8 +1,8 @@
-// To compile this file, in dgraph directory :
-// protoc --gofast_out=. -I. protos/facetsp/facets.proto
+// Use protos/gen.sh to generate .pb.go files.
+
 syntax = "proto3";
 
-package facetsp;
+package protos;
 
 message Facet {
 	enum ValType {
@@ -21,14 +21,14 @@ message Facet {
 
 message Param {
 	bool all_keys = 1;
-	repeated string keys = 2;
+	repeated string keys = 2; 
 }
 
 message Facets {
 	repeated Facet facets = 1;
 }
 
-message List {
+message FacetsList {
 	repeated Facets facets_list = 1;
 }
 

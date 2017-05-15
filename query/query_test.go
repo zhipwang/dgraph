@@ -39,9 +39,7 @@ import (
 	"github.com/dgraph-io/dgraph/gql"
 	"github.com/dgraph-io/dgraph/group"
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos/graphp"
-	"github.com/dgraph-io/dgraph/protos/taskp"
-	"github.com/dgraph-io/dgraph/protos/typesp"
+	"github.com/dgraph-io/dgraph/protos"
 
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/store"
@@ -73,6 +71,16 @@ func populateGraph(t *testing.T) {
 	addEdgeToUID(t, "friend", 31, 24, nil)
 	addEdgeToUID(t, "friend", 23, 1, nil)
 
+	addEdgeToUID(t, "school", 1, 5000, nil)
+	addEdgeToUID(t, "school", 23, 5001, nil)
+	addEdgeToUID(t, "school", 24, 5000, nil)
+	addEdgeToUID(t, "school", 25, 5000, nil)
+	addEdgeToUID(t, "school", 31, 5001, nil)
+	addEdgeToUID(t, "school", 101, 5001, nil)
+
+	addEdgeToValue(t, "name", 5000, "School A", nil)
+	addEdgeToValue(t, "name", 5001, "School B", nil)
+
 	addEdgeToUID(t, "follow", 1, 31, nil)
 	addEdgeToUID(t, "follow", 1, 24, nil)
 	addEdgeToUID(t, "follow", 31, 1001, nil)
@@ -89,6 +97,7 @@ func populateGraph(t *testing.T) {
 	addEdgeToUID(t, "path", 1000, 1002, map[string]string{"weight": "0.7"})
 	addEdgeToUID(t, "path", 1001, 1002, map[string]string{"weight": "0.1"})
 	addEdgeToUID(t, "path", 1002, 1003, map[string]string{"weight": "0.6"})
+	addEdgeToUID(t, "path", 1001, 1003, map[string]string{"weight": "1.5"})
 	addEdgeToUID(t, "path", 1003, 1001, map[string]string{})
 
 	addEdgeToValue(t, "name", 1000, "Alice", nil)
@@ -105,6 +114,8 @@ func populateGraph(t *testing.T) {
 	// Now let's add a few properties for the main user.
 	addEdgeToValue(t, "name", 1, "Michonne", nil)
 	addEdgeToValue(t, "gender", 1, "female", nil)
+	addEdgeToValue(t, "full_name", 1, "Michonne's large name for hashing", nil)
+	addEdgeToValue(t, "noindex_name", 1, "Michonne's name not indexed", nil)
 
 	src := types.ValueForType(types.StringID)
 	src.Value = []byte("{\"Type\":\"Point\", \"Coordinates\":[1.1,2.0]}")
@@ -177,6 +188,7 @@ func populateGraph(t *testing.T) {
 	addEdgeToValue(t, "name", farm.Fingerprint64([]byte("a.bc")), "Alice", nil)
 	addEdgeToValue(t, "name", 25, "Daryl Dixon", nil)
 	addEdgeToValue(t, "name", 31, "Andrea", nil)
+	addEdgeToValue(t, "name", 2300, "Andre", nil)
 	src.Value = []byte(`{"Type":"Point", "Coordinates":[2.0, 2.0]}`)
 	coord, err = types.Convert(src, types.GeoID)
 	require.NoError(t, err)
@@ -282,7 +294,6 @@ func populateGraph(t *testing.T) {
 
 	addEdgeToValue(t, "name", 240, "Andrea With no friends", nil)
 	addEdgeToUID(t, "son", 1, 2300, nil)
-	addEdgeToValue(t, "name", 2300, "Andre", nil)
 
 	addEdgeToValue(t, "name", 2301, `Alice\"`, nil)
 
@@ -388,6 +399,125 @@ func TestCascadeDirective(t *testing.T) {
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t, `{"me":[{"friend":[{"friend":[{"age":38,"dob":"1910-01-01","name":"Michonne"}],"name":"Rick Grimes"},{"friend":[{"age":15,"dob":"1909-05-05","name":"Glenn Rhee"}],"name":"Andrea"}],"gender":"female","name":"Michonne"}]}`,
+		js)
+}
+
+func TestLevelBasedFacetVarSum(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			friend(id: 1000) {
+				path @facets(L1 as weight) {
+						path @facets(L2 as weight) {
+							c as count(follow)
+						}
+						L4 as math(c+L2+L1)
+				}
+			}
+
+			sum(id: var(L4), orderdesc: var(L4)) {
+				name
+				var(L4)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"friend":[{"path":[{"@facets":{"_":{"weight":0.100000}},"path":[{"@facets":{"_":{"weight":0.100000}},"count(follow)":1},{"@facets":{"_":{"weight":1.500000}},"count(follow)":1}]},{"@facets":{"_":{"weight":0.700000}},"path":[{"@facets":{"_":{"weight":0.600000}},"count(follow)":1}],"var(L4)":1.200000}]}],"sum":[{"name":"John","var(L4)":3.900000},{"name":"Matt","var(L4)":1.200000}]}`, js)
+}
+
+func TestLevelBasedFacetVarSumError(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			friend(id: 1000) {
+				path @facets(L1 as weight)
+				follow {
+					path @facets(L2 as weight)
+					L3 as math(L1+L2)
+				}
+			}
+
+			sum(id: var(L3), orderdesc: var(L3)) {
+				name
+				var(L3)
+			}
+		}
+	`
+	res, err := gql.Parse(gql.Request{Str: query})
+	require.NoError(t, err)
+
+	var l Latency
+	ctx := context.Background()
+	_, err = ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+
+func TestLevelBasedSumMix1(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			friend(id: 1) {
+				a as age
+				path @facets(L1 as weight) {
+					L2 as math(a+L1)
+			 	}
+			}
+			sum(id: var(L2), orderdesc: var(L2)) {
+				name
+				var(L2)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"friend":[{"age":38,"path":[{"@facets":{"_":{"weight":0.200000}},"var(L2)":38.200000},{"@facets":{"_":{"weight":0.100000}},"var(L2)":38.100000}]}],"sum":[{"name":"Glenn Rhee","var(L2)":38.200000},{"name":"Andrea","var(L2)":38.100000}]}`,
+		js)
+}
+
+func TestLevelBasedFacetVarSum1(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			friend(id: 1000) {
+				path @facets(L1 as weight) {
+					name
+					path @facets(L2 as weight)
+					L3 as math(L1+L2)
+			 }
+			}
+			sum(id: var(L3), orderdesc: var(L3)) {
+				name
+				var(L3)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"friend":[{"path":[{"@facets":{"_":{"weight":0.100000}},"name":"Bob","path":[{"@facets":{"_":{"weight":0.100000}}},{"@facets":{"_":{"weight":1.500000}}}]},{"@facets":{"_":{"weight":0.700000}},"name":"Matt","path":[{"@facets":{"_":{"weight":0.600000}}}],"var(L3)":0.200000}]}],"sum":[{"name":"John","var(L3)":2.900000},{"name":"Matt","var(L3)":0.200000}]}`,
+		js)
+}
+
+func TestLevelBasedFacetVarSum2(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			friend(id: 1000) {
+				path @facets(L1 as weight) {
+					path @facets(L2 as weight) {
+						path @facets(L3 as weight)
+						L4 as math(L1+L2+L3)
+					}
+				}
+			}
+			sum(id: var(L4), orderdesc: var(L4)) {
+				name
+				var(L4)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"friend":[{"path":[{"@facets":{"_":{"weight":0.100000}},"path":[{"@facets":{"_":{"weight":0.100000}},"path":[{"@facets":{"_":{"weight":0.600000}}}]},{"@facets":{"_":{"weight":1.500000}},"var(L4)":0.800000}]},{"@facets":{"_":{"weight":0.700000}},"path":[{"@facets":{"_":{"weight":0.600000}},"var(L4)":0.800000}]}]}],"sum":[{"name":"Bob","var(L4)":2.900000},{"name":"John","var(L4)":0.800000}]}`,
 		js)
 }
 
@@ -746,7 +876,7 @@ func TestQueryVarValAggMul(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Andrea","var(mul)":19,"var(n)":19,"var(s)":1},{"name":"Rick Grimes","var(mul)":15,"var(n)":15,"var(s)":1},{"name":"Glenn Rhee","var(mul)":0,"var(n)":15,"var(s)":0},{"name":"Daryl Dixon","var(mul)":0,"var(n)":17,"var(s)":0}]}`,
+		`{"me":[{"name":"Andrea","var(mul)":19.000000,"var(n)":19,"var(s)":1},{"name":"Rick Grimes","var(mul)":15.000000,"var(n)":15,"var(s)":1},{"name":"Glenn Rhee","var(mul)":0.000000,"var(n)":15,"var(s)":0},{"name":"Daryl Dixon","var(mul)":0.000000,"var(n)":17,"var(s)":0},{"var(mul)":0.000000,"var(s)":0}]}`,
 		js)
 }
 
@@ -771,7 +901,7 @@ func TestQueryVarValAggOrderDesc(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"info":[{"friend":[{"age":15,"friend":[{"count":1}],"var(sum)":16},{"age":15,"friend":[{"count":0}],"var(sum)":15},{"age":17,"friend":[{"count":0}],"var(sum)":17},{"age":19,"friend":[{"count":1}],"var(sum)":20},{"friend":[{"count":0}]}]}],"me":[{"age":19,"friend":[{"count":1}],"name":"Andrea"},{"age":17,"friend":[{"count":0}],"name":"Daryl Dixon"},{"age":15,"friend":[{"count":1}],"name":"Rick Grimes"},{"age":15,"friend":[{"count":0}],"name":"Glenn Rhee"}]}`,
+		`{"info":[{"friend":[{"age":15,"count(friend)":1,"var(sum)":16.000000},{"age":15,"count(friend)":0,"var(sum)":15.000000},{"age":17,"count(friend)":0,"var(sum)":17.000000},{"age":19,"count(friend)":1,"var(sum)":20.000000},{"count(friend)":0,"var(sum)":0.000000}]}],"me":[{"age":19,"count(friend)":1,"name":"Andrea"},{"age":17,"count(friend)":0,"name":"Daryl Dixon"},{"age":15,"count(friend)":1,"name":"Rick Grimes"},{"age":15,"count(friend)":0,"name":"Glenn Rhee"},{"count(friend)":0}]}`,
 		js)
 }
 
@@ -883,6 +1013,114 @@ func TestQueryVarValOrderDescMissing(t *testing.T) {
 	require.JSONEq(t, `{}`, js)
 }
 
+func TestGroupBy(t *testing.T) {
+	populateGraph(t)
+	query := `
+	{
+		age(id: 1) {
+			friend {
+				age
+				name
+			}
+		}
+
+		me(id: 1) {
+			friend @groupby(age) {
+				count(_uid_)
+			}
+			name
+		}
+	}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"age":[{"friend":[{"age":15,"name":"Rick Grimes"},{"age":15,"name":"Glenn Rhee"},{"age":17,"name":"Daryl Dixon"},{"age":19,"name":"Andrea"}]}],"me":[{"friend":{"@groupby":[{"age":17,"count":1},{"age":19,"count":1},{"age":15,"count":2}]},"name":"Michonne"}]}`,
+		js)
+}
+
+func TestGroupByCountVar(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			var(id: 1) {
+				friend @groupby(school) {
+					a as count(_uid_)
+				}
+			}
+
+			order(id:var(a), orderdesc: var(a)) {
+				name
+				var(a)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"order":[{"name":"School B","var(a)":3},{"name":"School A","var(a)":2}]}`,
+		js)
+}
+func TestGroupByAggVar(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			var(id: 1) {
+				friend @groupby(school) {
+					a as max(name)
+					b as min(name)
+				}
+			}
+
+			orderMax(id:var(a), orderdesc: var(a)) {
+				name
+				var(a)
+			}
+
+			orderMin(id:var(b), orderdesc: var(b)) {
+				name
+				var(b)
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"orderMax":[{"name":"School B","var(a)":"Rick Grimes"},{"name":"School A","var(a)":"Glenn Rhee"}],"orderMin":[{"name":"School A","var(b)":"Daryl Dixon"},{"name":"School B","var(b)":"Andrea"}]}`,
+		js)
+}
+
+func TestGroupByAgg(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id: 1) {
+				friend @groupby(age) {
+					max(name)
+				}
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"friend":{"@groupby":[{"age":17,"max(name)":"Daryl Dixon"},{"age":19,"max(name)":"Andrea"},{"age":15,"max(name)":"Rick Grimes"}]}}]}`,
+		js)
+}
+
+func TestGroupByMulti(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id: 1) {
+				friend @groupby(friend,name) {
+					count(_uid_)
+				}
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"friend":{"@groupby":[{"count":1,"friend":"0x1","name":"Rick Grimes"},{"count":1,"friend":"0x18","name":"Andrea"}]}}]}`,
+		js)
+}
+
 func TestMultiEmptyBlocks(t *testing.T) {
 	populateGraph(t)
 	query := `
@@ -975,9 +1213,9 @@ func TestFilterFacetVar(t *testing.T) {
 	query := `
 		{
 			friend(id:0x01) {
-				L as path @facets(weight) {
-				name
-				 friend @filter(var(L)){
+				path @facets(L as weight) {
+					name
+				 	friend @filter(var(L)) {
 						name
 						var(L)
 					}
@@ -996,9 +1234,9 @@ func TestFilterFacetVar1(t *testing.T) {
 	query := `
 		{
 			friend(id:0x01) {
-				L as path @facets(weight1) {
-				name
-				 friend @filter(var(L)){
+				path @facets(L as weight1) {
+					name
+				 	friend @filter(var(L)){
 						name
 						var(L)
 					}
@@ -1008,7 +1246,7 @@ func TestFilterFacetVar1(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"friend":[{"path":[{"name":"Glenn Rhee"},{"@facets":{"_":{"weight1":0.200000}},"friend":[{"name":"Glenn Rhee"}],"name":"Andrea"}]}]}`,
+		`{"friend":[{"path":[{"name":"Glenn Rhee"},{"@facets":{"_":{"weight1":0.200000}},"name":"Andrea"}]}]}`,
 		js)
 }
 
@@ -1056,30 +1294,115 @@ func TestUseVarsFilterVarReuse2(t *testing.T) {
 		js)
 }
 
-func TestUseVarsFilterVarReuse3(t *testing.T) {
+func TestVarInAggError(t *testing.T) {
 	populateGraph(t)
 	query := `
-		{
-			var(id:0x01) {
-				fr as friend(first:2, offset:2, orderasc: dob)
-			}
-
-			friend(id:0x01) {
-				L as friend {
-					friend {
-						name
-						friend @filter(var(L) and var(fr)) {
-							name
-						}
-					}
+    {
+			var(id: 1) {
+				friend {
+					a as age
 				}
 			}
+
+			# var not allowed in min filter
+			me(func: min(var(a))) {
+				name
+			}
 		}
-	`
+  `
+	res, err := gql.Parse(gql.Request{Str: query})
+	require.NoError(t, err)
+
+	var l Latency
+	ctx := context.Background()
+	_, err = ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+func TestVarInIneqError(t *testing.T) {
+	populateGraph(t)
+	query := `
+    {
+			var(id: 1) {
+				f as friend {
+					a as age
+				}
+			}
+
+			me(id: var(f)) @filter(gt(var(a), "alice")) {
+				name
+			}
+		}
+  `
+	res, err := gql.Parse(gql.Request{Str: query})
+	require.NoError(t, err)
+
+	var l Latency
+	ctx := context.Background()
+	_, err = ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+
+func TestVarInIneqScore(t *testing.T) {
+	populateGraph(t)
+	query := `
+    {
+			var(id: 1) {
+				friend {
+					a as age
+					s as count(friend)
+					score as math(2*a + 3 * s + 1)
+				}
+			}
+
+			me(func: ge(var(score), 35)) { 
+				name
+				var(score)
+				var(a)
+				var(s)
+			}
+		}
+  `
 	js := processToFastJSON(t, query)
-	require.JSONEq(t,
-		`{"friend":[{"friend":[{"friend":[{"name":"Michonne", "friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"}]}]}, {"friend":[{"name":"Glenn Rhee"}]}]}]}`,
+	require.JSONEq(t, `{"me":[{"name":"Daryl Dixon","var(a)":17,"var(s)":0,"var(score)":35.000000},{"name":"Andrea","var(a)":19,"var(s)":1,"var(score)":42.000000}]}`,
 		js)
+}
+
+func TestVarInIneq(t *testing.T) {
+	populateGraph(t)
+	query := `
+    {
+			var(id: 1) {
+				f as friend {
+					a as age
+				}
+			}
+
+			me(id: var(f)) @filter(gt(var(a), 18)) {
+				name
+			}
+		}
+  `
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"name":"Andrea"}]}`, js)
+}
+
+func TestVarInIneq2(t *testing.T) {
+	populateGraph(t)
+	query := `
+    {
+			var(id: 1) {
+				friend {
+					a as age
+				}
+			}
+
+			me(func: gt(var(a), 18)) {
+				name
+			}
+		}
+  `
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"name":"Andrea"}]}`, js)
 }
 
 func TestNestedFuncRoot(t *testing.T) {
@@ -1221,7 +1544,7 @@ func TestFacetVarRetrieval(t *testing.T) {
 	query := `
 		{
 			var(id:1) {
-				f as path @facets(weight)
+				path @facets(f as weight)
 			}
 
 			me(id: 24) {
@@ -1239,7 +1562,7 @@ func TestFacetVarRetrieveOrder(t *testing.T) {
 	query := `
 		{
 			var(id:1) {
-				f as path @facets(weight)
+				path @facets(f as weight)
 			}
 
 			me(id: var(f), orderasc: var(f)) {
@@ -1308,24 +1631,6 @@ func TestShortestPath2(t *testing.T) {
 	require.JSONEq(t,
 		`{"_path_":[{"_uid_":"0x1","path":[{"_uid_":"0x1f","path":[{"_uid_":"0x3e8"}]}]}],"me":[{"name":"Michonne"},{"name":"Andrea"},{"name":"Alice"}]}
 `,
-		js)
-}
-
-func TestShortestPath3(t *testing.T) {
-	populateGraph(t)
-	query := `
-		{
-			A as shortest(from:1, to:1003) {
-				path
-			}
-
-			me(id: var( A)) {
-				name
-			}
-		}`
-	js := processToFastJSON(t, query)
-	require.JSONEq(t,
-		`{"_path_":[{"_uid_":"0x1","path":[{"_uid_":"0x1f","path":[{"_uid_":"0x3e8","path":[{"_uid_":"0x3ea","path":[{"_uid_":"0x3eb"}]}]}]}]}],"me":[{"name":"Michonne"},{"name":"Andrea"},{"name":"Alice"},{"name":"Matt"},{"name":"John"}]}`,
 		js)
 }
 
@@ -1489,7 +1794,7 @@ func TestGetUIDCount(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"_uid_":"0x1","alive":true,"friend":[{"count":5}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"_uid_":"0x1","alive":true,"count(friend)":5,"gender":"female","name":"Michonne"}]}`,
 		js)
 }
 
@@ -1609,7 +1914,7 @@ func TestCount(t *testing.T) {
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"alive":true,"friend":[{"count":5}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"alive":true,"count(friend)":5,"gender":"female","name":"Michonne"}]}`,
 		js)
 }
 func TestCountAlias(t *testing.T) {
@@ -1622,14 +1927,14 @@ func TestCountAlias(t *testing.T) {
 				name
 				gender
 				alive
-				friendcount: count(friend)
+				friendCount: count(friend)
 			}
 		}
 	`
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"alive":true,"friend":[{"friendcount":5}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"alive":true,"friendCount":5,"gender":"female","name":"Michonne"}]}`,
 		js)
 }
 
@@ -1704,7 +2009,7 @@ func TestMultiCountSort(t *testing.T) {
 `
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"countorder":[{"friend":[{"count":0}],"name":"Andrea With no friends"},{"friend":[{"count":1}],"name":"Rick Grimes"},{"friend":[{"count":1}],"name":"Andrea"},{"friend":[{"count":5}],"name":"Michonne"}]}`,
+		`{"countorder":[{"count(friend)":0,"name":"Andrea With no friends"},{"count(friend)":1,"name":"Rick Grimes"},{"count(friend)":1,"name":"Andrea"},{"count(friend)":5,"name":"Michonne"}]}`,
 		js)
 }
 
@@ -1724,7 +2029,7 @@ func TestMultiLevelAgg(t *testing.T) {
 `
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"sumorder":[{"friend":[{"friend":[{"count":1}]},{"friend":[{"count":0}]},{"friend":[{"count":0}]},{"friend":[{"count":1}]},{"friend":[{"count":0}]}],"name":"Michonne","sum(var(s))":2},{"friend":[{"friend":[{"count":5}]}],"name":"Rick Grimes","sum(var(s))":5},{"friend":[{"friend":[{"count":0}]}],"name":"Andrea","sum(var(s))":0},{"name":"Andrea With no friends"}]}`,
+		`{"sumorder":[{"friend":[{"count(friend)":1},{"count(friend)":0},{"count(friend)":0},{"count(friend)":1},{"count(friend)":0}],"name":"Michonne","sum(var(s))":2},{"friend":[{"count(friend)":5}],"name":"Rick Grimes","sum(var(s))":5},{"friend":[{"count(friend)":0}],"name":"Andrea","sum(var(s))":0},{"name":"Andrea With no friends"}]}`,
 		js)
 }
 
@@ -2012,12 +2317,12 @@ func TestMinSchema(t *testing.T) {
 		`{"me":[{"alive":true,"friend":[{"survival_rate":1.600000},{"survival_rate":1.600000},{"survival_rate":1.600000},{"survival_rate":1.600000}],"gender":"female","min(var(x))":1.600000,"name":"Michonne"}]}`,
 		js)
 
-	schema.State().Set("survival_rate", typesp.Schema{ValueType: uint32(types.IntID)})
+	schema.State().Set("survival_rate", protos.SchemaUpdate{ValueType: uint32(types.IntID)})
 	js = processToFastJSON(t, query)
 	require.EqualValues(t,
 		`{"me":[{"alive":true,"friend":[{"survival_rate":1},{"survival_rate":1},{"survival_rate":1},{"survival_rate":1}],"gender":"female","min(var(x))":1,"name":"Michonne"}]}`,
 		js)
-	schema.State().Set("survival_rate", typesp.Schema{ValueType: uint32(types.FloatID)})
+	schema.State().Set("survival_rate", protos.SchemaUpdate{ValueType: uint32(types.FloatID)})
 }
 
 func TestAvg(t *testing.T) {
@@ -2944,7 +3249,7 @@ func TestToFastJSONFilterOrCount(t *testing.T) {
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"friend":[{"count":2}, {"name":"Andrea"}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"count(friend)":2,"friend": [{"name":"Andrea"}],"gender":"female","name":"Michonne"}]}`,
 		js)
 }
 
@@ -3400,7 +3705,7 @@ func TestToFastJSONFilterOrFirstOffsetCount(t *testing.T) {
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"friend":[{"count":1}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"count(friend)":1,"gender":"female","name":"Michonne"}]}`,
 		js)
 }
 
@@ -3516,7 +3821,7 @@ func TestCountReverseFunc(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Glenn Rhee","~friend":[{"count":2}]}]}`,
+		`{"me":[{"name":"Glenn Rhee","count(~friend)":2}]}`,
 		js)
 }
 
@@ -3532,7 +3837,7 @@ func TestCountReverseFilter(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Glenn Rhee","~friend":[{"count":2}]}]}`,
+		`{"me":[{"name":"Glenn Rhee","count(~friend)":2}]}`,
 		js)
 }
 
@@ -3548,7 +3853,7 @@ func TestCountReverse(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Glenn Rhee","~friend":[{"count":2}]}]}`,
+		`{"me":[{"name":"Glenn Rhee","count(~friend)":2}]}`,
 		js)
 }
 
@@ -3630,11 +3935,11 @@ func TestToFastJSONReverseDelSetCount(t *testing.T) {
 	`
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"name":"Glenn Rhee","~friend":[{"count":2}]}]}`,
+		`{"me":[{"name":"Glenn Rhee","count(~friend)":2}]}`,
 		js)
 }
 
-func getProperty(properties []*graphp.Property, prop string) *graphp.Value {
+func getProperty(properties []*protos.Property, prop string) *protos.Value {
 	for _, p := range properties {
 		if p.Prop == prop {
 			return p.Value
@@ -3970,7 +4275,7 @@ func TestToFastJSONOrderDescCount(t *testing.T) {
 
 	js := processToFastJSON(t, query)
 	require.JSONEq(t,
-		`{"me":[{"friend":[{"count":1}],"gender":"female","name":"Michonne"}]}`,
+		`{"me":[{"count(friend)":1,"gender":"female","name":"Michonne"}]}`,
 		string(js))
 }
 
@@ -4017,12 +4322,12 @@ func TestToFastJSONOrderOffsetCount(t *testing.T) {
 }
 
 // Mocking Subgraph and Testing fast-json with it.
-func ageSg(uidMatrix []*taskp.List, srcUids *taskp.List, ages []uint64) *SubGraph {
-	var as []*taskp.Value
+func ageSg(uidMatrix []*protos.List, srcUids *protos.List, ages []uint64) *SubGraph {
+	var as []*protos.TaskValue
 	for _, a := range ages {
 		bs := make([]byte, 4)
 		binary.LittleEndian.PutUint64(bs, a)
-		as = append(as, &taskp.Value{[]byte(bs), 2})
+		as = append(as, &protos.TaskValue{[]byte(bs), 2})
 	}
 
 	return &SubGraph{
@@ -4033,10 +4338,10 @@ func ageSg(uidMatrix []*taskp.List, srcUids *taskp.List, ages []uint64) *SubGrap
 		Params:    params{isDebug: false, GetUID: true},
 	}
 }
-func nameSg(uidMatrix []*taskp.List, srcUids *taskp.List, names []string) *SubGraph {
-	var ns []*taskp.Value
+func nameSg(uidMatrix []*protos.List, srcUids *protos.List, names []string) *SubGraph {
+	var ns []*protos.TaskValue
 	for _, n := range names {
-		ns = append(ns, &taskp.Value{[]byte(n), 0})
+		ns = append(ns, &protos.TaskValue{[]byte(n), 0})
 	}
 	return &SubGraph{
 		Attr:      "name",
@@ -4047,7 +4352,7 @@ func nameSg(uidMatrix []*taskp.List, srcUids *taskp.List, names []string) *SubGr
 	}
 
 }
-func friendsSg(uidMatrix []*taskp.List, srcUids *taskp.List, friends []*SubGraph) *SubGraph {
+func friendsSg(uidMatrix []*protos.List, srcUids *protos.List, friends []*SubGraph) *SubGraph {
 	return &SubGraph{
 		Attr:      "friend",
 		uidMatrix: uidMatrix,
@@ -4056,7 +4361,7 @@ func friendsSg(uidMatrix []*taskp.List, srcUids *taskp.List, friends []*SubGraph
 		Children:  friends,
 	}
 }
-func rootSg(uidMatrix []*taskp.List, srcUids *taskp.List, names []string, ages []uint64) *SubGraph {
+func rootSg(uidMatrix []*protos.List, srcUids *protos.List, names []string, ages []uint64) *SubGraph {
 	nameSg := nameSg(uidMatrix, srcUids, names)
 	ageSg := ageSg(uidMatrix, srcUids, ages)
 
@@ -5499,7 +5804,7 @@ func TestLangFilterMismatch5(t *testing.T) {
 		js)
 }
 
-func checkSchemaNodes(t *testing.T, expected []*graphp.SchemaNode, actual []*graphp.SchemaNode) {
+func checkSchemaNodes(t *testing.T, expected []*protos.SchemaNode, actual []*protos.SchemaNode) {
 	sort.Slice(expected, func(i, j int) bool {
 		return expected[i].Predicate >= expected[j].Predicate
 	})
@@ -5517,14 +5822,15 @@ func TestSchemaBlock1(t *testing.T) {
 		}
 	`
 	actual := processSchemaQuery(t, query)
-	expected := []*graphp.SchemaNode{{Predicate: "genre", Type: "uid"},
+	expected := []*protos.SchemaNode{{Predicate: "genre", Type: "uid"},
 		{Predicate: "age", Type: "int"}, {Predicate: "name", Type: "string"},
 		{Predicate: "film.film.initial_release_date", Type: "date"},
 		{Predicate: "loc", Type: "geo"}, {Predicate: "alive", Type: "bool"},
 		{Predicate: "shadow_deep", Type: "int"}, {Predicate: "friend", Type: "uid"},
 		{Predicate: "geometry", Type: "geo"}, {Predicate: "alias", Type: "string"},
 		{Predicate: "dob", Type: "date"}, {Predicate: "survival_rate", Type: "float"},
-		{Predicate: "value", Type: "string"}}
+		{Predicate: "value", Type: "string"}, {Predicate: "full_name", Type: "string"},
+		{Predicate: "noindex_name", Type: "string"}}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -5538,7 +5844,7 @@ func TestSchemaBlock2(t *testing.T) {
 		}
 	`
 	actual := processSchemaQuery(t, query)
-	expected := []*graphp.SchemaNode{
+	expected := []*protos.SchemaNode{
 		{Predicate: "name", Type: "string", Index: true, Tokenizer: []string{"term", "exact", "trigram"}}}
 	checkSchemaNodes(t, expected, actual)
 }
@@ -5553,7 +5859,7 @@ func TestSchemaBlock3(t *testing.T) {
 		}
 	`
 	actual := processSchemaQuery(t, query)
-	expected := []*graphp.SchemaNode{{Predicate: "age", Type: "int"}}
+	expected := []*protos.SchemaNode{{Predicate: "age", Type: "int"}}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -5567,7 +5873,7 @@ func TestSchemaBlock4(t *testing.T) {
 		}
 	`
 	actual := processSchemaQuery(t, query)
-	expected := []*graphp.SchemaNode{
+	expected := []*protos.SchemaNode{
 		{Predicate: "genre", Type: "uid", Reverse: true}, {Predicate: "age", Type: "int"}}
 	checkSchemaNodes(t, expected, actual)
 }
@@ -5578,7 +5884,7 @@ func TestSchemaBlock5(t *testing.T) {
 		}
 	`
 	actual := processSchemaQuery(t, query)
-	expected := []*graphp.SchemaNode{
+	expected := []*protos.SchemaNode{
 		{Predicate: "name", Type: "string", Index: true, Tokenizer: []string{"term", "exact", "trigram"}}}
 	checkSchemaNodes(t, expected, actual)
 }
@@ -5597,6 +5903,8 @@ shadow_deep   : int .
 friend:uid @reverse .
 geometry:geo @index .
 value:string @index(trigram) .
+full_name:string @index(hash) .
+noindex_name: string .
 `
 
 func TestMain(m *testing.M) {
@@ -6028,4 +6336,168 @@ func TestOrderDescFilterCount(t *testing.T) {
 	require.JSONEq(t,
 		`{"me":[{"friend":[{"alias":"Zambo Alice"}]}]}`,
 		js)
+}
+
+func TestHashTokEq(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: eq(full_name, "Michonne's large name for hashing")) {
+				full_name
+				alive
+				friend {
+					name
+				}
+			}
+		}
+	`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"alive":true,"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"full_name":"Michonne's large name for hashing"}]}`,
+		js)
+}
+
+func TestHashTokGeqErr(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: ge(full_name, "Michonne's large name for hashing")) {
+				full_name
+				alive
+				friend {
+					name
+				}
+			}
+		}
+	`
+	res, _ := gql.Parse(gql.Request{Str: query})
+	var l Latency
+	ctx := context.Background()
+	_, err := ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+
+func TestNameNotIndexed(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: eq(noindex_name, "Michonne's name not indexed")) {
+				full_name
+				alive
+				friend {
+					name
+				}
+			}
+		}
+	`
+	res, _ := gql.Parse(gql.Request{Str: query})
+	var l Latency
+	ctx := context.Background()
+	_, err := ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+
+func TestMultipleMinMax(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id: 0x01) {
+				friend {
+					x as age
+					n as name
+				}
+				min(var(x))
+				max(var(x))
+				min(var(n))
+				max(var(n))
+			}
+		}`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"friend":[{"age":15,"name":"Rick Grimes"},{"age":15,"name":"Glenn Rhee"},{"age":17,"name":"Daryl Dixon"},{"age":19,"name":"Andrea"}],"max(var(n))":"Rick Grimes","max(var(x))":19,"min(var(n))":"Andrea","min(var(x))":15}]}`,
+		js)
+}
+
+func TestDuplicateAlias(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id: 0x01) {
+				friend {
+					x as age
+				}
+				a: min(var(x))
+				a: max(var(x))
+			}
+		}`
+	res, _ := gql.Parse(gql.Request{Str: query})
+	var l Latency
+	ctx := context.Background()
+	_, err := ProcessQuery(ctx, res, &l)
+	require.Error(t, err)
+}
+
+func TestMinSomething(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(id: 0x01) {
+				friendCount: count(friend)
+			}
+		}`
+	pb := processToPB(t, query, map[string]string{}, false)
+	require.Equal(t, `attribute: "_root_"
+children: <
+  attribute: "me"
+  properties: <
+    prop: "friendCount"
+    value: <
+      int_val: 5
+    >
+  >
+>
+`, proto.MarshalTextString(pb[0]))
+}
+
+func TestGraphQLId(t *testing.T) {
+	populateGraph(t)
+	q := `{"query": "query test ($a: string = 1) { me(id: $a) { name, gender, friend(first: 1) { name }}}",
+	"variables" : { "$a": "[1, 31]"}}`
+	js := processToFastJSON(t, q)
+	require.JSONEq(t, `{"me":[{"friend":[{"name":"Rick Grimes"}],"gender":"female","name":"Michonne"},{"friend":[{"name":"Glenn Rhee"}],"name":"Andrea"}]}`, string(js))
+}
+
+func TestGraphQLIdProto(t *testing.T) {
+	populateGraph(t)
+	q := `query test ($id: string) { me(id: $id) { name, gender, friend(first: 1) { name }}}`
+
+	variables := make(map[string]string)
+	variables["$id"] = "1"
+	pb := processToPB(t, q, variables, false)
+	require.Equal(t, `attribute: "_root_"
+children: <
+  attribute: "me"
+  properties: <
+    prop: "name"
+    value: <
+      str_val: "Michonne"
+    >
+  >
+  properties: <
+    prop: "gender"
+    value: <
+      default_val: "female"
+    >
+  >
+  children: <
+    attribute: "friend"
+    properties: <
+      prop: "name"
+      value: <
+        str_val: "Rick Grimes"
+      >
+    >
+  >
+>
+`, proto.MarshalTextString(pb[0]))
 }

@@ -22,13 +22,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dgraph-io/dgraph/protos/taskp"
+	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
 )
 
 type sortBase struct {
 	values []Val
-	ul     *taskp.List
+	ul     *protos.List
 }
 
 // Len returns size of vector.
@@ -65,7 +65,7 @@ func (s byValue) Less(i, j int) bool {
 }
 
 // Sort sorts the given array in-place.
-func Sort(v []Val, ul *taskp.List, desc bool) error {
+func Sort(v []Val, ul *protos.List, desc bool) error {
 	if len(v) == 0 {
 		return nil
 	}
@@ -101,8 +101,11 @@ func Less(a, b Val) (bool, error) {
 		return (a.Value.(int64)) < (b.Value.(int64)), nil
 	case FloatID:
 		return (a.Value.(float64)) < (b.Value.(float64)), nil
+	case UidID:
+		return (a.Value.(uint64) < b.Value.(uint64)), nil
 	case StringID, DefaultID:
 		return (a.Value.(string)) < (b.Value.(string)), nil
+
 	}
 	return false, x.Errorf("Compare not supported for type: %v", a.Tid)
 }
