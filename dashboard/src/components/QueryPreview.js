@@ -3,25 +3,24 @@ import classnames from 'classnames';
 
 import { collapseQuery } from '../containers/Helpers';
 
-const QueryPreview = ({ query, editingQuery, onToggleEditingQuery }) => {
+const QueryPreview = ({ query, onSelectQuery }) => {
   return (
     <div
-      className={classnames('query-row', { editing: editingQuery })}
+      className={classnames('query-row')}
       onClick={(e) => {
         e.preventDefault();
-        if (editingQuery) {
-          return;
-        }
+        onSelectQuery(query);
 
-        onToggleEditingQuery();
+        // Scroll to top
+        // IDEA: This breaks encapsulation. Is there a better way?
+        document.querySelector('.main-content').scrollTop = 0;
       }}
     >
-      {editingQuery ? null :
-        <div>
-          <i className="fa fa-search query-prompt" /> <span className="preview">{collapseQuery(query)}</span>
-        </div>
-      }
+      <div>
+        <i className="fa fa-search query-prompt" /> <span className="preview">{collapseQuery(query)}</span>
+      </div>
     </div>
   );
 };
+
 export default QueryPreview;

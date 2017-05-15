@@ -6,31 +6,8 @@ import Editor from "../containers/Editor";
 import '../assets/css/EditorPanel.css';
 
 class EditorPanel extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = {
-      query: '',
-      dirty: false
-    };
-  }
-
-  handleQueryUpdate = (val) => {
-    const dirty = val.trim() !== '';
-
-    this.setState({ query: val, dirty });
-  }
-
-  handleRunQuery = (query) => {
-    const { onRunQuery } = this.props;
-
-    onRunQuery(query, () => {
-      this.setState({ dirty: false, query: '' });
-    });
-  }
-
   render() {
-    const { query, dirty } = this.state;
+    const { isQueryDirty, query, onRunQuery, onUpdateQuery } = this.props;
 
     return (
       <div className="editor-panel">
@@ -44,19 +21,18 @@ class EditorPanel extends React.Component {
               className="action"
               onClick={(e) => {
                 e.preventDefault();
-                const { query } = this.state;
 
-                this.handleRunQuery(query);
+                onRunQuery(query);
               }}
             >
-              <i className={classnames('fa fa-play', { dirty })} id="run-btn" />
+              <i className={classnames('fa fa-play', { dirty: isQueryDirty })} id="run-btn" />
             </a>
           </div>
         </div>
 
         <Editor
-          onUpdateQuery={this.handleQueryUpdate}
-          onRunQuery={this.handleRunQuery}
+          onUpdateQuery={onUpdateQuery}
+          onRunQuery={onRunQuery}
           query={query}
         />
       </div>

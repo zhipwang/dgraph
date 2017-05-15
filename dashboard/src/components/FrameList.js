@@ -4,7 +4,7 @@ import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup';
 
 import '../assets/css/Frames.css';
 
-const FrameList = ({ frames, onDiscardFrame }) => {
+const FrameList = ({ frames, onDiscardFrame, onSelectQuery }) => {
   return (
     <CSSTransitionGroup
       transitionName="frame-item"
@@ -20,6 +20,7 @@ const FrameList = ({ frames, onDiscardFrame }) => {
               key={frame.id}
               frame={frame}
               onDiscardFrame={onDiscardFrame}
+              onSelectQuery={onSelectQuery}
             />
           )
         })

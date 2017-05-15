@@ -43,13 +43,14 @@ function getFrameContent(frame) {
   );
 }
 
-const FrameItem = ({ frame, onDiscardFrame }) => {
+const FrameItem = ({ frame, onDiscardFrame, onSelectQuery }) => {
   const content = getFrameContent(frame);
 
   return (
     <FrameLayout
       frame={frame}
       onDiscardFrame={onDiscardFrame}
+      onSelectQuery={onSelectQuery}
     >
       {content}
     </FrameLayout>

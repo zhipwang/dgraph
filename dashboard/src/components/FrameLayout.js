@@ -112,7 +112,7 @@ class FrameLayout extends React.Component {
   }
 
   render() {
-    const { children, onDiscardFrame, frame } = this.props;
+    const { children, onDiscardFrame, onSelectQuery, frame } = this.props;
     const { isFullscreen, shareId, shareHidden, editingQuery } = this.state;
     const isCollapsed = frame.meta && frame.meta.collapsed;
 
@@ -142,6 +142,7 @@ class FrameLayout extends React.Component {
             }
           }}
           onDiscardFrame={onDiscardFrame}
+          onSelectQuery={onSelectQuery}
           onShare={this.handleShare}
           shareHidden={shareHidden}
           frame={frame}
@@ -152,16 +153,7 @@ class FrameLayout extends React.Component {
         />
 
         <div className="body-container">
-          {frame.data.query ?
-            <FrameQueryEditor
-              frame={frame}
-              query={frame.data.query}
-              open={editingQuery}
-              onToggleEditingQuery={this.handleToggleEditingQuery}
-              saveCodeMirrorInstance={this.saveCodeMirrorInstance}
-            /> : null}
-
-            {isCollapsed ? null : children}
+          {isCollapsed ? null : children}
         </div>
       </li>
     );

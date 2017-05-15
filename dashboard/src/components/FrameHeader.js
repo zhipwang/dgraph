@@ -7,7 +7,7 @@ import QueryPreview from './QueryPreview';
 const FrameHeader = ({
   frame, shareId, shareHidden, isFullscreen, onShare, onToggleFullscreen,
   onToggleCollapse, onToggleEditingQuery, onDiscardFrame, saveShareURLRef,
-  editingQuery, isCollapsed
+  editingQuery, isCollapsed, onSelectQuery
 }) => {
   const shareURLValue = shareId ? getShareURL(shareId) : '';
 
@@ -16,10 +16,8 @@ const FrameHeader = ({
       {frame.data.query ?
         <QueryPreview
           query={frame.data.query}
-          onToggleEditingQuery={onToggleEditingQuery}
-          editingQuery={editingQuery}
-        /> :
-        null}
+          onSelectQuery={onSelectQuery}
+        /> : null}
       <div className="actions">
         <a
           href="#share"

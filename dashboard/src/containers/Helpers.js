@@ -640,7 +640,7 @@ export function makeFrame({ type, data }) {
 
 // CollapseQuery replaces deeply nested blocks in a query with ellipsis
 export function collapseQuery(query) {
-  const depthLimit = 2;
+  const depthLimit = 3;
   let ret = '';
   let depth = 0;
 

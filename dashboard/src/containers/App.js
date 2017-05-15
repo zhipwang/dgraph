@@ -11,6 +11,15 @@ import { readCookie, eraseCookie } from './Helpers';
 import "../assets/css/App.css";
 
 class App extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      query: '',
+      isQueryDirty: false
+    };
+  }
+
   componentDidMount = () => {
     const { handleRunQuery, match } = this.props;
 
@@ -30,6 +39,20 @@ class App extends React.Component {
     }
   };
 
+  handleUpdateQuery = (val) => {
+    const isQueryDirty = val.trim() !== '';
+
+    this.setState({ query: val, isQueryDirty });
+  }
+
+  handleRunQuery = (query) => {
+    const { _handleRunQuery } = this.props;
+
+    _handleRunQuery(query, () => {
+      this.setState({ isQueryDirty: false, query: '' });
+    });
+  }
+
   onRunSharedQuery(shareId) {
     const { handleRunSharedQuery } = this.props;
 
@@ -39,7 +62,8 @@ class App extends React.Component {
   }
 
   render = () => {
-    const { handleRunQuery, handleDiscardFrame, frames } = this.props;
+    const { query, isQueryDirty } = this.state;
+    const { handleDiscardFrame, frames } = this.props;
 
     return (
       <div className="app-layout">
@@ -49,7 +73,10 @@ class App extends React.Component {
             <div className="row justify-content-md-center">
               <div className="col-sm-12">
                 <EditorPanel
-                  onRunQuery={handleRunQuery}
+                  query={query}
+                  isQueryDirty={isQueryDirty}
+                  onRunQuery={this.handleRunQuery}
+                  onUpdateQuery={this.handleUpdateQuery}
                 />
               </div>
 
@@ -57,6 +84,7 @@ class App extends React.Component {
                 <FrameList
                   frames={frames}
                   onDiscardFrame={handleDiscardFrame}
+                  onSelectQuery={this.handleUpdateQuery}
                 />
               </div>
             </div>
@@ -72,7 +100,7 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-  handleRunQuery(query, done = () => {}) {
+  _handleRunQuery(query, done = () => {}) {
     return dispatch(runQuery(query))
       .then(done);
   },
