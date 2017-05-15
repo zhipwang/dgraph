@@ -42,17 +42,24 @@
   display: flex;
   flex-direction: column;
 
-  &.frame-session {
-    height: 692px;
+  .body-container {
+    transition: height 200ms ease-in;
   }
-  &.frame-error {
-    height: 397px;
+
+  &.frame-session .body-container {
+    height: 672px;
   }
-  &.frame-loading {
-    height: 397px;
+  &.frame-error .body-container {
+    height: 377px;
   }
-  &.frame-system {
-    height: 397px;
+  &.frame-loading .body-container {
+    height: 377px;
+  }
+  &.frame-system .body-container {
+    height: 377px;
+  }
+  &.collapsed .body-container {
+    height: 0;
   }
 
   .loading-container {

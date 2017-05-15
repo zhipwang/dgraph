@@ -6,7 +6,8 @@ import QueryPreview from './QueryPreview';
 
 const FrameHeader = ({
   frame, shareId, shareHidden, isFullscreen, onShare, onToggleFullscreen,
-  onToggleEditingQuery, onDiscardFrame, saveShareURLRef, editingQuery
+  onToggleCollapse, onToggleEditingQuery, onDiscardFrame, saveShareURLRef,
+  editingQuery, isCollapsed
 }) => {
   const shareURLValue = shareId ? getShareURL(shareId) : '';
 
@@ -52,6 +53,20 @@ const FrameHeader = ({
             <i className="fa fa-compress" /> :
             <i className="fa fa-expand" />}
 
+        </a>
+
+        <a
+          href="#expand-toggle"
+          className="action"
+          onClick={(e) => {
+            e.preventDefault();
+            onToggleCollapse();
+          }}
+        >
+          {isCollapsed ?
+            <i className="fa fa-chevron-down"></i> :
+            <i className="fa fa-chevron-up"></i>
+          }
         </a>
 
         {!isFullscreen ?

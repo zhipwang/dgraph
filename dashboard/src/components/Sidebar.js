@@ -44,18 +44,22 @@ class Sidebar extends React.Component {
                 <img src={logo} alt="logo" className="logo" />
               </a>
             </li>
-            <li>
-              <a
-                href="#"
-                className={classnames('link', { active: currentMenu === 'favorite' })}
-                onClick={(e) => {
-                  e.preventDefault();
-                  this.handleToggleMenu('favorite')
-                }}
-              >
-                <i className="fa fa-star" />
-              </a>
-            </li>
+            {
+              /*
+              <li>
+                <a
+                  href="#"
+                  className={classnames('link', { active: currentMenu === 'favorite' })}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    this.handleToggleMenu('favorite')
+                  }}
+                >
+                  <i className="fa fa-star" />
+                </a>
+              </li>
+              */
+            }
             <li>
               <a
                 href="#"

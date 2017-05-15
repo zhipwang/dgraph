@@ -16,9 +16,10 @@ class FrameLayout extends React.Component {
 
     this.state = {
       isFullscreen: false,
+      isCollapsed: false,
       shareId: '',
       shareHidden: false,
-      editingQuery: false
+      editingQuery: false,
     };
   }
 
@@ -49,6 +50,12 @@ class FrameLayout extends React.Component {
         this.setState({ isFullscreen: true });
       }
     }
+  }
+
+  handleToggleCollapse = () => {
+    this.setState({
+      isCollapsed: !this.state.isCollapsed
+    });
   }
 
   handleShare = () => {
@@ -103,13 +110,14 @@ class FrameLayout extends React.Component {
 
   render() {
     const { children, onDiscardFrame, frame } = this.props;
-    const { isFullscreen, shareId, shareHidden, editingQuery } = this.state;
+    const { isFullscreen, isCollapsed, shareId, shareHidden, editingQuery } = this.state;
 
     return (
       <li
         className={
           classnames('frame-item', {
             fullscreen: isFullscreen,
+            collapsed: isCollapsed,
             'frame-error': frame.type === FRAME_TYPE_ERROR,
             'frame-session': frame.type === FRAME_TYPE_SESSION,
             'frame-loading': frame.type === FRAME_TYPE_LOADING,
@@ -121,12 +129,14 @@ class FrameLayout extends React.Component {
         <FrameHeader
           shareId={shareId}
           onToggleFullscreen={this.handleToggleFullscreen}
+          onToggleCollapse={this.handleToggleCollapse}
           onToggleEditingQuery={this.handleToggleEditingQuery}
           onDiscardFrame={onDiscardFrame}
           onShare={this.handleShare}
           shareHidden={shareHidden}
           frame={frame}
           isFullscreen={isFullscreen}
+          isCollapsed={isCollapsed}
           saveShareURLRef={this.saveShareURLRef}
           editingQuery={editingQuery}
         />
@@ -141,7 +151,7 @@ class FrameLayout extends React.Component {
               saveCodeMirrorInstance={this.saveCodeMirrorInstance}
             /> : null}
 
-          {children}
+            {isCollapsed ? null : children}
         </div>
       </li>
     );
