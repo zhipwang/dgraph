@@ -9,6 +9,7 @@ import {
 } from 'react-router-dom';
 import thunk from 'redux-thunk';
 import reducer from "../reducers";
+import { updateFrame } from '../actions/frames';
 
 import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap/dist/css/bootstrap-theme.css";
@@ -32,12 +33,31 @@ export default class AppProvider extends React.Component {
   componentWillMount() {
     // begin periodically persisting the store
     persistStore(store, { whitelist: ["frames"] }, () => {
-      this.setState({ rehydrated: true });
+      this.setState({ rehydrated: true }, this.onRehydrated);
     });
   }
 
+  onRehydrated = () => {
+    const currentState = store.getState();
+    const frameItems = currentState.frames.items;
+
+    // If more than 5 frames, collapse all except the first one to avoid slow render
+    if (frameItems.length > 5) {
+      for (let i = 1; i < frameItems.length; i++) {
+        const targetFrame = frameItems[i];
+
+        store.dispatch(updateFrame({
+          id: targetFrame.id,
+          type: targetFrame.type,
+          data: targetFrame.data,
+          meta: Object.assign({}, targetFrame.meta, { collapsed: true })
+        }));
+      }
+    }
+  }
+
   render() {
-    const {component} = this.props;
+    const { component } = this.props;
     const { rehydrated } = this.state;
 
     if (!rehydrated) {

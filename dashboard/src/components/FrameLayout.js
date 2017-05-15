@@ -1,4 +1,5 @@
 import React from 'react';
+import { connect } from 'react-redux';
 import ReactDOM from 'react-dom';
 import screenfull from 'screenfull';
 import classnames from 'classnames';
@@ -9,6 +10,7 @@ import {
   FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING, FRAME_TYPE_SUCCESS
 } from '../lib/const';
 import { getShareId } from '../actions';
+import { updateFrame } from '../actions/frames';
 
 class FrameLayout extends React.Component {
   constructor(props) {
@@ -16,7 +18,6 @@ class FrameLayout extends React.Component {
 
     this.state = {
       isFullscreen: false,
-      isCollapsed: false,
       shareId: '',
       shareHidden: false,
       editingQuery: false,
@@ -50,12 +51,6 @@ class FrameLayout extends React.Component {
         this.setState({ isFullscreen: true });
       }
     }
-  }
-
-  handleToggleCollapse = () => {
-    this.setState({
-      isCollapsed: !this.state.isCollapsed
-    });
   }
 
   handleShare = () => {
@@ -108,9 +103,18 @@ class FrameLayout extends React.Component {
     });
   }
 
+  handleToggleCollapse = (done = () => {}) => {
+    const { changeCollapseState, frame } = this.props;
+    const nextState = !frame.meta.collapsed;
+
+    changeCollapseState(frame, nextState);
+    done();
+  }
+
   render() {
     const { children, onDiscardFrame, frame } = this.props;
-    const { isFullscreen, isCollapsed, shareId, shareHidden, editingQuery } = this.state;
+    const { isFullscreen, shareId, shareHidden, editingQuery } = this.state;
+    const isCollapsed = frame.meta && frame.meta.collapsed;
 
     return (
       <li
@@ -130,7 +134,13 @@ class FrameLayout extends React.Component {
           shareId={shareId}
           onToggleFullscreen={this.handleToggleFullscreen}
           onToggleCollapse={this.handleToggleCollapse}
-          onToggleEditingQuery={this.handleToggleEditingQuery}
+          onToggleEditingQuery={() => {
+            if (frame.meta.collapsed) {
+              this.handleToggleCollapse(this.handleToggleEditingQuery);
+            } else {
+              this.handleToggleEditingQuery();
+            }
+          }}
           onDiscardFrame={onDiscardFrame}
           onShare={this.handleShare}
           shareHidden={shareHidden}
@@ -158,4 +168,18 @@ class FrameLayout extends React.Component {
   }
 }
 
-export default FrameLayout;
+const mapStateToProps = state => ({
+});
+
+const mapDispatchToProps = dispatch => ({
+  changeCollapseState(frame, nextCollapseState) {
+    return dispatch(updateFrame({
+      id: frame.id,
+      type: frame.type,
+      data: frame.data,
+      meta: Object.assign({}, frame.meta, { collapsed: nextCollapseState }),
+    }))
+  }
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(FrameLayout);
