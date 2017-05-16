@@ -18,6 +18,7 @@ const FrameHeader = ({
           query={frame.data.query}
           onSelectQuery={onSelectQuery}
         /> : null}
+
       <div className="actions">
         <a
           href="#share"
@@ -40,20 +41,6 @@ const FrameHeader = ({
         />
 
         <a
-          href="#fullscreen-toggle"
-          className="action"
-          onClick={(e) => {
-            e.preventDefault();
-            onToggleFullscreen();
-          }}
-        >
-          {isFullscreen ?
-            <i className="fa fa-compress" /> :
-            <i className="fa fa-expand" />}
-
-        </a>
-
-        <a
           href="#expand-toggle"
           className="action"
           onClick={(e) => {
@@ -65,6 +52,20 @@ const FrameHeader = ({
             <i className="fa fa-chevron-down"></i> :
             <i className="fa fa-chevron-up"></i>
           }
+        </a>
+
+        <a
+          href="#fullscreen-toggle"
+          className="action"
+          onClick={(e) => {
+            e.preventDefault();
+            onToggleFullscreen();
+          }}
+        >
+          {isFullscreen ?
+            <i className="fa fa-compress" /> :
+            <i className="fa fa-expand" />}
+
         </a>
 
         {!isFullscreen ?

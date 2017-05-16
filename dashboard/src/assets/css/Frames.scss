@@ -92,24 +92,21 @@
 
   .header {
     border-bottom: 1px solid #d2d2d2;
-    overflow-y: auto;
     background-color: #ffffff;
     display: flex;
-    justify-content: flex-end;
+    flex-direction: row;
 
     .query-row {
+      padding-top: 6px;
+      padding-bottom: 6px;
+      position: relative;
+      padding-left: 45px;
+      cursor: pointer;
       flex: 1;
-      display: flex;
-      font-size: 14px;
-      color: #828282;
-      align-items: center;
-      padding: 0 16px;
+      min-width: 0;
+      padding-right: 10px;
 
-      &:not(.editing) {
-        cursor: pointer;
-      }
-
-      &:not(.editing):hover {
+      &:hover {
         background: #fbffff;
       }
     }
@@ -121,13 +118,25 @@
     }
 
     .query-prompt {
-      margin-right: 8px;
-      color: black;
+      position: absolute;
+      left: 15px;
+      top: 12px;
+      font-size: 14px;
+      color: #8e8e8e;
     }
 
     .preview {
       font-weight: 500;
       font-size: 17px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+      display: block;
+    }
+
+    .actions {
+      width: 134px;
+      text-align: right;
     }
   }
 
@@ -135,6 +144,7 @@
     height: 100%;
     border: 0;
     width: 0;
+    padding: 0;
     transition: all 320ms ease-in;
 
     &.shared {

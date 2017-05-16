@@ -1,12 +1,11 @@
 import React from 'react';
-import classnames from 'classnames';
 
 import { collapseQuery } from '../containers/Helpers';
 
 const QueryPreview = ({ query, onSelectQuery }) => {
   return (
     <div
-      className={classnames('query-row')}
+      className="query-row"
       onClick={(e) => {
         e.preventDefault();
         onSelectQuery(query);
@@ -16,9 +15,7 @@ const QueryPreview = ({ query, onSelectQuery }) => {
         document.querySelector('.main-content').scrollTop = 0;
       }}
     >
-      <div>
-        <i className="fa fa-search query-prompt" /> <span className="preview">{collapseQuery(query)}</span>
-      </div>
+      <i className="fa fa-search query-prompt" /> <span className="preview">{collapseQuery(query)}</span>
     </div>
   );
 };
