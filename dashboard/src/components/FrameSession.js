@@ -2,7 +2,7 @@ import React from 'react';
 import classnames from 'classnames';
 
 import SessionGraphTab from './SessionGraphTab';
-import SessionJSONTab from './SessionJSONTab';
+import SessionCodeTab from './SessionCodeTab';
 import SessionTreeTab from './SessionTreeTab';
 import SessionFooter from './SessionFooter';
 import GraphIcon from './GraphIcon';
@@ -123,14 +123,14 @@ class FrameSession extends React.Component {
               <li>
                 <a
                   href="#tree"
-                  className={classnames('sidebar-nav-item', { active: currentTab === 'json' })}
-                  onClick={this.navigateTab.bind(this, 'json')}
+                  className={classnames('sidebar-nav-item', { active: currentTab === 'code' })}
+                  onClick={this.navigateTab.bind(this, 'code')}
                 >
                   <div className="icon-container">
                     <i className="icon fa fa-code" />
                   </div>
 
-                  <span className="menu-label">JSON</span>
+                  <span className="menu-label">Code</span>
 
                 </a>
               </li>
@@ -159,8 +159,8 @@ class FrameSession extends React.Component {
                  selectedNode={selectedNode}
                /> : null}
 
-             {currentTab === 'json' ?
-               <SessionJSONTab
+             {currentTab === 'code' ?
+               <SessionCodeTab
                  session={session}
                /> : null}
           </div>

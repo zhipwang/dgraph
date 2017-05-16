@@ -37,16 +37,18 @@
     color: #d4d4d4;
     transition: color 0.2s ease-out;
 
-
-    &:hover {
-      background: #f7f7f7;
-      color: gray;
+    &.actionable {
+      color: #333333;
+      transition: color 0.2s ease-in;
     }
-  }
 
-  #run-btn.dirty {
-    color: gray;
-    transition: color 0.2s ease-in;
+    &:not(.actionable) {
+      cursor: default;
+    }
+
+    &.actionable:hover {
+      background: #f7f7f7;
+    }
   }
 }
 

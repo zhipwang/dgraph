@@ -1,5 +1,4 @@
 import React from 'react';
-import classnames from 'classnames';
 
 import GraphContainer from "../containers/GraphContainer";
 
@@ -7,7 +6,7 @@ const SessionTreeTab = ({
   session, active, onBeforeTreeRender, onTreeRendered, onNodeSelected,
   onNodeHovered, selectedNode }) => {
   return (
-    <div className={classnames('content-container')}>
+    <div className="content-container">
       <GraphContainer
         response={session.response}
         onBeforeRender={onBeforeTreeRender}

@@ -7,7 +7,7 @@ import '../assets/css/EditorPanel.css';
 
 class EditorPanel extends React.Component {
   render() {
-    const { isQueryDirty, query, onRunQuery, onUpdateQuery } = this.props;
+    const { isQueryDirty, query, onRunQuery, onUpdateQuery, onClearQuery, saveCodeMirrorInstance } = this.props;
 
     return (
       <div className="editor-panel">
@@ -18,14 +18,31 @@ class EditorPanel extends React.Component {
           <div className="actions">
             <a
               href="#"
-              className="action"
+              className={classnames('action clear-btn', { actionable: isQueryDirty })}
               onClick={(e) => {
                 e.preventDefault();
+                if (query === '') {
+                  return;
+                }
+
+                onClearQuery();
+              }}
+            >
+              <i className="fa fa-close" />
+            </a>
+            <a
+              href="#"
+              className={classnames('action run-btn', { actionable: isQueryDirty })}
+              onClick={(e) => {
+                e.preventDefault();
+                if (query === '') {
+                  return;
+                }
 
                 onRunQuery(query);
               }}
             >
-              <i className={classnames('fa fa-play', { dirty: isQueryDirty })} id="run-btn" />
+              <i className="fa fa-play"/>
             </a>
           </div>
         </div>
@@ -34,6 +51,7 @@ class EditorPanel extends React.Component {
           onUpdateQuery={onUpdateQuery}
           onRunQuery={onRunQuery}
           query={query}
+          saveCodeMirrorInstance={saveCodeMirrorInstance}
         />
       </div>
     );

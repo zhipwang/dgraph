@@ -5,7 +5,6 @@ import screenfull from 'screenfull';
 import classnames from 'classnames';
 
 import FrameHeader from './FrameHeader';
-import FrameQueryEditor from '../containers/FrameQueryEditorContainer';
 import {
   FRAME_TYPE_SESSION, FRAME_TYPE_ERROR, FRAME_TYPE_LOADING, FRAME_TYPE_SUCCESS
 } from '../lib/const';
@@ -84,13 +83,6 @@ class FrameLayout extends React.Component {
   // property of this component
   saveShareURLRef = (el) => {
     this.shareURLEl = el;
-  }
-
-  // saveCodeMirrorInstance saves the codemirror instance initialized in the
-  // <Editor /> component so that we can access it in this component. (e.g. to
-  // focus)
-  saveCodeMirrorInstance = (cm) => {
-    this.queryEditor = cm;
   }
 
   handleToggleEditingQuery = () => {

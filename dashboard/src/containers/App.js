@@ -37,12 +37,37 @@ class App extends React.Component {
         eraseCookie('playQuery', { crossDomain: true });
       });
     }
-  };
+  }
 
-  handleUpdateQuery = (val) => {
+  // saveCodeMirrorInstance saves the codemirror instance initialized in the
+  // <Editor /> component so that we can access it in this component. (e.g. to
+  // focus)
+  saveCodeMirrorInstance = (codemirror) => {
+    this._codemirror = codemirror;
+  }
+
+  handleUpdateQuery = (val, done = () => {}) => {
     const isQueryDirty = val.trim() !== '';
 
-    this.setState({ query: val, isQueryDirty });
+    this.setState({ query: val, isQueryDirty }, done);
+  }
+
+  // focusCodemirror sets focus on codemirror and moves the cursor to the end
+  focusCodemirror = () => {
+    const cm = this._codemirror;
+    const lastlineNumber = cm.doc.lastLine();
+    const lastCharPos = cm.doc.getLine(lastlineNumber).length;
+
+    cm.focus();
+    cm.setCursor({ line: lastlineNumber, ch: lastCharPos });
+  }
+
+  handleSelectQuery = (val) => {
+    this.handleUpdateQuery(val, this.focusCodemirror);
+  }
+
+  handleClearQuery = () => {
+    this.handleUpdateQuery('', this.focusCodemirror);
   }
 
   handleRunQuery = (query) => {
@@ -58,7 +83,7 @@ class App extends React.Component {
 
     handleRunSharedQuery(shareId).catch(e => {
       console.log(e);
-    })
+    });
   }
 
   render = () => {
@@ -77,6 +102,8 @@ class App extends React.Component {
                   isQueryDirty={isQueryDirty}
                   onRunQuery={this.handleRunQuery}
                   onUpdateQuery={this.handleUpdateQuery}
+                  onClearQuery={this.handleClearQuery}
+                  saveCodeMirrorInstance={this.saveCodeMirrorInstance}
                 />
               </div>
 
@@ -84,7 +111,7 @@ class App extends React.Component {
                 <FrameList
                   frames={frames}
                   onDiscardFrame={handleDiscardFrame}
-                  onSelectQuery={this.handleUpdateQuery}
+                  onSelectQuery={this.handleSelectQuery}
                 />
               </div>
             </div>
