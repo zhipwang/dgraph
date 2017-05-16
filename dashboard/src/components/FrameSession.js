@@ -2,7 +2,7 @@ import React from 'react';
 import classnames from 'classnames';
 
 import SessionGraphTab from './SessionGraphTab';
-import SessionCodeTab from './SessionCodeTab';
+import FrameCodeTab from './FrameCodeTab';
 import SessionTreeTab from './SessionTreeTab';
 import SessionFooter from './SessionFooter';
 import GraphIcon from './GraphIcon';
@@ -160,8 +160,9 @@ class FrameSession extends React.Component {
                /> : null}
 
              {currentTab === 'code' ?
-               <SessionCodeTab
-                 session={session}
+               <FrameCodeTab
+                 query={session.query}
+                 response={session.response.data}
                /> : null}
           </div>
         </div>

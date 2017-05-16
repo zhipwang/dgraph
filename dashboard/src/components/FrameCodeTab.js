@@ -2,7 +2,7 @@ import React from 'react';
 
 import Highlight from './Highlight';
 
-const SessionCodeTab = ({ session, active }) => {
+const FrameCodeTab = ({ query, response }) => {
   return (
     <div className="content-container">
       <div className="code-container">
@@ -12,7 +12,7 @@ const SessionCodeTab = ({ session, active }) => {
           </span>
         </div>
         <Highlight preClass="content">
-          {session.query}
+          {query}
         </Highlight>
       </div>
 
@@ -23,10 +23,10 @@ const SessionCodeTab = ({ session, active }) => {
           </span>
         </div>
         <Highlight preClass="content">
-          {JSON.stringify(session.response.data, null, 2)}
+          {JSON.stringify(response, null, 2)}
         </Highlight>
       </div>
     </div>
   );
 };
-export default SessionCodeTab;
+export default FrameCodeTab;

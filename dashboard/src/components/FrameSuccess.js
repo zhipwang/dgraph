@@ -1,7 +1,7 @@
 import React from 'react';
 import classnames from 'classnames';
 
-import FrameQueryTab from './FrameQueryTab';
+import FrameCodeTab from './FrameCodeTab';
 import FrameMessageTab from './FrameMessageTab';
 
 class FrameSuccess extends React.Component {
@@ -52,7 +52,7 @@ class FrameSuccess extends React.Component {
                     <i className="icon fa fa-code" />
                   </div>
 
-                  <span className="menu-label">Response</span>
+                  <span className="menu-label">Code</span>
 
                 </a>
               </li>
@@ -63,7 +63,10 @@ class FrameSuccess extends React.Component {
             {currentTab === 'message' ?
               <FrameMessageTab message={data.message} /> :null}
             {currentTab === 'response' ?
-              <FrameQueryTab query={data.response} /> :null}
+              <FrameCodeTab
+                query={data.query}
+                response={data.response}
+              /> :null}
           </div>
         </div>
       </div>

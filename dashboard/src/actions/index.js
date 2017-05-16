@@ -13,7 +13,7 @@ import {
 } from '../lib/const';
 
 import { receiveFrame, updateFrame } from './frames';
-import { refreshConnectedState } from './connection';
+import { updateConnectedState } from './connection';
 
 // executeQueryAndUpdateFrame fetches the query response from the server
 // and updates the frame
@@ -35,6 +35,8 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
     .then(checkStatus)
     .then(response => response.json())
     .then((result) => {
+      dispatch(updateConnectedState(true));
+
       if (result.code !== undefined && result.message !== undefined) {
         // This is the case in which user sends a mutation.
         // We display the response from server.
@@ -51,7 +53,7 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
           data: {
             query,
             message: result.message,
-            response: JSON.stringify(result)
+            response: result
           }
         }));
       } else if (isNotEmpty(result)) {
@@ -83,7 +85,7 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
           data: {
             query,
             message: 'Your query did not return any results',
-            response: JSON.stringify(result)
+            response: result
           }
         }));
       }
@@ -93,14 +95,14 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
 
       // if no response, it's a network error
       if (!error.response) {
-        dispatch(refreshConnectedState());
+        dispatch(updateConnectedState(false));
         dispatch(updateFrame({
           id: frameId,
           type: FRAME_TYPE_ERROR,
           data: {
             query,
             message: `${error.message}: Could not connect to the server`,
-            response: JSON.stringify(error)
+            response: error
           }
         }));
       } else {
@@ -111,7 +113,7 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             data: {
               query,
               message: text,
-              response: JSON.stringify(error)
+              response: error
             }
           }));
         });

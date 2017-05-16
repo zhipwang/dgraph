@@ -1,7 +1,7 @@
 import React from 'react';
 import classnames from 'classnames';
 
-import FrameQueryTab from './FrameQueryTab';
+import FrameCodeTab from './FrameCodeTab';
 import FrameMessageTab from './FrameMessageTab';
 
 class FrameError extends React.Component {
@@ -23,7 +23,7 @@ class FrameError extends React.Component {
   }
 
   render() {
-    const { data: { message, response } } = this.props;
+    const { data: { message, response, query } } = this.props;
     const { currentTab } = this.state;
 
     return (
@@ -54,7 +54,7 @@ class FrameError extends React.Component {
                     <i className="icon fa fa-code" />
                   </div>
 
-                  <span className="menu-label">Response</span>
+                  <span className="menu-label">Code</span>
 
                 </a>
               </li>
@@ -65,7 +65,10 @@ class FrameError extends React.Component {
             {currentTab === 'error' ?
               <FrameMessageTab message={message} /> :null}
             {currentTab === 'response' ?
-              <FrameQueryTab query={response} /> :null}
+              <FrameCodeTab
+                query={query}
+                response={response}
+              /> :null}
           </div>
         </div>
 
