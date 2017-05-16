@@ -13,6 +13,7 @@ import {
 } from '../lib/const';
 
 import { receiveFrame, updateFrame } from './frames';
+import { refreshConnectedState } from './connection';
 
 // executeQueryAndUpdateFrame fetches the query response from the server
 // and updates the frame
@@ -24,6 +25,7 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
     fetch(endpoint, {
       method: "POST",
       mode: "cors",
+      cache: "no-cache",
       headers: {
         "Content-Type": "text/plain"
       },
@@ -87,18 +89,34 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
       }
     })
     .catch((error) => {
-      error.response.text().then(text => {
+      // FIXME: make it DRY. but error.response.text() is async and error.message is sync
+
+      // if no response, it's a network error
+      if (!error.response) {
+        dispatch(refreshConnectedState());
         dispatch(updateFrame({
           id: frameId,
           type: FRAME_TYPE_ERROR,
           data: {
             query,
-            message: text,
+            message: `${error.message}: Could not connect to the server`,
             response: JSON.stringify(error)
           }
         }));
-      })
-    })
+      } else {
+        error.response.text().then(text => {
+          dispatch(updateFrame({
+            id: frameId,
+            type: FRAME_TYPE_ERROR,
+            data: {
+              query,
+              message: text,
+              response: JSON.stringify(error)
+            }
+          }));
+        });
+      }
+    });
 }
 
 /**
