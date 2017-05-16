@@ -7,13 +7,21 @@ import '../assets/css/EditorPanel.css';
 
 class EditorPanel extends React.Component {
   render() {
-    const { isQueryDirty, query, onRunQuery, onUpdateQuery, onClearQuery, saveCodeMirrorInstance } = this.props;
+    const {
+      isQueryDirty, query, onRunQuery, onUpdateQuery, onClearQuery,
+      saveCodeMirrorInstance, connected
+    } = this.props;
 
     return (
       <div className="editor-panel">
         <div className="header">
-          <div className="status">
-            <i className="fa fa-circle icon" /> <span className="text">Connected</span>
+          <div
+            className={
+              classnames('status', { connected, 'not-connected': !connected })
+            }
+          >
+            <i className="fa fa-circle status-icon" />
+          <span className="status-text">{ connected ? 'Connected' : 'Not connected' }</span>
           </div>
           <div className="actions">
             <a

@@ -1,11 +1,11 @@
 import { combineReducers } from "redux";
 
-import scratchpad from "./scratchpad";
 import frames from "./frames";
+import connection from "./connection";
 
 const rootReducer = combineReducers({
-    scratchpad,
-    frames
+  frames,
+  connection
 });
 
 export default rootReducer;

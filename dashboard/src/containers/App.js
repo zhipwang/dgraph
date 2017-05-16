@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import EditorPanel from '../components/EditorPanel';
 import FrameList from '../components/FrameList';
 import { runQuery, runQueryByShareId } from "../actions";
+import { refreshConnectedState } from "../actions/connection";
 import { discardFrame } from '../actions/frames';
 import { readCookie, eraseCookie } from './Helpers';
 
@@ -21,7 +22,9 @@ class App extends React.Component {
   }
 
   componentDidMount = () => {
-    const { handleRunQuery, match } = this.props;
+    const { handleRunQuery, _refreshConnectedState, match } = this.props;
+
+    _refreshConnectedState();
 
     const { shareId } = match.params;
     if (shareId) {
@@ -88,7 +91,7 @@ class App extends React.Component {
 
   render = () => {
     const { query, isQueryDirty } = this.state;
-    const { handleDiscardFrame, frames } = this.props;
+    const { handleDiscardFrame, frames, connected } = this.props;
 
     return (
       <div className="app-layout">
@@ -104,6 +107,7 @@ class App extends React.Component {
                   onUpdateQuery={this.handleUpdateQuery}
                   onClearQuery={this.handleClearQuery}
                   saveCodeMirrorInstance={this.saveCodeMirrorInstance}
+                  connected={connected}
                 />
               </div>
 
@@ -123,13 +127,17 @@ class App extends React.Component {
 }
 
 const mapStateToProps = state => ({
-  frames: state.frames.items
+  frames: state.frames.items,
+  connected: state.connection.connected
 });
 
 const mapDispatchToProps = dispatch => ({
   _handleRunQuery(query, done = () => {}) {
     return dispatch(runQuery(query))
       .then(done);
+  },
+  _refreshConnectedState() {
+    dispatch(refreshConnectedState());
   },
   handleRunSharedQuery(shareId) {
     return dispatch(runQueryByShareId(shareId));
