@@ -23,11 +23,35 @@ class FrameLayout extends React.Component {
     };
   }
 
+  componentDidMount() {
+    // Sync fullscreen exit in case exited by ESC.
+    // IDEA: This is not efficient as there will be as many event listeners as
+    // there are frames.
+    document.addEventListener(screenfull.raw.fullscreenchange, this.syncFullscreenExit);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener(screenfull.raw.fullscreenchange, this.syncFullscreenExit);
+  }
+
   componentDidUpdate(prevProps, prevState) {
     // If shareId was fetched, select the share url input
     if (prevState.shareId !== this.state.shareId && this.state.shareId !== '') {
       const shareUrlEl = ReactDOM.findDOMNode(this.shareURLEl);
       shareUrlEl.select();
+    }
+  }
+
+  /**
+   * sycnFullscreenExit checks if fullscreen, and updates the state to false if not.
+   * used as a callback to fullscreen change event. Needed becasue a user might
+   * exit fullscreen by pressing ESC.
+   */
+  syncFullscreenExit = () => {
+    const isFullscreen = screenfull.isFullscreen;
+
+    if (!isFullscreen) {
+      this.setState({ isFullscreen: false });
     }
   }
 
