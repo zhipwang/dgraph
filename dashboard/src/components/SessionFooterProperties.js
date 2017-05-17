@@ -32,12 +32,26 @@ class SessionFooterProperties extends React.Component {
     return propertiesEl.clientWidth < propertiesEl.scrollWidth;
   };
 
-  componentDidMount() {
+  refreshCanExpand = () => {
+    if (this.state.isExpanded) {
+      return;
+    }
+
     const canExpand = this.isEllipsisActive();
 
-    if (canExpand) {
+    if (!this.state.canExpand && canExpand) {
       this.setState({ canExpand: true });
+    } else if (this.state.canExpand && !canExpand) {
+      this.setState({ canExpand: false });
     }
+  };
+
+  componentDidMount() {
+    this.refreshCanExpand();
+  }
+
+  componentDidUpdate() {
+    this.refreshCanExpand();
   }
 
   render() {
