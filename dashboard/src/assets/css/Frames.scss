@@ -43,23 +43,24 @@
   flex-direction: column;
 
   .body-container {
-    transition: height 200ms ease-in;
+    transition: height, min-height 200ms ease-in;
   }
 
   &.frame-session .body-container {
-    height: 650px;
+    min-height: 650px;
   }
   &.frame-error .body-container {
-    height: 355px;
+    min-height: 355px;
   }
   &.frame-loading .body-container {
-    height: 355px;
+    min-height: 355px;
   }
   &.frame-system .body-container {
-    height: 355px;
+    min-height: 355px;
   }
   &.collapsed .body-container {
     height: 0;
+    min-height: inherit;
   }
 
   .loading-container {
