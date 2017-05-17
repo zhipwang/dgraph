@@ -1,10 +1,18 @@
-import React from 'react';
+import React from "react";
 
 import GraphContainer from "../containers/GraphContainer";
 
 const SessionGraphTab = ({
-  session, active, onBeforeGraphRender, onGraphRendered, onNodeSelected,
-  onNodeHovered, selectedNode, hoveredNode
+  session,
+  active,
+  onBeforeGraphRender,
+  onGraphRendered,
+  onNodeSelected,
+  onNodeHovered,
+  selectedNode,
+  hoveredNode,
+  nodesDataset,
+  edgesDataset
 }) => {
   return (
     <div className="content-container">
@@ -16,6 +24,8 @@ const SessionGraphTab = ({
         onNodeHovered={onNodeHovered}
         selectedNode={selectedNode}
         hoveredNode={hoveredNode}
+        nodesDataset={nodesDataset}
+        edgesDataset={edgesDataset}
       />
     </div>
   );

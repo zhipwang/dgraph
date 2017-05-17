@@ -1,24 +1,27 @@
 import SHA256 from "crypto-js/sha256";
 
 import {
-    timeout,
-    checkStatus,
-    isNotEmpty,
-    processGraph,
-    getEndpoint,
-    makeFrame
+  timeout,
+  checkStatus,
+  isNotEmpty,
+  getEndpoint,
+  makeFrame
 } from "../containers/Helpers";
 import {
-  FRAME_TYPE_SESSION, FRAME_TYPE_SUCCESS, FRAME_TYPE_LOADING, FRAME_TYPE_ERROR
-} from '../lib/const';
+  FRAME_TYPE_SESSION,
+  FRAME_TYPE_SUCCESS,
+  FRAME_TYPE_LOADING,
+  FRAME_TYPE_ERROR
+} from "../lib/const";
+import { processGraph } from "../lib/graph";
 
-import { receiveFrame, updateFrame } from './frames';
-import { updateConnectedState } from './connection';
+import { receiveFrame, updateFrame } from "./frames";
+import { updateConnectedState } from "./connection";
 
 // executeQueryAndUpdateFrame fetches the query response from the server
 // and updates the frame
 function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
-  const endpoint = getEndpoint('query', { debug: true });
+  const endpoint = getEndpoint("query", { debug: true });
 
   return timeout(
     60000,
@@ -34,7 +37,7 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
   )
     .then(checkStatus)
     .then(response => response.json())
-    .then((result) => {
+    .then(result => {
       dispatch(updateConnectedState(true));
 
       if (result.code !== undefined && result.message !== undefined) {
@@ -47,75 +50,88 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
           frameType = FRAME_TYPE_SUCCESS;
         }
 
-        dispatch(updateFrame({
-          id: frameId,
-          type: frameType,
-          data: {
-            query,
-            message: result.message,
-            response: result
-          }
-        }));
-      } else if (isNotEmpty(result)) {
-        const { nodes, edges, labels, nodesIndex, edgesIndex } =
-          processGraph(result, false, query, '');
-
-        dispatch(updateFrame({
-          id: frameId,
-          type: FRAME_TYPE_SESSION,
-          data: {
-            query,
-            response: {
-              plotAxis: labels,
-              allNodes: nodes,
-              allEdges: edges,
-              numNodes: nodes.length,
-              numEdges: edges.length,
-              nodes: nodes.slice(0, nodesIndex),
-              edges: edges.slice(0, edgesIndex),
-              treeView: false,
-              data: result
+        dispatch(
+          updateFrame({
+            id: frameId,
+            type: frameType,
+            data: {
+              query,
+              message: result.message,
+              response: result
             }
-          }
-        }));
+          })
+        );
+      } else if (isNotEmpty(result)) {
+        const { nodes, edges, labels, nodesIndex, edgesIndex } = processGraph(
+          result,
+          false,
+          query
+        );
+
+        dispatch(
+          updateFrame({
+            id: frameId,
+            type: FRAME_TYPE_SESSION,
+            data: {
+              query,
+              response: {
+                plotAxis: labels,
+                allNodes: nodes,
+                allEdges: edges,
+                numNodes: nodes.length,
+                numEdges: edges.length,
+                nodes: nodes.slice(0, nodesIndex),
+                edges: edges.slice(0, edgesIndex),
+                treeView: false,
+                data: result
+              }
+            }
+          })
+        );
       } else {
-        dispatch(updateFrame({
-          id: frameId,
-          type: FRAME_TYPE_SUCCESS,
-          data: {
-            query,
-            message: 'Your query did not return any results',
-            response: result
-          }
-        }));
+        dispatch(
+          updateFrame({
+            id: frameId,
+            type: FRAME_TYPE_SUCCESS,
+            data: {
+              query,
+              message: "Your query did not return any results",
+              response: result
+            }
+          })
+        );
       }
     })
-    .catch((error) => {
+    .catch(error => {
       // FIXME: make it DRY. but error.response.text() is async and error.message is sync
 
       // if no response, it's a network error
       if (!error.response) {
         dispatch(updateConnectedState(false));
-        dispatch(updateFrame({
-          id: frameId,
-          type: FRAME_TYPE_ERROR,
-          data: {
-            query,
-            message: `${error.message}: Could not connect to the server`,
-            response: error
-          }
-        }));
-      } else {
-        error.response.text().then(text => {
-          dispatch(updateFrame({
+        dispatch(
+          updateFrame({
             id: frameId,
             type: FRAME_TYPE_ERROR,
             data: {
               query,
-              message: text,
+              message: `${error.message}: Could not connect to the server`,
               response: error
             }
-          }));
+          })
+        );
+      } else {
+        error.response.text().then(text => {
+          dispatch(
+            updateFrame({
+              id: frameId,
+              type: FRAME_TYPE_ERROR,
+              data: {
+                query,
+                message: text,
+                response: error
+              }
+            })
+          );
         });
       }
     });
@@ -135,11 +151,13 @@ export const runQuery = (query, frameId) => {
     // Either insert a new frame or update
     let targetFrameId;
     if (frameId) {
-      dispatch(updateFrame({
-        id: frameId,
-        type: FRAME_TYPE_LOADING,
-        data: {}
-      }));
+      dispatch(
+        updateFrame({
+          id: frameId,
+          type: FRAME_TYPE_LOADING,
+          data: {}
+        })
+      );
       targetFrameId = frameId;
     } else {
       const frame = makeFrame({
@@ -158,19 +176,19 @@ export const runQuery = (query, frameId) => {
 };
 
 export const addScratchpadEntry = entry => ({
-    type: "ADD_SCRATCHPAD_ENTRY",
-    ...entry
+  type: "ADD_SCRATCHPAD_ENTRY",
+  ...entry
 });
 
 export const deleteScratchpadEntries = () => ({
-    type: "DELETE_SCRATCHPAD_ENTRIES"
+  type: "DELETE_SCRATCHPAD_ENTRIES"
 });
 
 // createShare persists the queryText in the database
-const createShare = (queryText) => {
+const createShare = queryText => {
   const stringifiedQuery = encodeURI(queryText);
 
-  return fetch(getEndpoint('share'), {
+  return fetch(getEndpoint("share"), {
     method: "POST",
     mode: "cors",
     headers: {
@@ -181,11 +199,11 @@ const createShare = (queryText) => {
   })
     .then(checkStatus)
     .then(response => response.json())
-    .then((result) => {
+    .then(result => {
       if (result.uids && result.uids.share) {
         return result.uids.share;
       }
-    })
+    });
 };
 
 /**
@@ -195,7 +213,7 @@ const createShare = (queryText) => {
  * @params queryText {String} - A raw query text as entered by the user
  * @returns {Promise}
  */
-export const getShareId = (queryText) => {
+export const getShareId = queryText => {
   const encodedQuery = encodeURI(queryText);
   const queryHash = SHA256(encodedQuery).toString();
   const checkQuery = `
@@ -208,7 +226,7 @@ export const getShareId = (queryText) => {
 
   return timeout(
     6000,
-    fetch(getEndpoint('query'), {
+    fetch(getEndpoint("query"), {
       method: "POST",
       mode: "cors",
       headers: {
@@ -219,7 +237,7 @@ export const getShareId = (queryText) => {
     })
       .then(checkStatus)
       .then(response => response.json())
-      .then((result) => {
+      .then(result => {
         const matchingQueries = result.query;
 
         // If no match, store the query
@@ -254,7 +272,7 @@ export const getShareId = (queryText) => {
 export const getSharedQuery = shareId => {
   return timeout(
     6000,
-    fetch(getEndpoint('query'), {
+    fetch(getEndpoint("query"), {
       method: "POST",
       mode: "cors",
       headers: {
@@ -274,17 +292,19 @@ export const getSharedQuery = shareId => {
         const query = decodeURI(result.query[0]._share_);
         return query;
       } else {
-        return '';
+        return "";
       }
     })
     .catch(function(error) {
-      console.log(`Got error while getting query for id: ${shareId}, err: ${error.message}`);
+      console.log(
+        `Got error while getting query for id: ${shareId}, err: ${error.message}`
+      );
     });
-}
+};
 
 // runQueryByShareId runs the query by the given shareId and displays the frame
 export const runQueryByShareId = shareId => {
-  return (dispatch) => {
+  return dispatch => {
     const frame = makeFrame({
       type: FRAME_TYPE_LOADING,
       data: {}
@@ -294,29 +314,36 @@ export const runQueryByShareId = shareId => {
     return getSharedQuery(shareId)
       .then(query => {
         if (!query) {
-          return dispatch(updateFrame({
+          return dispatch(
+            updateFrame({
+              id: frame.id,
+              type: FRAME_TYPE_ERROR,
+              data: {
+                query: "", // TOOD: make query optional
+                message: `No query found for the shareId: ${shareId}`,
+                response: JSON.stringify("{}") // TOOD: make response optional
+              }
+            })
+          );
+        }
+
+        return executeQueryAndUpdateFrame(dispatch, {
+          query,
+          frameId: frame.id
+        });
+      })
+      .catch(error => {
+        return dispatch(
+          updateFrame({
             id: frame.id,
             type: FRAME_TYPE_ERROR,
             data: {
-              query: '', // TOOD: make query optional
-              message: `No query found for the shareId: ${shareId}`,
-              response: JSON.stringify('{}') // TOOD: make response optional
+              query: "",
+              message: error.message,
+              response: JSON.stringify(error)
             }
-          }));
-        }
-
-        return executeQueryAndUpdateFrame(dispatch, { query, frameId: frame.id });
-      })
-      .catch(error => {
-        return dispatch(updateFrame({
-          id: frame.id,
-          type: FRAME_TYPE_ERROR,
-          data: {
-            query: '',
-            message: error.message,
-            response: JSON.stringify(error)
-          }
-        }));
+          })
+        );
       });
-  }
-}
+  };
+};

@@ -5,9 +5,10 @@ import React, { Component } from "react";
 function getTextColor(bgColor) {
   var nThreshold = 105;
   var components = getRGBComponents(bgColor);
-  var bgDelta = (components.R * 0.299) + (components.G * 0.587) + (components.B * 0.114);
+  var bgDelta =
+    components.R * 0.299 + components.G * 0.587 + components.B * 0.114;
 
-  return ((255 - bgDelta) < nThreshold) ? "#000000" : "#ffffff";
+  return 255 - bgDelta < nThreshold ? "#000000" : "#ffffff";
 }
 
 function getRGBComponents(color) {
@@ -22,20 +23,41 @@ function getRGBComponents(color) {
   };
 }
 
-
 class Label extends Component {
   render() {
     return (
       <div
-        className="plot-label"
+        className="label-container"
         style={{
           backgroundColor: this.props.color,
           color: getTextColor(this.props.color)
         }}
       >
-        {this.props.pred} <span className="shorthand">({this.props.label})</span>
+        <span className="label-value">{this.props.pred}</span>
+        <span className="shorthand">({this.props.label})</span>
       </div>
     );
+
+    // const { onInitNodeTypeConfig } = this.props;
+    //
+    // return (
+    //   <a
+    //     href="#init-config"
+    //     className="label-container"
+    //     style={{
+    //       backgroundColor: this.props.color,
+    //       color: getTextColor(this.props.color)
+    //     }}
+    //     onClick={e => {
+    //       e.preventDefault();
+    //
+    //       onInitNodeTypeConfig(this.props.pred);
+    //     }}
+    //   >
+    //     <span className="label-value">{this.props.pred}</span>
+    //     <span className="shorthand">({this.props.label})</span>
+    //   </a>
+    // );
   }
 }
 

@@ -2,10 +2,7 @@ import React from "react";
 
 import SessionFooterResult from "./SessionFooterResult";
 import SessionFooterProperties from "./SessionFooterProperties";
-
-const SessionFooterDisplayConfig = () => {
-  return <div>SessionFooterDisplayConfig</div>;
-};
+import SessionFooterConfig from "./SessionFooterConfig";
 
 const SessionFooter = ({
   session,
@@ -13,13 +10,15 @@ const SessionFooter = ({
   graphRenderTime,
   treeRenderTime,
   hoveredNode,
-  selectedNode
+  selectedNode,
+  configuringNodeType,
+  isConfiguringLabel
 }) => {
   let child;
-  if (selectedNode) {
-    child = <SessionFooterProperties entity={selectedNode} />;
-  } else if (hoveredNode) {
-    child = <SessionFooterProperties entity={hoveredNode} />;
+  if (isConfiguringLabel) {
+    child = <SessionFooterConfig />;
+  } else if (selectedNode || hoveredNode) {
+    child = <SessionFooterProperties entity={selectedNode || hoveredNode} />;
   } else {
     child = (
       <SessionFooterResult
