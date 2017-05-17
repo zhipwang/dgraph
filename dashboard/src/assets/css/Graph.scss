@@ -168,35 +168,10 @@
 }
 
 .properties {
-  background: white;
-  padding: 9px 8px;
-  border-top: 1px solid #d2d2d2;
+  // background: white;
+  // padding: 9px 8px;
+  // border-top: 1px solid #d2d2d2;
 }
-
-// START: CSS Transition of items
-.properties-enter {
-  opacity: 0.01;
-  max-height: 0;
-}
-.properties-enter.properties-enter-active {
-  opacity: 1;
-  max-height: 2300px;
-  transition-property: max-height, opacity;
-  transition-duration: 180ms;
-  transition-timing-function: cubic-bezier(0.175, 0.665, 0.320, 1), linear;
-}
-.properties-leave {
-  opacity: 1;
-  max-height: 2300px;
-  transition-property: max-height, opacity;
-  transition-duration: 180ms;
-  transition-timing-function: cubic-bezier(0.175, 0.665, 0.320, 1), linear;
-}
-.properties-leave.properties-leave-active {
-  opacity: 0.01;
-  max-height: 0;
-}
-// END: CSS Transition of items
 
 .plot-label {
   display: inline-block;

@@ -145,8 +145,6 @@ class FrameSession extends React.Component {
                  onGraphRendered={this.handleGraphRendered}
                  onNodeSelected={this.handleNodeSelected}
                  onNodeHovered={this.handleNodeHovered}
-                 selectedNode={selectedNode}
-                 hoveredNode={hoveredNode}
                /> : null}
 
              {currentTab === 'tree' ?
@@ -164,17 +162,17 @@ class FrameSession extends React.Component {
                  query={session.query}
                  response={session.response.data}
                /> : null}
+
+             <SessionFooter
+               session={session}
+               currentTab={currentTab}
+               selectedNode={selectedNode}
+               hoveredNode={hoveredNode}
+               graphRenderTime={this.getGraphRenderTime()}
+               treeRenderTime={this.getTreeRenderTime()}
+             />
           </div>
         </div>
-
-        <SessionFooter
-          session={session}
-          currentTab={currentTab}
-          selectedNode={selectedNode}
-          hoveredNode={hoveredNode}
-          graphRenderTime={this.getGraphRenderTime()}
-          treeRenderTime={this.getTreeRenderTime()}
-        />
       </div>
     );
   }

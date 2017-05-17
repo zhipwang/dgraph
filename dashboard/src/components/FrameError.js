@@ -69,11 +69,11 @@ class FrameError extends React.Component {
                 query={query}
                 response={response}
               /> :null}
-          </div>
-        </div>
 
-        <div className="footer error-footer">
-          <i className="fa fa-warning error-mark" /> <span className="result-message">Error occurred</span>
+            <div className="footer error-footer">
+              <i className="fa fa-warning error-mark" /> <span className="result-message">Error occurred</span>
+            </div>
+          </div>
         </div>
       </div>
     );

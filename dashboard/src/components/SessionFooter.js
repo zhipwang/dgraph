@@ -1,36 +1,39 @@
-import React from 'react';
-import pluralize from 'pluralize';
+import React from "react";
 
-import { humanizeTime } from '../containers/Helpers';
+import SessionFooterResult from "./SessionFooterResult";
+import SessionFooterProperties from "./SessionFooterProperties";
+
+const SessionFooterDisplayConfig = () => {
+  return <div>SessionFooterDisplayConfig</div>;
+};
 
 const SessionFooter = ({
-  session, currentTab, graphRenderTime, treeRenderTime
+  session,
+  currentTab,
+  graphRenderTime,
+  treeRenderTime,
+  hoveredNode,
+  selectedNode
 }) => {
-
-  let currentAction;
-  if (currentTab === 'graph' || currentTab === 'tree') {
-    currentAction = 'Showing';
+  let child;
+  if (selectedNode) {
+    child = <SessionFooterProperties entity={selectedNode} />;
+  } else if (hoveredNode) {
+    child = <SessionFooterProperties entity={hoveredNode} />;
   } else {
-    currentAction = 'Found';
+    child = (
+      <SessionFooterResult
+        currentTab={currentTab}
+        session={session}
+        graphRenderTime={graphRenderTime}
+        treeRenderTime={treeRenderTime}
+      />
+    );
   }
 
   return (
     <div className="footer">
-      <div className="row">
-        <div className="col-12 col-sm-8">
-        <i className="fa fa-check check-mark" /> <span className="result-message">{currentAction} <span className="value">{session.response.numNodes}</span> {pluralize('node', session.response.numNodes)} and <span className="value">{session.response.numEdges}</span> {pluralize('edge', session.response.numEdges)}</span>
-        </div>
-        <div className="col-12 col-sm-4">
-          <div className="latency stats">
-            {session.response.data.server_latency ?
-              <div className="stat">Server latency: <span className="value">{session.response.data.server_latency.total}</span></div> : null}
-            {graphRenderTime && currentTab === 'graph' ?
-              <div className="stat">Rendering latency: <span className="value">{humanizeTime(graphRenderTime)}</span></div> : null}
-            {treeRenderTime && currentTab === 'tree' ?
-              <div className="stat">Rendering latency: <span className="value">{humanizeTime(treeRenderTime)}</span></div> : null}
-          </div>
-        </div>
-      </div>
+      {child}
     </div>
   );
 };

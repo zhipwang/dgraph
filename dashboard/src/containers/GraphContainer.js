@@ -332,7 +332,7 @@ class GraphContainer extends Component {
     }
 
     render() {
-        const { response, selectedNode, hoveredNode } = this.props;
+        const { response } = this.props;
         const { renderProgress, partiallyRendered } = this.state;
 
         const isRendering = renderProgress !== 100;
@@ -342,18 +342,6 @@ class GraphContainer extends Component {
           <div className="graph-container">
             {isRendering ? <Progress perc={renderProgress} /> :null}
             <div ref="graph" className={classnames('graph', { hidden: isRendering })} />
-
-            {!isRendering ?
-              <GraphFooter
-                response={response}
-                selectedNode={selectedNode}
-                hoveredNode={hoveredNode}
-                canToggleExpand={canToggleExpand}
-                partiallyRendered={partiallyRendered}
-                onExpandNetwork={this.handleExpandNetwork}
-                onCollapseNetwork={this.handleCollapseNetwork}
-              /> : null}
-
           </div>
         );
     }
