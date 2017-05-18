@@ -1,13 +1,13 @@
 import React from "react";
 import { connect } from "react-redux";
 
-import Sidebar from '../components/Sidebar';
-import EditorPanel from '../components/EditorPanel';
-import FrameList from '../components/FrameList';
+import Sidebar from "../components/Sidebar";
+import EditorPanel from "../components/EditorPanel";
+import FrameList from "../components/FrameList";
 import { runQuery, runQueryByShareId } from "../actions";
 import { refreshConnectedState } from "../actions/connection";
-import { discardFrame } from '../actions/frames';
-import { readCookie, eraseCookie } from './Helpers';
+import { discardFrame } from "../actions/frames";
+import { readCookie, eraseCookie } from "./Helpers";
 
 import "../assets/css/App.css";
 
@@ -16,8 +16,9 @@ class App extends React.Component {
     super(props);
 
     this.state = {
-      query: '',
-      isQueryDirty: false
+      query: "",
+      isQueryDirty: false,
+      currentSidebarMenu: ""
     };
   }
 
@@ -33,27 +34,40 @@ class App extends React.Component {
 
     // If playQuery cookie is set, run the query and erase the cookie
     // The cookie is used to communicate the query string between docs and play
-    const playQuery = readCookie('playQuery');
+    const playQuery = readCookie("playQuery");
     if (playQuery) {
       const queryString = decodeURI(playQuery);
       handleRunQuery(queryString).then(() => {
-        eraseCookie('playQuery', { crossDomain: true });
+        eraseCookie("playQuery", { crossDomain: true });
       });
     }
-  }
+  };
+
+  handleToggleSidebarMenu = targetMenu => {
+    const { currentSidebarMenu } = this.state;
+
+    let nextState = "";
+    if (currentSidebarMenu !== targetMenu) {
+      nextState = targetMenu;
+    }
+
+    this.setState({
+      currentSidebarMenu: nextState
+    });
+  };
 
   // saveCodeMirrorInstance saves the codemirror instance initialized in the
   // <Editor /> component so that we can access it in this component. (e.g. to
   // focus)
-  saveCodeMirrorInstance = (codemirror) => {
+  saveCodeMirrorInstance = codemirror => {
     this._codemirror = codemirror;
-  }
+  };
 
   handleUpdateQuery = (val, done = () => {}) => {
-    const isQueryDirty = val.trim() !== '';
+    const isQueryDirty = val.trim() !== "";
 
     this.setState({ query: val, isQueryDirty }, done);
-  }
+  };
 
   // focusCodemirror sets focus on codemirror and moves the cursor to the end
   focusCodemirror = () => {
@@ -63,40 +77,54 @@ class App extends React.Component {
 
     cm.focus();
     cm.setCursor({ line: lastlineNumber, ch: lastCharPos });
-  }
+  };
 
-  handleSelectQuery = (val) => {
+  handleSelectQuery = val => {
     this.handleUpdateQuery(val, this.focusCodemirror);
-  }
+  };
 
   handleClearQuery = () => {
-    this.handleUpdateQuery('', this.focusCodemirror);
-  }
+    this.handleUpdateQuery("", this.focusCodemirror);
+  };
 
-  handleRunQuery = (query) => {
+  handleRunQuery = query => {
     const { _handleRunQuery } = this.props;
 
     _handleRunQuery(query, () => {
-      this.setState({ isQueryDirty: false, query: '' });
+      this.setState({ isQueryDirty: false, query: "" });
     });
-  }
+  };
 
-  onRunSharedQuery(shareId) {
+  onRunSharedQuery = shareId => {
     const { handleRunSharedQuery } = this.props;
 
     handleRunSharedQuery(shareId).catch(e => {
       console.log(e);
     });
-  }
+  };
 
   render = () => {
-    const { query, isQueryDirty } = this.state;
+    const { query, isQueryDirty, currentSidebarMenu } = this.state;
     const { handleDiscardFrame, frames, connected } = this.props;
 
     return (
       <div className="app-layout">
-        <Sidebar />
+        <Sidebar
+          currentMenu={currentSidebarMenu}
+          onToggleMenu={this.handleToggleSidebarMenu}
+        />
         <div className="main-content">
+          {currentSidebarMenu !== ""
+            ? <div
+                className="click-capture"
+                onClick={e => {
+                  e.stopPropagation();
+                  this.setState({
+                    currentSidebarMenu: ""
+                  });
+                }}
+              />
+            : null}
           <div className="container-fluid">
             <div className="row justify-content-md-center">
               <div className="col-sm-12">
@@ -133,8 +161,7 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   _handleRunQuery(query, done = () => {}) {
-    return dispatch(runQuery(query))
-      .then(done);
+    return dispatch(runQuery(query)).then(done);
   },
   _refreshConnectedState() {
     dispatch(refreshConnectedState());
