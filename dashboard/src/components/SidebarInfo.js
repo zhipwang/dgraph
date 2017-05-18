@@ -50,14 +50,17 @@ const SidebarInfo = () => {
 
       <section>
         <h3>
-          About Dgraph browser
+          About Dgraph Browser
         </h3>
 
         <p>
           An interface to easily query and visualize your data.
         </p>
         <p>
-          <a href="https://github.com/dgraph-io/dgraph/tree/master/dashboard">
+          <a
+            target="_blank"
+            href="https://github.com/dgraph-io/dgraph/tree/master/dashboard"
+          >
             <i className="fa fa-external-link link-icon" />
             View on Github
           </a>
