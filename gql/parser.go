@@ -1995,7 +1995,15 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				it.Next()
 				if gq.IsGroupby {
 					item = it.Item()
-					child.Attr = item.Val
+					attr := collectName(it, item.Val)
+					// Get language list, if present
+					items, err := it.Peek(1)
+					if err == nil && items[0].Typ == itemAt {
+						it.Next() // consume '@'
+						it.Next() // move forward
+						child.Langs = parseLanguageList(it)
+					}
+					child.Attr = attr
 					child.IsInternal = false
 				} else {
 					if it.Item().Val != "var" {

@@ -2790,7 +2790,7 @@ func TestParseGroupbyWithMaxVar(t *testing.T) {
 	query {
 		me(id:0x1) {
 			friends @groupby(friends) {
-				a as max(name)
+				a as max(first-name@en:ta)
 			}
 			hometown
 			age
@@ -2806,6 +2806,8 @@ func TestParseGroupbyWithMaxVar(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(res.Query[0].Children[0].GroupbyAttrs))
 	require.Equal(t, "friends", res.Query[0].Children[0].GroupbyAttrs[0])
+	require.Equal(t, "first-name", res.Query[0].Children[0].Children[0].Attr)
+	require.Equal(t, []string{"en", "ta"}, res.Query[0].Children[0].Children[0].Langs)
 	require.Equal(t, "a", res.Query[0].Children[0].Children[0].Var)
 }
 
