@@ -7,8 +7,16 @@ import SidebarInfo from "./SidebarInfo";
 import "../assets/css/Sidebar.css";
 
 class Sidebar extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      rotate: false
+    };
+  }
   render() {
     const { currentMenu, onToggleMenu } = this.props;
+    const { rotate } = this.state;
 
     return (
       <div className="sidebar-container">
@@ -22,10 +30,14 @@ class Sidebar extends React.Component {
                 })}
                 onClick={e => {
                   e.preventDefault();
-                  onToggleMenu("about");
+                  this.setState({ rotate: !rotate });
                 }}
               >
-                <img src={logo} alt="logo" className="logo" />
+                <img
+                  src={logo}
+                  alt="logo"
+                  className={classnames("logo", { rotate })}
+                />
               </a>
             </li>
             {/*
