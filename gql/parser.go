@@ -54,7 +54,7 @@ type GraphQuery struct {
 	Cascade      bool
 	Facets       *Facets
 	FacetsFilter *FilterTree
-	GroupbyAttrs []string
+	GroupbyAttrs []AttrLang
 	FacetVar     map[string]string
 
 	// Internal fields below.
@@ -72,6 +72,11 @@ type Mutation struct {
 	Set    string
 	Del    string
 	Schema string
+}
+
+type AttrLang struct {
+	Attr  string
+	Langs []string
 }
 
 // pair denotes the key value pair that is part of the GraphQL query root in parenthesis.
@@ -1508,7 +1513,19 @@ func parseGroupby(it *lex.ItemIterator, gq *GraphQuery) error {
 			if !expectArg {
 				return x.Errorf("Expected a comma or right round but got: %v", item.Val)
 			}
-			gq.GroupbyAttrs = append(gq.GroupbyAttrs, item.Val)
+			attr := collectName(it, item.Val)
+			var langs []string
+			items, err := it.Peek(1)
+			if err == nil && items[0].Typ == itemAt {
+				it.Next() // consume '@'
+				it.Next() // move forward
+				langs = parseLanguageList(it)
+			}
+			attrLang := AttrLang{
+				Attr:  attr,
+				Langs: langs,
+			}
+			gq.GroupbyAttrs = append(gq.GroupbyAttrs, attrLang)
 			count++
 			expectArg = false
 		}
