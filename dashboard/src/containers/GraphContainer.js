@@ -91,7 +91,9 @@ class GraphContainer extends Component {
     const {
       response: { allNodes, allEdges },
       onNodeSelected,
-      onNodeHovered
+      onNodeHovered,
+      labelRegex,
+      applyLabels
     } = this.props;
     const { data } = network.body;
     const allEdgeSet = new vis.DataSet(allEdges);
@@ -124,6 +126,12 @@ class GraphContainer extends Component {
       }
       data.nodes.update(allNodeSet.get(nodes));
       data.edges.update(adjEdges);
+
+      // Apply labels so that newly attached nodes will show labels according to
+      // the current labelRegex
+      // IDEA: Rather than applying labels to all nodes, can we just apply to newly
+      // attached nodes?
+      applyLabels(data.nodes, labelRegex);
     }
 
     network.on("stabilizationProgress", params => {

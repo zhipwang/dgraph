@@ -11,7 +11,9 @@ const SessionTreeTab = ({
   onNodeHovered,
   selectedNode,
   nodesDataset,
-  edgesDataset
+  edgesDataset,
+  labelRegex,
+  applyLabels
 }) => {
   return (
     <div className="content-container">
@@ -24,6 +26,8 @@ const SessionTreeTab = ({
         selectedNode={selectedNode}
         nodesDataset={nodesDataset}
         edgesDataset={edgesDataset}
+        labelRegex={labelRegex}
+        applyLabels={applyLabels}
         treeView
       />
     </div>

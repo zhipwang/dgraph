@@ -117,10 +117,21 @@ class FrameSession extends React.Component {
     const { labelRegex } = this.state;
     const re = new RegExp(labelRegex);
 
-    const allNodes = this.nodes.get();
+    this.applyLabels(this.nodes, re);
+  };
+
+  /**
+   * applyLabels applies labels to a set of nodes, given a regex object for labels
+   * @params nodeSet {vis.DataSet} - a vis.js dataset holding nodes
+   * @params labelRegex {RegExp} - regex for labels
+   *
+   * mutates the nodeSet
+   */
+  applyLabels = (nodeSet, labelRegex) => {
+    const allNodes = nodeSet.get();
     const updatedNodes = allNodes.map(node => {
       const properties = JSON.parse(node.title);
-      const fullName = getNodeLabel(properties.attrs, re);
+      const fullName = getNodeLabel(properties.attrs, labelRegex);
       const displayLabel = shortenName(fullName);
 
       return Object.assign({}, node, {
@@ -128,7 +139,7 @@ class FrameSession extends React.Component {
       });
     });
 
-    this.nodes.update(updatedNodes);
+    nodeSet.update(updatedNodes);
   };
 
   render() {
@@ -207,6 +218,8 @@ class FrameSession extends React.Component {
                   onNodeHovered={this.handleNodeHovered}
                   nodesDataset={this.nodes}
                   edgesDataset={this.edges}
+                  labelRegex={new RegExp(labelRegex)}
+                  applyLabels={this.applyLabels}
                 />
               : null}
 
@@ -220,6 +233,8 @@ class FrameSession extends React.Component {
                   selectedNode={selectedNode}
                   nodesDataset={this.nodes}
                   edgesDataset={this.edges}
+                  labelRegex={new RegExp(labelRegex)}
+                  applyLabels={this.applyLabels}
                 />
               : null}
 
