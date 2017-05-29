@@ -216,7 +216,7 @@ build_docker_image() {
 	tar -xzf ${NIGHTLY_FILE}
 	cp ${ASSETS_FILE} .
 	echo -e "Building the docker image with tag: $DOCKER_TAG."
-	docker build dgraph/dgraph:$DOCKER_TAG .
+	docker build -t dgraph/dgraph:$DOCKER_TAG .
 	if [[ $DOCKER_TAG == $LATEST_TAG ]]; then
 		echo "Tagging docker image with latest tag"
 		docker tag dgraph/dgraph:$DOCKER_TAG dgraph/dgraph:latest
