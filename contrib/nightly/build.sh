@@ -146,6 +146,7 @@ upload_assets() {
 		| jq -r -c "(.[] | select(.tag_name == \"${BUILD_TAG}\").id), \"\"") \
 		|| exit
 
+	echo "Release id $release_id"
 	if [[ -z "${release_id}" ]]; then
 		echo "Creating release for tag ${BUILD_TAG}."
 		# For actual releases add draft true and for nightly release prerelease true.
@@ -183,7 +184,7 @@ upload_assets() {
 		if [[ $BUILD_TAG == "nightly" ]]; then
 			echo 'Updating release description.'
 			send_gh_api_data_request repos/${DGRAPH_REPO}/releases/${release_id} PATCH \
-				"{ \"body\": $(get_nightly_release_body) | jq -s -c -R '.') }" \
+				"{ \"force\": true, \"body\": $(get_nightly_release_body) | jq -s -c -R '.') }" \
 				> /dev/null
 
 			echo "Updating ${BUILD_TAG} tag to point to ${DGRAPH_COMMIT}."
