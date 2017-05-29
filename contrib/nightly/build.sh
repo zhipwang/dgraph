@@ -44,7 +44,7 @@ run_upload_script() {
 		return 0
 	fi
 
-	return 0
+	return 1
 }
 
 get_tag() {
@@ -146,7 +146,6 @@ upload_assets() {
 		| jq -r -c "(.[] | select(.tag_name == \"${BUILD_TAG}\").id), \"\"") \
 		|| exit
 
-	echo "Release id $release_id"
 	if [[ -z "${release_id}" ]]; then
 		echo "Creating release for tag ${BUILD_TAG}."
 		# For actual releases add draft true and for nightly release prerelease true.
@@ -212,7 +211,6 @@ build_docker_image() {
 		return 0
 	fi
 
-	DOCKER_TAG="master"
 	pushd ${GOPATH}/src/github.com/dgraph-io/dgraph/contrib/nightly > /dev/null
 	# Extract dgraph folder from the tar as its required by the Dockerfile.
 	tar -xzf ${NIGHTLY_FILE}
