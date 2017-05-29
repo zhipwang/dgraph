@@ -44,7 +44,7 @@ run_upload_script() {
 		return 0
 	fi
 
-	return 1
+	return 0
 }
 
 get_tag() {
