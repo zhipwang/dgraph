@@ -210,12 +210,13 @@ build_docker_image() {
 		return 0
 	fi
 
+	DOCKER_TAG="master"
 	pushd ${GOPATH}/src/github.com/dgraph-io/dgraph/contrib/nightly > /dev/null
 	# Extract dgraph folder from the tar as its required by the Dockerfile.
 	tar -xzf ${NIGHTLY_FILE}
 	cp ${ASSETS_FILE} .
 	echo -e "Building the docker image with tag: $DOCKER_TAG."
-	docker build -t dgraph/dgraph:$DOCKER_TAG .
+	docker build dgraph/dgraph:$DOCKER_TAG .
 	if [[ $DOCKER_TAG == $LATEST_TAG ]]; then
 		echo "Tagging docker image with latest tag"
 		docker tag dgraph/dgraph:$DOCKER_TAG dgraph/dgraph:latest
