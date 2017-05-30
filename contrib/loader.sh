@@ -24,7 +24,7 @@ popd &> /dev/null
 
 pushd cmd/dgraph &> /dev/null
 go build .
-./dgraph &
+./dgraph --gentlecommit 0.7 &
 popd &> /dev/null
 
 sleep 15
