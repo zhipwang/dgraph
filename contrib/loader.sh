@@ -44,11 +44,16 @@ popd &> /dev/null
 
 # Shutdown Dgraph
 curl http://localhost:8080/admin/shutdown
+# Dgraph would require sometime to persist dirty map to disk.
+echo "Sleeping for a bit so that Dgraph can complete shutdown."
+sleep 60
 
 pushd cmd/dgraph &> /dev/null
+echo "Restarting Dgraph"
 ./dgraph &
 popd &> /dev/null
 
+echo "Running actual queries"
 pushd $GOPATH/src/github.com/dgraph-io/dgraph/contrib/indextest &> /dev/null
 
 function run_index_test {
