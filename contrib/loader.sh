@@ -5,7 +5,7 @@ SRC="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/.."
 BUILD=$1
 # If build variable is empty then we set it.
 if [ -z "$1" ]; then
-  BUILD=$SRC/build
+	BUILD=$SRC/build
 fi
 
 set -e
@@ -13,7 +13,7 @@ set -e
 pushd $BUILD &> /dev/null
 
 if [ ! -f "goldendata.rdf.gz" ]; then
-  wget https://github.com/dgraph-io/benchmarks/raw/master/data/goldendata.rdf.gz
+	wget https://github.com/dgraph-io/benchmarks/raw/master/data/goldendata.rdf.gz
 fi
 
 # log file size.
@@ -24,16 +24,16 @@ popd &> /dev/null
 
 pushd cmd/dgraph &> /dev/null
 go build .
-./dgraph -gentlecommit 1.0 &
+./dgraph &
 popd &> /dev/null
 
 sleep 15
 
 #Set Schema
 curl -X POST  -d 'mutation {
-  schema {
-	  name: string @index .
-	  initial_release_date: date @index .
+schema {
+name: string @index .
+initial_release_date: date @index .
 	}
 }' "http://localhost:8080/query"
 
@@ -42,8 +42,12 @@ go build .
 ./dgraphloader -r $benchmark/goldendata.rdf.gz
 popd &> /dev/null
 
-# Lets wait for stuff to be committed to RocksDB.
-sleep 20
+# Shutdown Dgraph
+curl http://localhost:8080/admin/shutdown
+
+pushd cmd/dgraph &> /dev/null
+./dgraph &
+popd &> /dev/null
 
 pushd $GOPATH/src/github.com/dgraph-io/dgraph/contrib/indextest &> /dev/null
 
@@ -51,10 +55,12 @@ function run_index_test {
 	X=$1
 	GREPFOR=$2
 	ANS=$3
-    N=`curl localhost:8080/query -XPOST -d @${X}.in 2> /dev/null | python -m json.tool | grep $GREPFOR | wc -l`
+	N=`curl localhost:8080/query -XPOST -d @${X}.in 2> /dev/null | python -m json.tool | grep $GREPFOR | wc -l`
 	if [[ ! "$N" -eq "$ANS" ]]; then
-	  echo "Index test failed: ${X}  Expected: $ANS  Got: $N"
-	  exit 1
+		echo "Index test failed: ${X}  Expected: $ANS  Got: $N"
+		exit 1
+	else
+		echo "Index test passed: ${X}"
 	fi
 }
 run_index_test basic name 138676
