@@ -1,7 +1,6 @@
 #!/bin/bash
 
 if [[ $TRAVIS_OS_NAME == "osx" ]]; then
-	brew install grep
 	brew install jq
 fi
 

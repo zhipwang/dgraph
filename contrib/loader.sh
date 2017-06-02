@@ -45,11 +45,11 @@ echo "Running dgraphloader to load goldendata."
 ./dgraphloader -r $benchmark/goldendata.rdf.gz
 popd &> /dev/null
 
-echo "Shutting down Dgraph"
-curl http://localhost:8080/admin/shutdown
-echo ""
-
-sleep 300
+# echo "Shutting down Dgraph"
+# curl http://localhost:8080/admin/shutdown
+# echo ""
+# 
+# sleep 600
 # ps cax | grep dgraph$ > /dev/null
 # while [ $? -eq 0 ];
 # do
@@ -59,11 +59,11 @@ sleep 300
 # done
 # echo "Out of loop. Dgraph has been shutdown."
 
-pushd cmd/dgraph &> /dev/null
-echo "Restarting Dgraph"
-./dgraph > /dev/null 2>&1 &
-popd &> /dev/null
-sleep 15
+# pushd cmd/dgraph &> /dev/null
+# echo "Restarting Dgraph"
+# ./dgraph > /dev/null 2>&1 &
+# popd &> /dev/null
+# sleep 15
 
 echo "Running actual queries"
 pushd $GOPATH/src/github.com/dgraph-io/dgraph/contrib/indextest &> /dev/null
