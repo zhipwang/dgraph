@@ -46,7 +46,7 @@ popd &> /dev/null
 curl http://localhost:8080/admin/shutdown
 # Dgraph would require sometime to persist dirty map to disk.
 echo "Sleeping for a bit so that Dgraph can complete shutdown."
-sleep 120
+sleep 180
 
 pushd cmd/dgraph &> /dev/null
 echo "Restarting Dgraph"
