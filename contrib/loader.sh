@@ -49,14 +49,15 @@ echo "Shutting down Dgraph"
 curl http://localhost:8080/admin/shutdown
 echo ""
 
-ps cax | grep dgraph$ > /dev/null
-while [ $? -eq 0 ];
-do
-	echo "Dgraph is running. Sleeping for 30 secs"
-	sleep 30
-	ps cax | grep dgraph$ > /dev/null
-done
-echo "Out of loop. Dgraph has been shutdown."
+sleep 300
+# ps cax | grep dgraph$ > /dev/null
+# while [ $? -eq 0 ];
+# do
+# 	echo "Dgraph is running. Sleeping for 30 secs"
+# 	sleep 30
+# 	ps cax | grep dgraph$ > /dev/null
+# done
+# echo "Out of loop. Dgraph has been shutdown."
 
 pushd cmd/dgraph &> /dev/null
 echo "Restarting Dgraph"
@@ -79,6 +80,7 @@ function run_index_test {
 		echo "Index test passed: ${X}"
 	fi
 }
+
 run_index_test basic name 138676
 run_index_test allof_the name 25431
 run_index_test allof_the_a name 367
