@@ -23,13 +23,15 @@ benchmark=$(pwd)
 popd &> /dev/null
 
 pushd cmd/dgraph &> /dev/null
+echo "Building and running Dgraph in background"
 go build .
-./dgraph --gentlecommit 1.0 &
+./dgraph --gentlecommit 1.0  > /dev/null 2>&1 &
 popd &> /dev/null
 
 sleep 15
 
-#Set Schema
+echo "Sending schema mutation."
+# Set Schema
 curl -X POST  -d 'mutation {
 schema {
 name: string @index .
@@ -39,11 +41,13 @@ initial_release_date: date @index .
 
 pushd cmd/dgraphloader &> /dev/null
 go build .
+echo "Running dgraphloader to load goldendata."
 ./dgraphloader -r $benchmark/goldendata.rdf.gz
 popd &> /dev/null
 
-# Shutdown Dgraph
+echo "Shutting down Dgraph"
 curl http://localhost:8080/admin/shutdown
+echo ""
 
 ps cax | grep dgraph$ > /dev/null
 while [ $? -eq 0 ];
@@ -56,8 +60,9 @@ echo "Out of loop. Dgraph has been shutdown."
 
 pushd cmd/dgraph &> /dev/null
 echo "Restarting Dgraph"
-./dgraph &
+./dgraph > /dev/null 2>&1 &
 popd &> /dev/null
+sleep 15
 
 echo "Running actual queries"
 pushd $GOPATH/src/github.com/dgraph-io/dgraph/contrib/indextest &> /dev/null
