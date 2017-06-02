@@ -52,6 +52,7 @@ do
 	sleep 30
 	ps cax | grep dgraph$ > /dev/null
 done
+echo "Out of loop. Dgraph has been shutdown."
 
 pushd cmd/dgraph &> /dev/null
 echo "Restarting Dgraph"
