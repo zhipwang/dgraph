@@ -47,7 +47,7 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 
-	"github.com/cockroachdb/cmux"
+	//"github.com/cockroachdb/cmux"
 	"github.com/dgraph-io/dgraph/gql"
 	"github.com/dgraph-io/dgraph/group"
 	"github.com/dgraph-io/dgraph/posting"
@@ -56,6 +56,7 @@ import (
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/worker"
 	"github.com/dgraph-io/dgraph/x"
+	gwrt "github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
 )
 
@@ -454,6 +455,7 @@ type grpcServer struct{}
 // client as a protocol buffer message.
 func (s *grpcServer) Run(ctx context.Context,
 	req *protos.Request) (resp *protos.Response, err error) {
+	fmt.Println("tzdybal: GRPC:RUN")
 	if rand.Float64() < *tracing {
 		tr := trace.New("Dgraph", "GrpcQuery")
 		tr.SetMaxEvents(1000)
@@ -548,6 +550,7 @@ func (s *grpcServer) Run(ctx context.Context,
 
 func (s *grpcServer) CheckVersion(ctx context.Context, c *protos.Check) (v *protos.Version,
 	err error) {
+	fmt.Println("tzdybal: CheckVersion")
 	// we need membership information
 	if !worker.HealthCheck() {
 		if tr, ok := trace.FromContext(ctx); ok {
@@ -638,9 +641,9 @@ func serveGRPC(l net.Listener) {
 		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
 		grpc.MaxSendMsgSize(x.GrpcMaxSize))
 	protos.RegisterDgraphServer(s, &grpcServer{})
-	err := s.Serve(l)
-	log.Printf("gRpc server stopped : %s", err.Error())
-	s.GracefulStop()
+	//err := s.Serve(l)
+	//log.Printf("gRpc server stopped : %s", err.Error())
+	//s.GracefulStop()
 }
 
 func serveHTTP(l net.Listener) {
@@ -665,7 +668,7 @@ func serveHTTP(l net.Listener) {
 func setupServer(che chan error) {
 	// By default Go GRPC traces all requests.
 	grpc.EnableTracing = false
-	go worker.RunServer(*bindall) // For internal communication.
+	//go worker.RunServer(*bindall) // For internal communication.
 
 	laddr := "localhost"
 	if *bindall {
@@ -677,29 +680,42 @@ func setupServer(che chan error) {
 		log.Fatal(err)
 	}
 
-	tcpm := cmux.New(l)
-	grpcl := tcpm.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
-	httpl := tcpm.Match(cmux.HTTP1Fast())
-	http2 := tcpm.Match(cmux.HTTP2())
+	fullAddr := fmt.Sprintf("%s:%d", laddr, *port)
 
-	http.HandleFunc("/health", healthCheck)
-	http.HandleFunc("/query", queryHandler)
-	http.HandleFunc("/share", shareHandler)
-	http.HandleFunc("/debug/store", storeStatsHandler)
-	http.HandleFunc("/admin/shutdown", shutDownHandler)
-	http.HandleFunc("/admin/backup", backupHandler)
+	gServer := grpc.NewServer(grpc.CustomCodec(&query.Codec{}),
+		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
+		grpc.MaxSendMsgSize(x.GrpcMaxSize))
+	gServer = grpc.NewServer()
+
+	protos.RegisterDgraphServer(gServer, &grpcServer{})
+
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", healthCheck)
+	mux.HandleFunc("/query", queryHandler)
+	mux.HandleFunc("/share", shareHandler)
+	mux.HandleFunc("/debug/store", storeStatsHandler)
+	mux.HandleFunc("/admin/shutdown", shutDownHandler)
+	mux.HandleFunc("/admin/backup", backupHandler)
+	mux.HandleFunc("/ui/keywords", keywordHandler)
+
+	ctx := context.Background()
+	gwmux := gwrt.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	this wont work without TLS
+	err = protos.RegisterDgraphHandlerFromEndpoint(ctx, gwmux, fullAddr, opts)
+	if err != nil {
+		x.Fatalf("Register error: %v", err)
+	}
 
 	// UI related API's.
 	// Share urls have a hex string as the shareId. So if
 	// our url path matches it, we wan't to serve index.html.
 	reg := regexp.MustCompile(`\/0[xX][0-9a-fA-F]+`)
-	http.Handle("/", homeHandler(http.FileServer(http.Dir(uiDir)), reg))
-	http.HandleFunc("/ui/keywords", keywordHandler)
-
-	// Initilize the servers.
-	go serveGRPC(grpcl)
-	go serveHTTP(httpl)
-	go serveHTTP(http2)
+	// TODO:
+	mux.Handle("/foo", homeHandler(http.FileServer(http.Dir(uiDir)), reg))
+	mux.Handle("/", gwmux)
 
 	go func() {
 		<-shutdownCh
@@ -707,13 +723,32 @@ func setupServer(che chan error) {
 		l.Close()
 	}()
 
-	log.Println("grpc server started.")
-	log.Println("http server started.")
-	log.Println("Server listening on port", *port)
+	srv := &http.Server{
+		Addr:    fullAddr,
+		Handler: grpcHandlerFunc(gServer, mux),
+	}
 
-	err = tcpm.Serve() // Start cmux serving. blocking call
-	<-shutdownCh       // wait for shutdownServer to finish
-	che <- err         // final close for main.
+	log.Println("Server listening on port", *port)
+	err = srv.Serve(l)
+	if err != nil {
+		log.Fatal("srv.Serve(%v): %v", l, err)
+	}
+
+	//err = tcpm.Serve() // Start cmux serving. blocking call
+	<-shutdownCh // wait for shutdownServer to finish
+	che <- err   // final close for main.
+}
+
+func grpcHandlerFunc(grpcServer *grpc.Server, otherHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+			fmt.Println("tzdybal: grpc")
+			grpcServer.ServeHTTP(w, r)
+		} else {
+			fmt.Println("tzdybal: http")
+			otherHandler.ServeHTTP(w, r)
+		}
+	})
 }
 
 func main() {
@@ -761,7 +796,7 @@ func main() {
 	// Setup external communication.
 	che := make(chan error, 1)
 	go setupServer(che)
-	go worker.StartRaftNodes(*walDir)
+	//go worker.StartRaftNodes(*walDir)
 
 	if err := <-che; !strings.Contains(err.Error(),
 		"use of closed network connection") {

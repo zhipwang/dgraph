@@ -18,13 +18,20 @@
 syntax="proto3";
 import "facets.proto";
 import "schema.proto";
+import "google/api/annotations.proto";
 
 package protos;
 
 service Dgraph {
-    rpc Run (Request) returns (Response) {};
-    rpc CheckVersion(Check) returns (Version) {};
-    rpc AssignUids(Num) returns (AssignedIds) {};
+    rpc Run (Request) returns (Response) {
+		option(google.api.http) = { post: "/run"; body: "*"; };
+	};
+    rpc CheckVersion(Check) returns (Version) {
+		option(google.api.http) = { post: "/version"; body: "*"; };
+	};
+    rpc AssignUids(Num) returns (AssignedIds) {
+		option(google.api.http) = { post: "/assignUids"; body: "*"; };
+	};
 }
 
 message Num {

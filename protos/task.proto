@@ -18,7 +18,6 @@
 syntax = "proto3";
 import "facets.proto";
 import "schema.proto";
-import "graphresponse.proto";
 
 package protos;
 
