@@ -76,6 +76,11 @@ message Request {
     Mutation mutation = 2;
     SchemaRequest schema = 3;
     map<string, string> vars = 4; // Support for GraphQL like variables.
+    enum ResultFormat {
+        DEFAULT = 0; // default JSON format
+        QUADS = 1; // list of quads
+    }
+    ResultFormat resultFormat = 5;
 }
 
 message Latency {
@@ -97,9 +102,10 @@ message Node {
 
 message Response {
     repeated Node n = 1;
-    Latency l = 2;
-    map<string, uint64> AssignedUids = 3;
-    repeated SchemaNode schema = 4;
+	repeated string quads = 2;
+    Latency l = 3;
+    map<string, uint64> AssignedUids = 4;
+    repeated SchemaNode schema = 5;
 }
 
 message Check {}
