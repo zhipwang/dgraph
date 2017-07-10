@@ -112,14 +112,14 @@ func WriteValue(buf *bytes.Buffer, val []byte, vt protos.Posting_ValType, lang s
 			buf.WriteByte('>')
 		}
 	} else {
-		buf.WriteString("<_:uid")
-		buf.WriteString(strconv.FormatUint(uid, 16))
-		buf.WriteByte('>')
+		WriteBlankNode(buf, uid)
 	}
-
 }
 
 func WriteBlankNode(buf *bytes.Buffer, uid uint64) {
+	buf.WriteString("<_:uid")
+	buf.WriteString(strconv.FormatUint(uid, 16))
+	buf.WriteByte('>')
 }
 
 func WriteLabel(buf *bytes.Buffer, label string) {
@@ -321,9 +321,8 @@ func export(gid uint32, bdir string) error {
 			continue
 		}
 
-		prefix.WriteString("<_:uid")
-		prefix.WriteString(strconv.FormatUint(uid, 16))
-		prefix.WriteString("> <")
+		WriteBlankNode(prefix, uid)
+		prefix.WriteString(" <")
 		prefix.WriteString(pred)
 		prefix.WriteString("> ")
 		pl := &protos.PostingList{}
