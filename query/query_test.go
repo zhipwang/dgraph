@@ -198,6 +198,12 @@ func populateGraph(t *testing.T) {
 	require.NoError(t, err)
 	addEdgeToTypedValue(t, "loc", 31, types.GeoID, gData.Value.([]byte), nil)
 
+	addEdgeToValue(t, "dob_day", 1, "1910-01-01", nil)
+	addEdgeToValue(t, "dob_day", 23, "1910-01-02", nil)
+	addEdgeToValue(t, "dob_day", 24, "1909-05-05", nil)
+	addEdgeToValue(t, "dob_day", 25, "1909-01-10", nil)
+	addEdgeToValue(t, "dob_day", 31, "1901-01-15", nil)
+
 	addEdgeToValue(t, "dob", 1, "1910-01-01", nil)
 	addEdgeToValue(t, "dob", 23, "1910-01-02", nil)
 	addEdgeToValue(t, "dob", 24, "1909-05-05", nil)
@@ -310,6 +316,9 @@ func populateGraph(t *testing.T) {
 	addEdgeToUID(t, "son", 1, 2300, nil)
 
 	addEdgeToValue(t, "name", 2301, `Alice\"`, nil)
+
+	// Add some base64 encoded data
+	addEdgeToTypedValue(t, "bin_data", 0x1, types.BinaryID, []byte("YmluLWRhdGE="), nil)
 }
 
 func TestGetUID(t *testing.T) {
@@ -1551,6 +1560,32 @@ func TestNestedFuncRoot2(t *testing.T) {
   `
 	js := processToFastJSON(t, query)
 	require.JSONEq(t, `{"me":[{"name":"Michonne"},{"name":"Rick Grimes"},{"name":"Andrea"}]}`, js)
+}
+
+func TestNestedFuncRoot3(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: le(count(friend), -1)) {
+				name
+			}
+		}
+  `
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{}`, js)
+}
+
+func TestNestedFuncRoot4(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: le(count(friend), 1)) {
+				name
+			}
+		}
+  `
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"name":"Rick Grimes"},{"name":"Andrea"}]}`, js)
 }
 
 func TestRecurseQuery(t *testing.T) {
@@ -3555,7 +3590,7 @@ func TestToFastJSONFilteLtAlias(t *testing.T) {
 		js)
 }
 
-func TestToFastJSONFilterge(t *testing.T) {
+func TestToFastJSONFilterge1(t *testing.T) {
 	populateGraph(t)
 	query := `
 		{
@@ -3563,6 +3598,26 @@ func TestToFastJSONFilterge(t *testing.T) {
 				name
 				gender
 				friend @filter(ge(dob, "1909-05-05")) {
+					name
+				}
+			}
+		}
+	`
+
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"}],"gender":"female","name":"Michonne"}]}`,
+		js)
+}
+
+func TestToFastJSONFilterge2(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: uid(0x01)) {
+				name
+				gender
+				friend @filter(ge(dob_day, "1909-05-05")) {
 					name
 				}
 			}
@@ -4505,7 +4560,7 @@ func TestToFastJSONOrder(t *testing.T) {
 }
 
 // Test sorting / ordering by dob.
-func TestToFastJSONOrderDesc(t *testing.T) {
+func TestToFastJSONOrderDesc1(t *testing.T) {
 	populateGraph(t)
 	query := `
 		{
@@ -4513,6 +4568,27 @@ func TestToFastJSONOrderDesc(t *testing.T) {
 				name
 				gender
 				friend(orderdesc: dob) {
+					name
+					dob
+				}
+			}
+		}
+	`
+
+	js := processToFastJSON(t, query)
+	require.JSONEq(t,
+		`{"me":[{"friend":[{"dob":"1910-01-02T00:00:00Z","name":"Rick Grimes"},{"dob":"1909-05-05T00:00:00Z","name":"Glenn Rhee"},{"dob":"1909-01-10T00:00:00Z","name":"Daryl Dixon"},{"dob":"1901-01-15T00:00:00Z","name":"Andrea"}],"gender":"female","name":"Michonne"}]}`,
+		js)
+}
+
+func TestToFastJSONOrderDesc2(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: uid(0x01)) {
+				name
+				gender
+				friend(orderdesc: dob_day) {
 					name
 					dob
 				}
@@ -6388,7 +6464,7 @@ func checkSchemaNodes(t *testing.T, expected []*protos.SchemaNode, actual []*pro
 		return actual[i].Predicate >= actual[j].Predicate
 	})
 	require.True(t, reflect.DeepEqual(expected, actual),
-		fmt.Sprintf("Expected: %+v, Received: %+v \n", expected, actual))
+		fmt.Sprintf("Expected: %+v \nReceived: %+v \n", expected, actual))
 }
 
 func TestSchemaBlock1(t *testing.T) {
@@ -6412,7 +6488,9 @@ func TestSchemaBlock1(t *testing.T) {
 		{Predicate: "value", Type: "string"}, {Predicate: "full_name", Type: "string"},
 		{Predicate: "noindex_name", Type: "string"},
 		{Predicate: "lossy", Type: "string"},
-		{Predicate: "school", Type: "uid"}}
+		{Predicate: "school", Type: "uid"},
+		{Predicate: "dob_day", Type: "datetime"},
+	}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -6483,6 +6561,7 @@ const schemaStr = `
 name                           : string @index(term, exact, trigram) @count .
 alias                          : string @index(exact, term, fulltext) .
 dob                            : dateTime @index .
+dob_day                        : dateTime @index(day) .
 film.film.initial_release_date : dateTime @index .
 loc                            : geo @index .
 genre                          : uid @reverse .
@@ -7824,10 +7903,11 @@ func TestMultipleEqInt(t *testing.T) {
 
 func TestPBUnmarshalToStruct1(t *testing.T) {
 	type Person struct {
-		Name    string `dgraph:"name"`
-		Age     int    `dgraph:"age"`
-		Birth   string
-		Friends []Person `dgraph:"friend"`
+		Name       string `dgraph:"name"`
+		Age        int    `dgraph:"age"`
+		Birth      string
+		BinaryData []byte   `dgraph:"bin_data"`
+		Friends    []Person `dgraph:"friend"`
 	}
 
 	type res struct {
@@ -7840,6 +7920,7 @@ func TestPBUnmarshalToStruct1(t *testing.T) {
 			me(func: uid(0x01)) {
 				name
 				age
+				bin_data
 				Birth: dob
 				friend {
 					name
@@ -7854,6 +7935,7 @@ func TestPBUnmarshalToStruct1(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Michonne", r.Root.Name)
 	require.Equal(t, 38, r.Root.Age)
+	require.Equal(t, "bin-data", string(r.Root.BinaryData))
 	require.Equal(t, "1910-01-01T00:00:00Z", r.Root.Birth)
 	require.Equal(t, 4, len(r.Root.Friends))
 	require.Equal(t, Person{
@@ -8185,4 +8267,95 @@ func TestUidInFunctioniAtRoot(t *testing.T) {
 	qr := QueryRequest{Latency: &Latency{}, GqlQuery: &res}
 	err = qr.ProcessQuery(ctx)
 	require.Error(t, err)
+}
+
+func TestBinaryJSON(t *testing.T) {
+	populateGraph(t)
+	query := `
+	{
+		me(func: uid(1)) {
+			name
+			bin_data
+		}
+	}`
+	js := processToFastJSON(t, query)
+	require.Equal(t, `{"me":[{"bin_data":"YmluLWRhdGE=","name":"Michonne"}]}`, js)
+}
+
+func TestReflexive(t *testing.T) {
+	populateGraph(t)
+	query := `
+	{
+		me(func:anyofterms(name, "Michonne Rick Daryl")) @ignoreReflex {
+			name
+			friend {
+				name
+				friend {
+					name
+				}
+			}
+		}
+	}`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"},{"friend":[{"name":"Glenn Rhee"}],"name":"Daryl Dixon"},{"friend":[{"name":"Glenn Rhee"}],"name":"Andrea"}],"name":"Michonne"},{"friend":[{"friend":[{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"name":"Michonne"}],"name":"Rick Grimes"},{"friend":[{"name":"Glenn Rhee"}],"name":"Daryl Dixon"}]}`, js)
+}
+
+func TestReflexive2(t *testing.T) {
+	populateGraph(t)
+	query := `
+	{
+		me(func:anyofterms(name, "Michonne Rick Daryl")) @IGNOREREFLEX {
+			name
+			friend {
+				name
+				friend {
+					name
+				}
+			}
+		}
+	}`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"},{"friend":[{"name":"Glenn Rhee"}],"name":"Daryl Dixon"},{"friend":[{"name":"Glenn Rhee"}],"name":"Andrea"}],"name":"Michonne"},{"friend":[{"friend":[{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"name":"Michonne"}],"name":"Rick Grimes"},{"friend":[{"name":"Glenn Rhee"}],"name":"Daryl Dixon"}]}`, js)
+}
+
+func TestReflexive3(t *testing.T) {
+	populateGraph(t)
+	query := `
+	{
+		me(func:anyofterms(name, "Michonne Rick Daryl")) @IGNOREREFLEX @normalize {
+			Me: name
+			friend {
+				Friend: name
+				friend {
+					Cofriend: name
+				}
+			}
+		}
+	}`
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"Friend":"Rick Grimes","Me":"Michonne"},{"Friend":"Glenn Rhee","Me":"Michonne"},{"Cofriend":"Glenn Rhee","Friend":"Daryl Dixon","Me":"Michonne"},{"Cofriend":"Glenn Rhee","Friend":"Andrea","Me":"Michonne"},{"Cofriend":"Glenn Rhee","Friend":"Michonne","Me":"Rick Grimes"},{"Cofriend":"Daryl Dixon","Friend":"Michonne","Me":"Rick Grimes"},{"Cofriend":"Andrea","Friend":"Michonne","Me":"Rick Grimes"},{"Friend":"Glenn Rhee","Me":"Daryl Dixon"}]}`, js)
+}
+
+func TestCascadeUid(t *testing.T) {
+	populateGraph(t)
+	query := `
+		{
+			me(func: uid(0x01)) @cascade {
+				name
+				gender
+				friend {
+					_uid_
+					name
+					friend{
+						name
+						dob
+						age
+					}
+				}
+			}
+		}
+	`
+
+	js := processToFastJSON(t, query)
+	require.JSONEq(t, `{"me":[{"friend":[{"_uid_":"0x17","friend":[{"age":38,"dob":"1910-01-01T00:00:00Z","name":"Michonne"}],"name":"Rick Grimes"},{"_uid_":"0x19","friend":[{"age":15,"dob":"1909-05-05T00:00:00Z","name":"Glenn Rhee"}],"name":"Daryl Dixon"},{"_uid_":"0x1f","friend":[{"age":15,"dob":"1909-05-05T00:00:00Z","name":"Glenn Rhee"}],"name":"Andrea"}],"gender":"female","name":"Michonne"}]}`, js)
 }

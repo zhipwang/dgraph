@@ -17,6 +17,7 @@
 package client
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -45,24 +46,6 @@ type Req struct {
 // a query/mutation.
 func (req *Req) Request() *protos.Request {
 	return &req.gr
-}
-
-func checkNQuad(nq protos.NQuad) error {
-	if len(nq.Subject) == 0 {
-		return fmt.Errorf("Subject can't be empty")
-	}
-	if len(nq.Predicate) == 0 {
-		return fmt.Errorf("Predicate can't be empty")
-	}
-
-	hasVal := nq.ObjectValue != nil
-	if len(nq.ObjectId) == 0 && !hasVal {
-		return fmt.Errorf("Both objectId and objectValue can't be nil")
-	}
-	if len(nq.ObjectId) > 0 && hasVal {
-		return fmt.Errorf("Only one out of objectId and objectValue can be set")
-	}
-	return nil
 }
 
 func checkSchema(schema protos.SchemaUpdate) error {
@@ -101,20 +84,12 @@ func (req *Req) addMutation(e Edge, op Op) {
 	}
 }
 
-func (req *Req) Set(e Edge) error {
-	if err := checkNQuad(e.nq); err != nil {
-		return err
-	}
+func (req *Req) Set(e Edge) {
 	req.addMutation(e, SET)
-	return nil
 }
 
-func (req *Req) Delete(e Edge) error {
-	if err := checkNQuad(e.nq); err != nil {
-		return err
-	}
+func (req *Req) Delete(e Edge) {
 	req.addMutation(e, DEL)
-	return nil
 }
 
 // AddSchema sets the schema mutations
@@ -145,15 +120,26 @@ type nquadOp struct {
 	op Op
 }
 
-type Node uint64
+type Node struct {
+	uid uint64
+	// We can do variables in mutations.
+	varName string
+}
 
 func (n Node) String() string {
-	return fmt.Sprintf("%#x", uint64(n))
+	if n.uid != 0 {
+		return fmt.Sprintf("%#x", uint64(n.uid))
+	}
+	return n.varName
 }
 
 func (n *Node) ConnectTo(pred string, n1 Node) Edge {
 	e := Edge{}
-	e.nq.Subject = n.String()
+	if len(n.varName) != 0 {
+		e.nq.SubjectVar = n.String()
+	} else {
+		e.nq.Subject = n.String()
+	}
 	e.nq.Predicate = pred
 	e.ConnectTo(n1)
 	return e
@@ -161,7 +147,11 @@ func (n *Node) ConnectTo(pred string, n1 Node) Edge {
 
 func (n *Node) Edge(pred string) Edge {
 	e := Edge{}
-	e.nq.Subject = n.String()
+	if len(n.varName) != 0 {
+		e.nq.SubjectVar = n.String()
+	} else {
+		e.nq.Subject = n.String()
+	}
 	e.nq.Predicate = pred
 	return e
 }
@@ -178,7 +168,11 @@ func (e *Edge) ConnectTo(n Node) error {
 	if e.nq.ObjectType > 0 {
 		return ErrValue
 	}
-	e.nq.ObjectId = n.String()
+	if len(n.varName) != 0 {
+		e.nq.ObjectVar = n.String()
+	} else {
+		e.nq.ObjectId = n.String()
+	}
 	return nil
 }
 
@@ -308,6 +302,21 @@ func (e *Edge) SetValueDefault(val string) error {
 	}
 	e.nq.ObjectValue = v
 	e.nq.ObjectType = int32(types.StringID)
+	return nil
+}
+
+func (e *Edge) SetValueBytes(val []byte) error {
+	if len(e.nq.ObjectId) > 0 {
+		return ErrConnected
+	}
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(val)))
+	base64.StdEncoding.Encode(dst, val)
+	v, err := types.ObjectValue(types.BinaryID, []byte(dst))
+	if err != nil {
+		return err
+	}
+	e.nq.ObjectValue = v
+	e.nq.ObjectType = int32(types.BinaryID)
 	return nil
 }
 

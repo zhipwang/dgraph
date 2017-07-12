@@ -57,6 +57,7 @@ type GraphQuery struct {
 	MathExp      *MathTree
 	Normalize    bool
 	Cascade      bool
+	IgnoreReflex bool
 	Facets       *Facets
 	FacetsFilter *FilterTree
 	GroupbyAttrs []AttrLang
@@ -285,6 +286,7 @@ func convertToVarMap(variables map[string]string) (vm varMap) {
 
 type Request struct {
 	Str       string
+	Mutation  *protos.Mutation
 	Variables map[string]string
 	// We need this so that we don't try to do JSON.Unmarshal for request coming
 	// from Go client, as we directly get the variables in a map.
@@ -480,11 +482,11 @@ func Parse(r Request) (res Result, rerr error) {
 		return res, err
 	}
 
-	l := lex.Lexer{Input: query}
-	l.Run(lexTopLevel)
+	lexer := lex.Lexer{Input: query}
+	lexer.Run(lexTopLevel)
 
 	var qu *GraphQuery
-	it := l.NewIterator()
+	it := lexer.NewIterator()
 	fmap := make(fragmentMap)
 	for it.Next() {
 		item := it.Item()
@@ -537,6 +539,15 @@ func Parse(r Request) (res Result, rerr error) {
 			}
 			res.Query = append(res.Query, qu)
 		}
+	}
+
+	// Clients can pass mutations separately apart from passing it as part of request.
+	if r.Mutation != nil {
+		if res.Mutation == nil {
+			res.Mutation = &Mutation{}
+		}
+		res.Mutation.Set = append(res.Mutation.Set, r.Mutation.Set...)
+		res.Mutation.Del = append(res.Mutation.Del, r.Mutation.Del...)
 	}
 
 	if res.Mutation != nil {
@@ -762,7 +773,7 @@ L:
 		it.Next()
 		item := it.Item()
 		if item.Typ == itemName {
-			switch item.Val {
+			switch strings.ToLower(item.Val) {
 			case "filter":
 				if seenFilter {
 					return nil, x.Errorf("Repeated filter at root")
@@ -781,6 +792,8 @@ L:
 			case "groupby":
 				gq.IsGroupby = true
 				parseGroupby(it, gq)
+			case "ignorereflex":
+				gq.IgnoreReflex = true
 			default:
 				return nil, x.Errorf("Unknown directive [%s]", item.Val)
 			}
@@ -1515,6 +1528,10 @@ L:
 					g.Args = append(g.Args, val)
 				}
 
+				if g.Name == "var" {
+					return nil, x.Errorf("Unexpected var(). Maybe you want to try using uid()")
+				}
+
 				expectArg = false
 				if g.Name == VALUE {
 					// E.g. @filter(gt(val(a), 10))
@@ -2212,7 +2229,7 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				}
 				it.Next() // Consume the '('
 				if it.Item().Typ != itemLeftRound {
-					return x.Errorf("Invalid use of expand()", val)
+					return x.Errorf("Invalid use of expand()")
 				}
 				it.Next()
 				item := it.Item()
