@@ -19,7 +19,6 @@ package posting
 
 import (
 	"crypto/md5"
-	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -37,9 +36,6 @@ import (
 )
 
 var (
-	maxmemory = flag.Float64("max_memory_mb", 1024.0,
-		"Estimated max memory the process can take")
-	commitFraction   = flag.Float64("gentlecommit", 0.10, "Fraction of dirty posting lists to commit every few seconds.")
 	lhmapNumShards   = runtime.NumCPU() * 4
 	dummyPostingList []byte // Used for indexing.
 	elog             trace.EventLog
@@ -193,7 +189,7 @@ func periodicCommit() {
 			inUse := float64(megs)
 			idle := float64((ms.HeapIdle - ms.HeapReleased) / (1 << 20))
 
-			fraction := math.Min(1.0, *commitFraction*math.Exp(float64(dsize)/1000000.0))
+			fraction := math.Min(1.0, Config.CommitFraction*math.Exp(float64(dsize)/1000000.0))
 			gentleCommit(dirtyMap, pending, fraction)
 			x.MemoryInUse.Set(int64(inUse))
 			x.HeapIdle.Set(int64(idle))
@@ -201,8 +197,8 @@ func periodicCommit() {
 
 			stats := lcache.Stats()
 			x.EvictedPls.Set(int64(stats.NumEvicts))
-			x.LCacheSize.Set(int64(stats.Size))
-			x.LCacheLen.Set(int64(stats.Length))
+			x.LcacheSize.Set(int64(stats.Size))
+			x.LcacheLen.Set(int64(stats.Length))
 
 			// Flush out the dirtyChan after acquiring lock. This allow posting lists which
 			// are currently being processed to not get stuck on dirtyChan, which won't be
@@ -211,8 +207,8 @@ func periodicCommit() {
 			// Okay, we exceed the max memory threshold.
 			// Stop the world, and deal with this first.
 			x.NumGoRoutines.Set(int64(runtime.NumGoroutine()))
-			if setLruMemory && inUse > 0.75*(*maxmemory) {
-				go lcache.UpdateMaxSize()
+			if setLruMemory && inUse > 0.75*(Config.AllottedMemory) {
+				lcache.UpdateMaxSize()
 				setLruMemory = false
 			}
 		}
@@ -241,6 +237,7 @@ func Init(ps *badger.KV) {
 	marks = new(syncMarks)
 	pstore = ps
 	lcache = newListCache(math.MaxUint64)
+	x.LcacheCapacity.Set(math.MaxInt64)
 	dirtyChan = make(chan fingerPrint, 10000)
 	syncCh = make(chan syncEntry, syncChCapacity)
 
@@ -265,7 +262,6 @@ func GetOrCreate(key []byte, group uint32) (rlist *List, decr func()) {
 	lp := lcache.Get(fp)
 	if lp != nil {
 		x.CacheHit.Add(1)
-		lp.incr()
 		return lp, lp.decr
 	}
 	x.CacheMiss.Add(1)
@@ -275,11 +271,9 @@ func GetOrCreate(key []byte, group uint32) (rlist *List, decr func()) {
 	l := getNew(key, pstore) // This retrieves a new *List and sets refcount to 1.
 	l.water = marks.Get(group)
 
+	// We are always going to return lp to caller, whether it is l or not
+	// lcache increments the ref counter
 	lp = lcache.PutIfMissing(fp, l)
-
-	// We are always going to return lp to caller, whether it is l or not. So, let's
-	// increment its reference counter.
-	lp.incr()
 
 	if lp != l {
 		x.CacheRace.Add(1)
@@ -303,7 +297,6 @@ func Get(key []byte, gid uint32) (rlist *List, decr func()) {
 	lp := lcache.Get(fp)
 
 	if lp != nil {
-		lp.incr()
 		return lp, lp.decr
 	}
 
