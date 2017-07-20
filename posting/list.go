@@ -32,6 +32,7 @@ import (
 	"unsafe"
 
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/y"
 	"golang.org/x/net/trace"
 
 	"github.com/dgryski/go-farm"
@@ -333,7 +334,10 @@ func (l *List) updateMutationLayer(mpost *protos.Posting) bool {
 	x.AssertTrue(mpost.Op == Set || mpost.Op == Del)
 
 	// First check the mutable layer.
-	oldP, ok := l.mlayer.Get(mpost.Uid)
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, mpost.Uid)
+	oldP := l.mlayer.Get(b)
+	ok := oldP != y.ValueStruct{}
 
 	// This block handles the case where mpost.UID is found in mutation layer.
 	if ok {
@@ -380,7 +384,7 @@ func (l *List) updateMutationLayer(mpost *protos.Posting) bool {
 				l.len--
 			}
 		}
-		l.mlayer.Set(mpost.Uid, mpost)
+		l.mlayer.Put(b, mpost)
 		return true
 	}
 
@@ -413,7 +417,7 @@ func (l *List) updateMutationLayer(mpost *protos.Posting) bool {
 		}
 	}
 
-	l.mlayer.Set(mpost.Uid, mpost)
+	l.mlayer.Put(b, mpost)
 	return true
 }
 
