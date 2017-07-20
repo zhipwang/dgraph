@@ -32,7 +32,6 @@ import (
 	"unsafe"
 
 	"github.com/dgraph-io/badger"
-	"github.com/ryszard/goskiplist/skiplist"
 	"golang.org/x/net/trace"
 
 	"github.com/dgryski/go-farm"
@@ -40,6 +39,7 @@ import (
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/group"
 	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/skl"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/types/facets"
 	"github.com/dgraph-io/dgraph/x"
@@ -64,13 +64,15 @@ const (
 	Add uint32 = 0x03
 )
 
+const arenaSize = 1 << 11
+
 type List struct {
 	x.SafeMutex
 	index         x.SafeMutex
 	key           []byte
 	ghash         uint64
 	plist         *protos.PostingList
-	mlayer        *skiplist.SkipList // mutation layer
+	mlayer        *skl.Skiplist // mutation layer
 	len           int
 	lastCompact   time.Time
 	deleteMe      int32 // Using atomic for this, to avoid expensive SetForDeletion operation.
@@ -197,10 +199,8 @@ func (it *PIterator) Posting() *protos.Posting {
 	return it.uidPosting
 }
 
-func getNewSL() *skiplist.SkipList {
-	return skiplist.NewCustomMap(func(l, r interface{}) bool {
-		return l.(uint64) < r.(uint64)
-	})
+func getNewSL() *skl.Skiplist {
+	return skl.NewSkiplist(arenaSize)
 }
 
 func getNew(key []byte, pstore *badger.KV) *List {

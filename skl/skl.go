@@ -68,6 +68,7 @@ type node struct {
 
 type Skiplist struct {
 	height int32 // Current height. 1 <= height <= kMaxHeight. CAS.
+	count  uint32
 	head   *node
 	ref    int32
 	arena  *Arena
@@ -88,6 +89,10 @@ func init() {
 			}
 		}(i)
 	}
+}
+
+func (s *Skiplist) Len() int {
+	return int(atomic.LoadUint32(&s.count))
 }
 
 func (s *Skiplist) IncrRef() {
@@ -343,6 +348,7 @@ func (s *Skiplist) Put(key []byte, v y.ValueStruct) {
 			}
 		}
 	}
+	atomic.AddUint32(&s.count, 1)
 }
 
 // findLast returns the last element. If head (empty list), we return nil. All the find functions
