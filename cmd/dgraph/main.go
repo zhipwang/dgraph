@@ -87,6 +87,10 @@ func setupConfigOpts() {
 	defaults := dgraph.DefaultConfig
 	flag.StringVar(&config.PostingDir, "p", defaults.PostingDir,
 		"Directory to store posting lists.")
+	flag.StringVar(&config.PostingTables, "posting_tables", defaults.PostingTables,
+		"Specifies how Badger LSM tree is stored. Options are loadtoram, memorymap and "+
+			"nothing; which consume most to least RAM while providing best to worst "+
+			"performance respectively.")
 	flag.StringVar(&config.WALDir, "w", defaults.WALDir,
 		"Directory to store raft write-ahead logs.")
 	flag.BoolVar(&config.Nomutations, "nomutations", defaults.Nomutations,
@@ -155,6 +159,12 @@ func setupConfigOpts() {
 	flag.Parse()
 	if !flag.Parsed() {
 		log.Fatal("Unable to parse flags")
+	}
+
+	// Read from config file before setting config.
+	if config.ConfigFile != "" {
+		x.Println("Loading configuration from file:", config.ConfigFile)
+		x.LoadConfigFromYAML(config.ConfigFile)
 	}
 
 	dgraph.SetConfiguration(config)
@@ -261,6 +271,9 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if dgraph.Config.DebugMode {
+		fmt.Printf("Received query: %+v\n", q)
+	}
 	parseStart := time.Now()
 	parsed, err := dgraph.ParseQueryAndMutation(ctx, gql.Request{
 		Str:       q,
@@ -662,6 +675,11 @@ func setupServer(che chan error) {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	// Setting a higher number here allows more disk I/O calls to be scheduled, hence considerably
+	// improving throughput. The extra CPU overhead is almost negligible in comparison. The
+	// benchmark notes are located in badger-bench/randread.
+	runtime.GOMAXPROCS(128)
+
 	setupConfigOpts()
 	x.Init() // flag.Parse is called here
 
@@ -700,7 +718,7 @@ func main() {
 	// Setup external communication.
 	che := make(chan error, 1)
 	go setupServer(che)
-	go worker.StartRaftNodes(dgraph.State.WALstore)
+	go worker.StartRaftNodes(dgraph.State.WALstore, bindall)
 
 	if err := <-che; !strings.Contains(err.Error(),
 		"use of closed network connection") {

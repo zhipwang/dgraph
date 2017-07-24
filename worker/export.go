@@ -171,6 +171,9 @@ func toSchema(buf *bytes.Buffer, s *skv) {
 		buf.WriteString(strings.Join(s.schema.Tokenizer, ","))
 		buf.WriteByte(')')
 	}
+	if s.schema.Count {
+		buf.WriteString(" @count")
+	}
 	buf.WriteString(" . \n")
 }
 
@@ -213,7 +216,7 @@ func export(gid uint32, bdir string) error {
 		time.Now().Format("2006-01-02-15-04")))
 	fspath := path.Join(bdir, fmt.Sprintf("dgraph-schema-%d-%s.rdf.gz", gid,
 		time.Now().Format("2006-01-02-15-04")))
-	fmt.Printf("Exporting to: %v, schema at %v\n", fpath, fspath)
+	x.Printf("Exporting to: %v, schema at %v\n", fpath, fspath)
 	chb := make(chan []byte, 1000)
 	errChan := make(chan error, 2)
 	go func() {
@@ -285,13 +288,8 @@ func export(gid uint32, bdir string) error {
 		key := item.Key()
 		pk := x.Parse(key)
 
-		if pk.IsIndex() {
-			// Seek to the end of index keys.
-			it.Seek(pk.SkipRangeOfSameType())
-			continue
-		}
-		if pk.IsReverse() {
-			// Seek to the end of reverse keys.
+		if pk.IsIndex() || pk.IsReverse() || pk.IsCount() {
+			// Seek to the end of index, reverse and count keys.
 			it.Seek(pk.SkipRangeOfSameType())
 			continue
 		}

@@ -22,7 +22,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 
@@ -101,7 +100,7 @@ func (p *poolsi) release(pl *pool) {
 func destroyPool(pl *pool) {
 	err := pl.conn.Close()
 	if err != nil {
-		log.Printf("Error closing cluster connection: %v\n", err.Error())
+		x.Printf("Error closing cluster connection: %v\n", err.Error())
 	}
 }
 
@@ -140,21 +139,21 @@ func (p *poolsi) connect(addr string) (*pool, bool) {
 	pool.AddOwner() // matches p.put() in goroutine
 	go func() {
 		defer p.release(pool)
-		err = TestConnection(pool)
+		err = testConnection(pool)
 		if err != nil {
-			log.Printf("Connection to %q fails, got error: %v\n", addr, err)
+			x.Printf("Connection to %q fails, got error: %v\n", addr, err)
 			// Don't return -- let's still put the empty pool in the map.  Its users
 			// have to handle errors later anyway.
 		} else {
-			fmt.Printf("Connection with %q healthy.\n", addr)
+			x.Printf("Connection with %q healthy.\n", addr)
 		}
 	}()
 
 	return pool, true
 }
 
-// TestConnection tests if we can run an Echo query on a connection.
-func TestConnection(p *pool) error {
+// testConnection tests if we can run an Echo query on a connection.
+func testConnection(p *pool) error {
 	conn := p.Get()
 
 	query := new(protos.Payload)

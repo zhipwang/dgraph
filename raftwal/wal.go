@@ -20,7 +20,6 @@ package raftwal
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
@@ -82,16 +81,17 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 	if err := w.wals.Set(w.snapshotKey(gid), data); err != nil {
 		return err
 	}
-	fmt.Printf("Writing snapshot to WAL: %+v\n", s)
+	x.Printf("Writing snapshot to WAL: %+v\n", s)
 
-	go func() {
+	go func(term uint64, index uint64) {
 		// Delete all entries before this snapshot to save disk space.
 		start := w.entryKey(gid, 0, 0)
-		last := w.entryKey(gid, s.Metadata.Term, s.Metadata.Index)
+		last := w.entryKey(gid, term, index)
 		opt := badger.DefaultIteratorOptions
 		opt.FetchValues = false
 		itr := w.wals.NewIterator(opt)
 		defer itr.Close()
+
 		for itr.Seek(start); itr.Valid(); itr.Next() {
 			key := itr.Item().Key()
 			if bytes.Compare(key, last) > 0 {
@@ -105,14 +105,14 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 		// Failure to delete entries is not a fatal error, so should be
 		// ok to ignore
 		if err := w.wals.BatchSet(wb); err != nil {
-			fmt.Printf("Error while deleting entries %v\n", err)
+			x.Printf("Error while deleting entries %v\n", err)
 		}
 		for _, wbe := range wb {
 			if err := wbe.Error; err != nil {
-				fmt.Printf("Error while deleting entries %v\n", err)
+				x.Printf("Error while deleting entries %v\n", err)
 			}
 		}
-	}()
+	}(s.Metadata.Term, s.Metadata.Index)
 	return nil
 }
 

@@ -49,10 +49,17 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
+var passwordCache map[string]string = make(map[string]string, 2)
+
 func addPassword(t *testing.T, uid uint64, attr, password string) {
 	value := types.ValueForType(types.BinaryID)
 	src := types.ValueForType(types.PasswordID)
-	src.Value, _ = types.Encrypt(password)
+	encrypted, ok := passwordCache[password]
+	if !ok {
+		encrypted, _ = types.Encrypt(password)
+		passwordCache[password] = encrypted
+	}
+	src.Value = encrypted
 	err := types.Marshal(src, &value)
 	require.NoError(t, err)
 	addEdgeToTypedValue(t, attr, uid, types.PasswordID, value.Value.([]byte), nil)
@@ -160,12 +167,9 @@ func populateGraph(t *testing.T) {
 	addEdgeToValue(t, "sword_present", 1, "true", nil)
 	addEdgeToValue(t, "_xid_", 1, "mich", nil)
 
-	addPassword(t, 1, "password", "123456")
-
 	// Now let's add a name for each of the friends, except 101.
 	addEdgeToTypedValue(t, "name", 23, types.StringID, []byte("Rick Grimes"), nil)
 	addEdgeToValue(t, "age", 23, "15", nil)
-	addPassword(t, 23, "pass", "654321")
 
 	src.Value = []byte(`{"Type":"Polygon", "Coordinates":[[[0.0,0.0], [2.0,0.0], [2.0, 2.0], [0.0, 2.0], [0.0, 0.0]]]}`)
 	coord, err = types.Convert(src, types.GeoID)
@@ -1424,6 +1428,24 @@ func TestUseVarsFilterVarReuse2(t *testing.T) {
 		js)
 }
 
+func TestDoubleOrder(t *testing.T) {
+	populateGraph(t)
+	query := `
+    {
+		me(func: uid(1)) {
+			friend(orderdesc: dob) @facets(orderasc: weight) 
+		}
+	}
+  `
+	res, err := gql.Parse(gql.Request{Str: query})
+	require.NoError(t, err)
+
+	ctx := defaultContext()
+	qr := QueryRequest{Latency: &Latency{}, GqlQuery: &res}
+	err = qr.ProcessQuery(ctx)
+	require.Error(t, err)
+}
+
 func TestVarInAggError(t *testing.T) {
 	populateGraph(t)
 	query := `
@@ -2620,6 +2642,8 @@ func TestSum(t *testing.T) {
 
 func TestQueryPassword(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	// Password is not fetchable
 	query := `
                 {
@@ -2640,6 +2664,8 @@ func TestQueryPassword(t *testing.T) {
 
 func TestCheckPassword(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(0x01)) {
@@ -2656,6 +2682,8 @@ func TestCheckPassword(t *testing.T) {
 
 func TestCheckPasswordIncorrect(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(0x01)) {
@@ -2673,6 +2701,8 @@ func TestCheckPasswordIncorrect(t *testing.T) {
 // ensure, that old and deprecated form is not allowed
 func TestCheckPasswordParseError(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(0x01)) {
@@ -2687,6 +2717,8 @@ func TestCheckPasswordParseError(t *testing.T) {
 
 func TestCheckPasswordDifferentAttr1(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(23)) {
@@ -2701,6 +2733,8 @@ func TestCheckPasswordDifferentAttr1(t *testing.T) {
 
 func TestCheckPasswordDifferentAttr2(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(23)) {
@@ -2715,6 +2749,8 @@ func TestCheckPasswordDifferentAttr2(t *testing.T) {
 
 func TestCheckPasswordInvalidAttr(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(0x1)) {
@@ -2731,6 +2767,8 @@ func TestCheckPasswordInvalidAttr(t *testing.T) {
 // test for old version of checkpwd with hardcoded attribute name
 func TestCheckPasswordQuery1(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(0x1)) {
@@ -2747,6 +2785,8 @@ func TestCheckPasswordQuery1(t *testing.T) {
 // test for improved version of checkpwd with custom attribute name
 func TestCheckPasswordQuery2(t *testing.T) {
 	populateGraph(t)
+	addPassword(t, 23, "pass", "654321")
+	addPassword(t, 1, "password", "123456")
 	query := `
                 {
                         me(func: uid(23)) {
@@ -6502,11 +6542,16 @@ func TestSchemaBlock2(t *testing.T) {
 			reverse
 			type
 			tokenizer
+			count
 		}
 	`
 	actual := processSchemaQuery(t, query)
 	expected := []*protos.SchemaNode{
-		{Predicate: "name", Type: "string", Index: true, Tokenizer: []string{"term", "exact", "trigram"}}}
+		{Predicate: "name",
+			Type:      "string",
+			Index:     true,
+			Tokenizer: []string{"term", "exact", "trigram"},
+			Count:     true}}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -6517,13 +6562,15 @@ func TestSchemaBlock3(t *testing.T) {
 			reverse
 			type
 			tokenizer
+			count
 		}
 	`
 	actual := processSchemaQuery(t, query)
 	expected := []*protos.SchemaNode{{Predicate: "age",
 		Type:      "int",
 		Index:     true,
-		Tokenizer: []string{"int"}}}
+		Tokenizer: []string{"int"},
+		Count:     false}}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -6554,7 +6601,11 @@ func TestSchemaBlock5(t *testing.T) {
 	`
 	actual := processSchemaQuery(t, query)
 	expected := []*protos.SchemaNode{
-		{Predicate: "name", Type: "string", Index: true, Tokenizer: []string{"term", "exact", "trigram"}}}
+		{Predicate: "name",
+			Type:      "string",
+			Index:     true,
+			Tokenizer: []string{"term", "exact", "trigram"},
+			Count:     true}}
 	checkSchemaNodes(t, expected, actual)
 }
 
@@ -6614,7 +6665,7 @@ func TestMain(m *testing.M) {
 	walStore, err := badger.NewKV(&kvOpt)
 	x.Check(err)
 
-	worker.StartRaftNodes(walStore)
+	worker.StartRaftNodes(walStore, false)
 	// Load schema after nodes have started
 	err = schema.ParseBytes([]byte(schemaStr), 1)
 	x.Check(err)
@@ -7650,6 +7701,32 @@ func TestGetAllPredicatesFunctions(t *testing.T) {
 	require.Contains(t, predicates, "alias")
 	require.Contains(t, predicates, "friend")
 	require.Contains(t, predicates, "school")
+	require.Contains(t, predicates, "follow")
+}
+
+// gather predicates from functions and filters
+func TestGetAllPredicatesFunctions2(t *testing.T) {
+	query := `
+	{
+		me(func:anyofterms(name, "Alice")) @filter(le(age, 30)) {
+			alias
+			friend @filter(uid(123, 5000)) {
+				alias
+				follow
+			}
+		}
+	}
+	`
+
+	subGraphs := getSubGraphs(t, query)
+
+	predicates := GetAllPredicates(subGraphs)
+	require.NotNil(t, predicates)
+	require.Equal(t, 5, len(predicates))
+	require.Contains(t, predicates, "name")
+	require.Contains(t, predicates, "age")
+	require.Contains(t, predicates, "alias")
+	require.Contains(t, predicates, "friend")
 	require.Contains(t, predicates, "follow")
 }
 

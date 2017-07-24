@@ -22,7 +22,6 @@ package posting
 import (
 	"container/list"
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/dgraph-io/dgraph/x"
@@ -69,10 +68,11 @@ func (c *listCache) UpdateMaxSize() {
 	defer c.Unlock()
 	if c.curSize < (50 << 20) {
 		c.MaxSize = 50 << 20
-		fmt.Println("LRU cache max size is being set to 50 MB")
+		x.Println("LRU cache max size is being set to 50 MB")
+		x.LcacheCapacity.Set(50 << 20)
 		return
 	}
-	x.LcacheCapacity.Set(int64(50 << 0))
+	x.LcacheCapacity.Set(int64(c.curSize))
 	c.MaxSize = c.curSize
 }
 
@@ -119,11 +119,13 @@ func (c *listCache) removeOldest() {
 		e := ele.Value.(*entry)
 		c.curSize -= e.size
 
-		// TODO: We should only remove the key after the PL is synced to disk.
 		e.pl.SetForDeletion()
-		e.pl.SyncIfDirty()
-		delete(c.cache, e.key)
-		e.pl.decr()
+		// If length of mutation layer is zero, then we won't call pstore.SetAsync and the
+		// key wont be deleted from cache. So lets delete it now if SyncIfDirty returns false.
+		if committed, _ := e.pl.SyncIfDirty(true); !committed {
+			delete(c.cache, e.key)
+			e.pl.decr()
+		}
 	}
 }
 
@@ -176,21 +178,34 @@ func (c *listCache) Reset() {
 	c.curSize = 0
 }
 
-// TODO: Remove it later
-// Clear purges all stored items from the cache.
-func (c *listCache) Clear() error {
+func (c *listCache) clear(attr string) error {
 	c.Lock()
 	defer c.Unlock()
-	for key, e := range c.cache {
+	for k, e := range c.cache {
 		kv := e.Value.(*entry)
+		keyAttr := x.ParseAttr(kv.pl.key)
+		if keyAttr != attr {
+			continue
+		}
+		c.ll.Remove(e)
 		kv.pl.SetForDeletion()
-		kv.pl.SyncIfDirty()
-		delete(c.cache, key)
-		kv.pl.decr()
-
+		if committed, _ := kv.pl.SyncIfDirty(true); !committed {
+			delete(c.cache, k)
+			kv.pl.decr()
+		}
 	}
-	c.ll = list.New()
-	c.cache = make(map[uint64]*list.Element)
-	c.curSize = 0
 	return nil
+}
+
+// delete removes a key from cache
+func (c *listCache) delete(key uint64) {
+	c.Lock()
+	defer c.Unlock()
+
+	if ele, ok := c.cache[key]; ok {
+		c.ll.Remove(ele)
+		delete(c.cache, key)
+		kv := ele.Value.(*entry)
+		kv.pl.decr()
+	}
 }
