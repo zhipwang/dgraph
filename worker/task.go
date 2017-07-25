@@ -48,6 +48,30 @@ var (
 	regexTok     tok.ExactTokenizer
 )
 
+type plf struct {
+	idx  int
+	key  []byte
+	pl   *posting.List
+	decr func()
+}
+
+type plheap []plf
+
+func (h plheap) Len() int           { return len(h) }
+func (h plheap) Less(i, j int) bool { return h[i].idx < h[j].idx }
+func (h plheap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *plheap) Push(x interface{}) {
+	*h = append(*h, x.(elem))
+}
+
+func (h *plheap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
 // ProcessTaskOverNetwork is used to process the query and get the result from
 // the instance which stores posting list corresponding to the predicate in the
 // query.
@@ -273,14 +297,29 @@ func processTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.Resu
 	if err != nil {
 		return nil, err
 	}
-
-	type plf struct {
-		pl   *posting.List
-		decr func()
-	}
 	plch := make(chan plf, 1000)
+	och := make(chan plf, 1000)
 	stopCh := make(chan struct{}, 1)
 	go func(q *protos.Query, srcFn *functionContext) {
+		var wg sync.WaitGroup
+		dch := make(chan plf, 1000)
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				for it := range dch {
+					pl, decr := posting.GetOrCreate(it.key, gid)
+					och <- plf{it.i, it.key, pl, decr}
+				}
+				wg.Done()
+			}()
+		}
+
+		go func() {
+			for it := range och {
+
+			}
+		}()
+
 	L:
 		for i := 0; i < srcFn.n; i++ {
 			select {
@@ -301,12 +340,17 @@ func processTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.Resu
 			} else {
 				key = x.IndexKey(attr, srcFn.tokens[i])
 			}
-			// Get or create the posting list for an entity, attribute combination.
-			pl, decr := posting.GetOrCreate(key, gid)
-			plch <- plf{pl, decr}
-			//defer decr()
+			dch <- plf{i: i, key: key}
+			/*
+				// Get or create the posting list for an entity, attribute combination.
+				pl, decr := posting.GetOrCreate(key, gid)
+				plch <- plf{pl, decr}
+				//defer decr()
+			*/
 		}
-		close(plch)
+		close(dch)
+		wg.Wait()
+		close(och)
 	}(q, srcFn)
 
 	i := -1
@@ -314,7 +358,7 @@ func processTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.Resu
 	var lastDecr func()
 BL:
 	// NOTE: Never return inside this loop
-	for it := range plch {
+	for it := range och {
 		i++
 		if lastDecr != nil {
 			lastDecr()
@@ -458,7 +502,7 @@ BL:
 		out.UidMatrix = append(out.UidMatrix, uidList)
 	}
 
-	for it := range plch {
+	for it := range och {
 		// Some items might be left after error. decr() their reference.
 		it.decr()
 	}
