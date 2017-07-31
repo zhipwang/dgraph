@@ -13,13 +13,14 @@ import FrameSuccess from "./FrameSuccess";
 import FrameLoading from "./FrameLoading";
 
 // getFrameContent returns React Component for a given frame depending on its type
-function getFrameContent(frame) {
+function getFrameContent(frame, response) {
   if (frame.type === FRAME_TYPE_SESSION) {
-    return <FrameSession session={frame.data} />;
+    return <FrameSuccess data={frame.data} response={response} />;
+    // return <FrameSession session={frame.data} response={response} />;
   } else if (frame.type === FRAME_TYPE_ERROR) {
     return <FrameError data={frame.data} />;
   } else if (frame.type === FRAME_TYPE_SUCCESS) {
-    return <FrameSuccess data={frame.data} />;
+    return <FrameSuccess data={frame.data} response={response} />;
   } else if (frame.type === FRAME_TYPE_LOADING) {
     return <FrameLoading />;
   }
@@ -29,15 +30,17 @@ function getFrameContent(frame) {
 
 const FrameItem = ({
   frame,
+  response,
   onDiscardFrame,
   onSelectQuery,
   collapseAllFrames
 }) => {
-  const content = getFrameContent(frame);
+  const content = getFrameContent(frame, response);
 
   return (
     <FrameLayout
       frame={frame}
+      response={response}
       onDiscardFrame={onDiscardFrame}
       onSelectQuery={onSelectQuery}
       collapseAllFrames={collapseAllFrames}

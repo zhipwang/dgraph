@@ -11,7 +11,7 @@ import {
   FRAME_TYPE_LOADING,
   FRAME_TYPE_SUCCESS
 } from "../lib/const";
-import { getShareId } from "../actions";
+import { getShareId, runQuery } from "../actions";
 import { updateFrame } from "../actions/frames";
 
 class FrameLayout extends React.Component {
@@ -192,6 +192,10 @@ const mapStateToProps = state => ({});
 
 const mapDispatchToProps = dispatch => ({
   changeCollapseState(frame, nextCollapseState) {
+    if (nextCollapseState === false) {
+      console.log(frame);
+      dispatch(runQuery(frame.data.query, frame.id));
+    }
     return dispatch(
       updateFrame({
         id: frame.id,

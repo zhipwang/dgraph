@@ -18,6 +18,7 @@ import { processGraph } from "../lib/graph";
 
 import { receiveFrame, updateFrame } from "./frames";
 import { updateConnectedState } from "./connection";
+import { updateResponse } from "./response";
 
 // executeQueryAndUpdateFrame fetches the query response from the server
 // and updates the frame
@@ -46,9 +47,14 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             type: FRAME_TYPE_ERROR,
             data: {
               query,
-              message: result.errors[0].message,
-              response: result
+              message: result.errors[0].message
             }
+          })
+        );
+        dispatch(
+          updateResponse({
+            id: frameId,
+            response: result
           })
         );
       } else if (
@@ -71,9 +77,15 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             type: frameType,
             data: {
               query,
-              message: result.data.message,
-              response: result
+              message: result.data.message
             }
+          })
+        );
+
+        dispatch(
+          updateResponse({
+            id: frameId,
+            response: result
           })
         );
       } else if (isNotEmpty(result.data)) {
@@ -88,18 +100,23 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             id: frameId,
             type: FRAME_TYPE_SESSION,
             data: {
-              query,
-              response: {
-                plotAxis: labels,
-                allNodes: nodes,
-                allEdges: edges,
-                numNodes: nodes.length,
-                numEdges: edges.length,
-                nodes: nodes.slice(0, nodesIndex),
-                edges: edges.slice(0, edgesIndex),
-                treeView: false,
-                data: result
-              }
+              query
+            }
+          })
+        );
+        dispatch(
+          updateResponse({
+            id: frameId,
+            response: {
+              plotAxis: labels,
+              allNodes: nodes,
+              allEdges: edges,
+              numNodes: nodes.length,
+              numEdges: edges.length,
+              nodes: nodes.slice(0, nodesIndex),
+              edges: edges.slice(0, edgesIndex),
+              treeView: false,
+              data: result
             }
           })
         );
@@ -110,9 +127,14 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             type: FRAME_TYPE_SUCCESS,
             data: {
               query,
-              message: "Your query did not return any results",
-              response: result
+              message: "Your query did not return any results"
             }
+          })
+        );
+        dispatch(
+          updateResponse({
+            id: frameId,
+            response: result
           })
         );
       }
@@ -133,9 +155,14 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
             type: FRAME_TYPE_ERROR,
             data: {
               query,
-              message: `${error.message}: Could not connect to the server`,
-              response: error
+              message: `${error.message}: Could not connect to the server`
             }
+          })
+        );
+        dispatch(
+          updateResponse({
+            id: frameId,
+            response: error
           })
         );
       } else {
@@ -146,9 +173,14 @@ function executeQueryAndUpdateFrame(dispatch, { frameId, query }) {
               type: FRAME_TYPE_ERROR,
               data: {
                 query,
-                message: text,
-                response: error
+                message: text
               }
+            })
+          );
+          dispatch(
+            updateResponse({
+              id: frameId,
+              response: error
             })
           );
         });
@@ -338,14 +370,19 @@ export const runQueryByShareId = shareId => {
     return getSharedQuery(shareId)
       .then(query => {
         if (!query) {
+          dispatch(
+            updateResponse({
+              id: frame.id,
+              response: JSON.stringify("{}")
+            })
+          );
           return dispatch(
             updateFrame({
               id: frame.id,
               type: FRAME_TYPE_ERROR,
               data: {
                 query: "", // TOOD: make query optional
-                message: `No query found for the shareId: ${shareId}`,
-                response: JSON.stringify("{}") // TOOD: make response optional
+                message: `No query found for the shareId: ${shareId}`
               }
             })
           );
@@ -358,15 +395,19 @@ export const runQueryByShareId = shareId => {
       })
       .catch(error => {
         Raven.captureException(error);
-
+        dispatch(
+          updateResponse({
+            id: frame.id,
+            response: JSON.stringify(error)
+          })
+        );
         return dispatch(
           updateFrame({
             id: frame.id,
             type: FRAME_TYPE_ERROR,
             data: {
               query: "",
-              message: error.message,
-              response: JSON.stringify(error)
+              message: error.message
             }
           })
         );

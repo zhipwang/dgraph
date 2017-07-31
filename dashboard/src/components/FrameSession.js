@@ -30,6 +30,11 @@ class FrameSession extends React.Component {
     };
 
     const { session: { response } } = props;
+    if (!response) {
+      this.nodes = new vis.DataSet([]);
+      this.edges = new vis.DataSet([]);
+      return;
+    }
     this.nodes = new vis.DataSet(response.nodes);
     this.edges = new vis.DataSet(response.edges);
   }

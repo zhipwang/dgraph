@@ -139,7 +139,7 @@ class App extends React.Component {
 
   render = () => {
     const { query, isQueryDirty, currentSidebarMenu } = this.state;
-    const { handleDiscardFrame, frames, connected } = this.props;
+    const { handleDiscardFrame, frames, connected, responses } = this.props;
 
     const canDiscardAll = frames.length > 0;
 
@@ -180,6 +180,7 @@ class App extends React.Component {
               <div className="col-sm-12">
                 <FrameList
                   frames={frames}
+                  responses={responses}
                   onDiscardFrame={handleDiscardFrame}
                   onSelectQuery={this.handleSelectQuery}
                   collapseAllFrames={this.collapseAllFrames}
@@ -195,6 +196,7 @@ class App extends React.Component {
 
 const mapStateToProps = state => ({
   frames: state.frames.items,
+  responses: state.response.items,
   connected: state.connection.connected
 });
 

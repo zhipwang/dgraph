@@ -22,7 +22,7 @@ class FrameSuccess extends React.Component {
   };
 
   render() {
-    const { data } = this.props;
+    const { data, response } = this.props;
     const { currentTab } = this.state;
 
     return (
@@ -68,7 +68,7 @@ class FrameSuccess extends React.Component {
               ? <FrameMessageTab message={data.message} />
               : null}
             {currentTab === "response"
-              ? <FrameCodeTab query={data.query} response={data.response} />
+              ? <FrameCodeTab query={data.query} response={response.response} />
               : null}
           </div>
         </div>
