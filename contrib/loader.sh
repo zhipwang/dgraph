@@ -118,7 +118,10 @@ echo -e "\nShutting down Dgraph"
 quit 0
 
 # Wait for clean shutdown.
-sleep 20
+while pgrep -x "dgraph" > /dev/null; do
+  echo -e "Dgraph is still running. Sleeping for 5 seconds."
+  sleep 5
+done
 
 echo -e "\nTrying to restart Dgraph and match export count"
 pushd cmd/dgraph &> /dev/null
