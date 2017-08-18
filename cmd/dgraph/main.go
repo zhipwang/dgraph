@@ -36,6 +36,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/pprof"
+	mtrace "runtime/trace"
 	"strconv"
 	"strings"
 	"syscall"
@@ -456,6 +457,13 @@ func shareHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func traceHandler(w http.ResponseWriter, r *http.Request) {
+	f, _ := os.Open("trace.out")
+	mtrace.Start(f)
+	time.Sleep(time.Second * 30)
+	mtrace.Stop()
+}
+
 // storeStatsHandler outputs some basic stats for data store.
 func storeStatsHandler(w http.ResponseWriter, r *http.Request) {
 	addCorsHeaders(w)
@@ -656,6 +664,7 @@ func setupServer(che chan error) {
 	http.HandleFunc("/query", queryHandler)
 	http.HandleFunc("/share", shareHandler)
 	http.HandleFunc("/debug/store", storeStatsHandler)
+	http.HandleFunc("/debug/trace", traceHandler)
 	http.HandleFunc("/admin/shutdown", shutDownHandler)
 	http.HandleFunc("/admin/export", exportHandler)
 
