@@ -459,6 +459,7 @@ func shareHandler(w http.ResponseWriter, r *http.Request) {
 
 func traceHandler(w http.ResponseWriter, r *http.Request) {
 	f, _ := os.Open("trace.out")
+	defer f.Close()
 	mtrace.Start(f)
 	time.Sleep(time.Second * 30)
 	mtrace.Stop()
