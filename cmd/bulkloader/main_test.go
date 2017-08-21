@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger"
 )
 
 func TestBulkLoader(t *testing.T) {
@@ -42,12 +44,10 @@ func runTestCase(t *testing.T, testDir string) {
 	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile)
 	loadWithBulkLoader(t, bulkLoaderDir, rdfFile)
 
-	// Create badger instance.
-	// Load via bulk loader.
-
-	// Compare the keys.
-
-	// Remove all of the temp dirs.
+	cmpBadgers(t,
+		filepath.Join(dgraphLoaderDir, "p"),
+		filepath.Join(bulkLoaderDir, "p"),
+	)
 }
 
 func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
@@ -114,10 +114,41 @@ func loadWithBulkLoader(t *testing.T, dataDir string, rdfFile string) {
 		"-r", rdfFile,
 	)
 	buf, err := bl.CombinedOutput()
-	t.Log(string(buf))
 	if err != nil {
 		t.Log(string(buf))
 		t.Fatal(err)
+	}
+}
+
+func cmpBadgers(t *testing.T, dgraphLoaderP, bulkLoaderP string) {
+
+	opt := badger.DefaultOptions
+	opt.Dir = dgraphLoaderP
+	opt.ValueDir = opt.Dir
+	wantKV, err := badger.NewKV(&opt)
+	noErr(t, "Could not start want KV:", err)
+	defer func() { noErr(t, "Could not close want KV:", wantKV.Close()) }()
+
+	opt.Dir = bulkLoaderP
+	opt.ValueDir = opt.Dir
+	gotKV, err := badger.NewKV(&opt)
+	defer func() { noErr(t, "Could not close got KV:", gotKV.Close()) }()
+
+	wantIt := wantKV.NewIterator(badger.DefaultIteratorOptions)
+	gotIt := gotKV.NewIterator(badger.DefaultIteratorOptions)
+	wantIt.Seek([]byte(nil))
+	gotIt.Seek([]byte(nil))
+
+	for wantIt.Valid() && gotIt.Valid() {
+		t.Fatal("ASSERT FALSE")
+	}
+	for wantIt.Valid() {
+		t.Errorf("Exists in want but not got:\nK: %v\nV: %v\n", wantIt.Item().Key(), wantIt.Item().Value())
+		wantIt.Next()
+	}
+	for gotIt.Valid() {
+		t.Errorf("Exists in got but not want:\nK: %v\nV: %v\n", gotIt.Item().Key(), gotIt.Item().Value())
+		gotIt.Next()
 	}
 }
 
