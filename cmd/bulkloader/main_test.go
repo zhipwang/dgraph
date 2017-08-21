@@ -33,13 +33,14 @@ func runTestCase(t *testing.T, testDir string) {
 	noErr(t, "Could not create temp dir:", err)
 	defer os.RemoveAll(dgraphLoaderDir)
 
-	//bulkLoaderDir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
-	//noErr(t, err)
-	//defer os.RemoveAll(bulkLoaderDir)
+	bulkLoaderDir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
+	noErr(t, "Could not create temp dir:", err)
+	defer os.RemoveAll(bulkLoaderDir)
 
 	rdfFile := filepath.Join(testDir, "data.rdf")
 
 	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile)
+	loadWithBulkLoader(t, bulkLoaderDir, rdfFile)
 
 	// Create badger instance.
 	// Load via bulk loader.
@@ -106,7 +107,18 @@ func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
 	}
 }
 
-func loadWithBulkLoader(t *testing.T, dataDir string) {
+func loadWithBulkLoader(t *testing.T, dataDir string, rdfFile string) {
+	noErr(t, "Could not create p dir:", os.Mkdir(filepath.Join(dataDir, "p"), 0755))
+
+	bl := exec.Command("bulkloader",
+		"-r", rdfFile,
+	)
+	buf, err := bl.CombinedOutput()
+	t.Log(string(buf))
+	if err != nil {
+		t.Log(string(buf))
+		t.Fatal(err)
+	}
 }
 
 func noErr(t *testing.T, msg string, err error) {
