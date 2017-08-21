@@ -106,14 +106,16 @@ func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
 }
 
 func loadWithBulkLoader(t *testing.T, dataDir string, rdfFile string) {
-	noErr(t, "Could not create p dir:", os.Mkdir(filepath.Join(dataDir, "p"), 0755))
+	badgerDir := filepath.Join(dataDir, "p")
+	noErr(t, "Could not create p dir:", os.Mkdir(badgerDir, 0755))
 
 	bl := exec.Command("bulkloader",
 		"-r", rdfFile,
+		"-b", badgerDir,
 	)
 	buf, err := bl.CombinedOutput()
+	t.Log(string(buf))
 	if err != nil {
-		t.Log(string(buf))
 		t.Fatal(err)
 	}
 }
