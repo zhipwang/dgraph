@@ -16,8 +16,8 @@ func main() {
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
 	flag.Parse()
 
-	lastUID := 0
-	uids := make(map[string]uint64)
+	//lastUID := 0
+	//uids := make(map[string]uint64)
 
 	// Load RDF
 	f, err := os.Open(*rdfFile)

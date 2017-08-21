@@ -127,11 +127,14 @@ func processFile(ctx context.Context, file string, dgraphClient *client.Dgraph) 
 	f, err := os.Open(file)
 	x.Check(err)
 	defer f.Close()
-	gr, err := gzip.NewReader(f)
-	x.Check(err)
+	var rdr io.Reader = f
+	if strings.HasSuffix(file, ".gz") {
+		rdr, err = gzip.NewReader(f)
+		x.Check(err)
+	}
 
 	var buf bytes.Buffer
-	bufReader := bufio.NewReader(gr)
+	bufReader := bufio.NewReader(rdr)
 
 	absPath, err := filepath.Abs(file)
 	x.Check(err)
