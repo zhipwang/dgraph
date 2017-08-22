@@ -62,8 +62,11 @@ func main() {
 
 		fmt.Printf("%#v\n", nq.NQuad)
 
-		predicateSchema[nq.GetPredicate()] = nil
+		predicateSchema[nq.GetPredicate()] = &protos.SchemaUpdate{
+			ValueType: uint32(gql.TypeValFrom(nq.GetObjectValue()).Tid),
+		}
 
+		nq.GetObjectValue().GetVal()
 		getUid(nq.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
 		de, err := nq.ToEdgeUsing(uidMap)
 		x.Check(err)
