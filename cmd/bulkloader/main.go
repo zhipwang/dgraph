@@ -17,6 +17,7 @@ import (
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/rdf"
 	"github.com/dgraph-io/dgraph/x"
+	farm "github.com/dgryski/go-farm"
 )
 
 func main() {
@@ -80,10 +81,11 @@ func main() {
 		////Uids:
 		//}
 
+		fingerprint := farm.Fingerprint64([]byte(nq.GetPredicate()))
 		list = &protos.PostingList{
 			Postings: []*protos.Posting{
 				&protos.Posting{
-					Uid:         407209193152762291, // TODO: Not sure where this comes from. I *think* it's the farm.Fingerprint64 of the value (i.e. predicate).
+					Uid:         fingerprint,
 					Value:       []byte(nq.GetPredicate()),
 					ValType:     protos.Posting_DEFAULT,
 					PostingType: protos.Posting_VALUE,
@@ -96,7 +98,7 @@ func main() {
 			},
 			Checksum: nil,
 			Commit:   0,
-			Uids:     bitPackUids([]uint64{407209193152762291}),
+			Uids:     bitPackUids([]uint64{fingerprint}),
 		}
 		val, err = list.Marshal()
 		x.Check(err)
