@@ -74,24 +74,10 @@ func main() {
 		x.Check(kv.Set(key, val, 0))
 
 		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
-		fingerprint := farm.Fingerprint64([]byte(nq.GetPredicate()))
+		p := createPredicatePosting(nq.GetPredicate())
 		list = &protos.PostingList{
-			Postings: []*protos.Posting{
-				&protos.Posting{
-					Uid:         fingerprint,
-					Value:       []byte(nq.GetPredicate()),
-					ValType:     protos.Posting_DEFAULT,
-					PostingType: protos.Posting_VALUE,
-					Metadata:    nil,
-					Label:       "",
-					Commit:      0,
-					Facets:      nil,
-					Op:          3,
-				},
-			},
-			Checksum: nil,
-			Commit:   0,
-			Uids:     bitPackUids([]uint64{fingerprint}),
+			Postings: []*protos.Posting{p},
+			Uids:     bitPackUids([]uint64{p.Uid}),
 		}
 		val, err = list.Marshal()
 		x.Check(err)
@@ -109,6 +95,17 @@ func main() {
 			x.Check(err)
 		}
 		x.Check(kv.Set(k, v, 0))
+	}
+}
+
+func createPredicatePosting(predicate string) *proto.Posting {
+	fp := farm.Fingerprint64([]byte(predicate))
+	return &protos.Posting{
+		Uid:         fp,
+		Value:       predicate,
+		ValType:     protos.Posting_DEFAULT,
+		PostingType: protos.Posting_VALUE,
+		Op:          3,
 	}
 }
 
