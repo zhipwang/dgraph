@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -12,23 +13,51 @@ import (
 	"time"
 )
 
-func TestBulkLoader(t *testing.T) {
-	fis, err := ioutil.ReadDir("test_data")
-	noErr(t, "Could not open test_data dir:", err)
-	installBinaries(t)
-	for _, fi := range fis {
-		if name := fi.Name(); len(name) >= 2 &&
-			name[0] >= '0' && name[0] <= '9' &&
-			name[1] >= '0' && name[1] <= '9' &&
-			fi.IsDir() {
-			runTestCase(t, filepath.Join("test_data", fi.Name()))
+func init() {
+	for _, p := range []string{
+		"github.com/dgraph-io/badger/cmd/badger_diff",
+		"github.com/dgraph-io/dgraph/cmd/dgraph",
+		"github.com/dgraph-io/dgraph/cmd/dgraphloader",
+		"github.com/dgraph-io/dgraph/cmd/bulkloader",
+	} {
+		log.Printf("Installing %s", p)
+		cmd := exec.Command("go", "install", p)
+		buf, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Println(string(buf))
+			log.Fatal(err)
 		}
 	}
 }
 
-func runTestCase(t *testing.T, testDir string) {
+func TestSingleNodeWithName(t *testing.T) {
+	rdfs := `<peter> <name> "Peter" .`
+	runTestCaseFromString(t, rdfs)
+}
 
-	t.Log(testDir)
+//func TestSingleNodeWithNameAndAge(t *testing.T) {
+//rdfs := `
+//<peter> <name> "Peter" .
+
+//<peter> <age> "28"^^<xs:int> .` // Also test blank line while we're here.
+//runTestCaseFromString(t, rdfs)
+//}
+
+func runTestCaseFromString(t *testing.T, rdfs string) {
+	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	fname := filepath.Join(dir, "data.rdf")
+	if err := ioutil.WriteFile(fname, []byte(rdfs), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runTestCase(t, fname)
+}
+
+func runTestCase(t *testing.T, rdfFile string) {
 
 	dgraphLoaderDir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	noErr(t, "Could not create temp dir:", err)
@@ -38,8 +67,6 @@ func runTestCase(t *testing.T, testDir string) {
 	noErr(t, "Could not create temp dir:", err)
 	defer os.RemoveAll(bulkLoaderDir)
 
-	rdfFile := filepath.Join(testDir, "data.rdf")
-
 	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile)
 	loadWithBulkLoader(t, bulkLoaderDir, rdfFile)
 
@@ -47,23 +74,6 @@ func runTestCase(t *testing.T, testDir string) {
 		filepath.Join(dgraphLoaderDir, "p"),
 		filepath.Join(bulkLoaderDir, "p"),
 	)
-}
-
-func installBinaries(t *testing.T) {
-	for _, p := range []string{
-		"github.com/dgraph-io/badger/cmd/badger_diff",
-		"github.com/dgraph-io/dgraph/cmd/dgraph",
-		"github.com/dgraph-io/dgraph/cmd/dgraphloader",
-		"github.com/dgraph-io/dgraph/cmd/bulkloader",
-	} {
-		t.Logf("Installing %s", p)
-		cmd := exec.Command("go", "install", p)
-		buf, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Log(string(buf))
-			t.Fatal(err)
-		}
-	}
 }
 
 func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {

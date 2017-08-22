@@ -49,7 +49,13 @@ func main() {
 	for sc.Scan() {
 		x.Check(sc.Err())
 
-		nq := parseNQuad(sc.Text())
+		nq, err := parseNQuad(sc.Text())
+		if err != nil {
+			if err == rdf.ErrEmpty {
+				continue
+			}
+			x.Check(err)
+		}
 
 		fmt.Printf("%#v\n", nq.NQuad)
 
@@ -96,10 +102,12 @@ func main() {
 	}
 }
 
-func parseNQuad(line string) gql.NQuad {
+func parseNQuad(line string) (gql.NQuad, error) {
 	nq, err := rdf.Parse(line)
-	x.Check(err)
-	return gql.NQuad{NQuad: &nq}
+	if err != nil {
+		return gql.NQuad{}, err
+	}
+	return gql.NQuad{NQuad: &nq}, nil
 }
 
 func createPredicatePosting(predicate string) *protos.Posting {
