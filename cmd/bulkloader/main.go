@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -22,29 +23,19 @@ func main() {
 	badgerDir := flag.String("b", "", "Location of badger data directory")
 	flag.Parse()
 
-	isRdf := strings.HasSuffix(*rdfFile, ".rdf")
-	isRdfGz := strings.HasSuffix(*rdfFile, "rdf.gz")
-	if !isRdf && !isRdfGz {
-		fmt.Println("Can only use .rdf or .rdf.gz file")
-		os.Exit(1)
-	}
 	f, err := os.Open(*rdfFile)
 	x.Check(err)
 	defer f.Close()
-	var sc *bufio.Scanner
-	if isRdfGz {
-		gr, err := gzip.NewReader(f)
-		x.Check(err)
-		sc = bufio.NewScanner(gr)
-	} else {
-		sc = bufio.NewScanner(f)
-	}
+
+	sc, err := rdfScanner(f, *rdfFile)
+	x.Check(err)
 
 	opt := badger.DefaultOptions
 	opt.Dir = *badgerDir
 	opt.ValueDir = *badgerDir
 	kv, err := badger.NewKV(&opt)
 	x.Check(err)
+	defer func() { x.Check(kv.Close()) }()
 
 	// Load RDF
 	for sc.Scan() {
@@ -82,8 +73,25 @@ func main() {
 		x.Check(err)
 
 		kv.Set(key, val, 0)
+	}
+}
+
+func rdfScanner(f *os.File, filename string) (*bufio.Scanner, error) {
+	isRdf := strings.HasSuffix(filename, ".rdf")
+	isRdfGz := strings.HasSuffix(filename, "rdf.gz")
+	if !isRdf && !isRdfGz {
+		return nil, errors.New("Can only use .rdf or .rdf.gz file")
 
 	}
+	var sc *bufio.Scanner
+	if isRdfGz {
+		gr, err := gzip.NewReader(f)
+		x.Check(err)
+		sc = bufio.NewScanner(gr)
+	} else {
+		sc = bufio.NewScanner(f)
+	}
+	return sc, nil
 }
 
 var (

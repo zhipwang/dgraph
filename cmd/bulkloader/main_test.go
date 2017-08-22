@@ -15,6 +15,7 @@ import (
 func TestBulkLoader(t *testing.T) {
 	fis, err := ioutil.ReadDir("test_data")
 	noErr(t, "Could not open test_data dir:", err)
+	installBinaries(t)
 	for _, fi := range fis {
 		if name := fi.Name(); len(name) >= 2 &&
 			name[0] >= '0' && name[0] <= '9' &&
@@ -46,6 +47,23 @@ func runTestCase(t *testing.T, testDir string) {
 		filepath.Join(dgraphLoaderDir, "p"),
 		filepath.Join(bulkLoaderDir, "p"),
 	)
+}
+
+func installBinaries(t *testing.T) {
+	for _, p := range []string{
+		"github.com/dgraph-io/badger/cmd/badger_diff",
+		"github.com/dgraph-io/dgraph/cmd/dgraph",
+		"github.com/dgraph-io/dgraph/cmd/dgraphloader",
+		"github.com/dgraph-io/dgraph/cmd/bulkloader",
+	} {
+		t.Logf("Installing %s", p)
+		cmd := exec.Command("go", "install", p)
+		buf, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Log(string(buf))
+			t.Fatal(err)
+		}
+	}
 }
 
 func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
