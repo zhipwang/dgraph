@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
-	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
+	"github.com/dgraph-io/dgraph/gql"
+	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/rdf"
 	"github.com/dgraph-io/dgraph/x"
@@ -100,24 +101,18 @@ func main() {
 
 	// Lease
 
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], 10001)
+	nqTmp, err := rdf.Parse("<___ROOT___> <_lease_> \"10001\"^^<xs:int> .")
+	x.Check(err)
+	nq := gql.NQuad{&nqTmp}
+	de, err := nq.ToEdgeUsing(map[string]uint64{"___ROOT___": 1})
+	x.Check(err)
+	p := posting.NewPosting(de)
+	p.Uid = math.MaxUint64
+	p.Op = 3
 
 	leaseKey := x.DataKey("_lease_", 1)
 	list := &protos.PostingList{
-		Postings: []*protos.Posting{
-			&protos.Posting{
-				Uid:         math.MaxUint64,
-				Value:       buf[:],
-				ValType:     protos.Posting_INT,
-				PostingType: protos.Posting_VALUE,
-				Metadata:    nil,
-				Label:       "",
-				Commit:      0,
-				Facets:      nil,
-				Op:          3,
-			},
-		},
+		Postings: []*protos.Posting{p},
 		Checksum: nil,
 		Commit:   0,
 		Uids:     bitPackUids([]uint64{math.MaxUint64}),
