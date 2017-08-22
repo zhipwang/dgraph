@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/dgraph-io/badger"
@@ -45,6 +46,8 @@ func main() {
 		"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
 	}
 
+	predicates := map[string][]*protos.Posting{}
+
 	// Load RDF
 	for sc.Scan() {
 		x.Check(sc.Err())
@@ -79,13 +82,7 @@ func main() {
 
 		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
-		list = &protos.PostingList{
-			Postings: []*protos.Posting{p},
-			Uids:     bitPackUids([]uint64{p.Uid}),
-		}
-		val, err = list.Marshal()
-		x.Check(err)
-		x.Check(kv.Set(key, val, 0))
+		predicates[string(key)] = append(predicates[string(key)], p)
 	}
 
 	lease(kv)
@@ -99,6 +96,22 @@ func main() {
 			x.Check(err)
 		}
 		x.Check(kv.Set(k, v, 0))
+	}
+
+	// Postings
+	for key, postings := range predicates {
+		sort.Slice(postings, func(i, j int) bool { return postings[i].Uid < postings[j].Uid })
+		uids := make([]uint64, len(postings))
+		for i := range postings {
+			uids[i] = postings[i].Uid
+		}
+		list := &protos.PostingList{
+			Postings: postings,
+			Uids:     bitPackUids(uids),
+		}
+		val, err := list.Marshal()
+		x.Check(err)
+		x.Check(kv.Set([]byte(key), val, 0))
 	}
 }
 

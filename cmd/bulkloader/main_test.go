@@ -35,13 +35,13 @@ func TestSingleNodeWithName(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
-//func TestSingleNodeWithNameAndAge(t *testing.T) {
-//rdfs := `
-//<peter> <name> "Peter" .
+func TestSingleNodeWithNameAndAge(t *testing.T) {
+	rdfs := `
+	<peter> <name> "Peter" .
 
-//<peter> <age> "28"^^<xs:int> .` // Also test blank line while we're here.
-//runTestCaseFromString(t, rdfs)
-//}
+	    <peter> <age> "28"^^<xs:int> .` // Also test blank lines/weird spacing while we're here.
+	runTestCaseFromString(t, rdfs)
+}
 
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
@@ -154,9 +154,11 @@ func cmpBadgers(t *testing.T, dgraphLoaderP, bulkLoaderP string) {
 		"-a", dgraphLoaderP,
 		"-b", bulkLoaderP,
 	)
-	buf, err := cmd.CombinedOutput()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
 	if err != nil {
-		t.Log(string(buf))
+		//t.Log(string(buf))
 		t.Fatal(err)
 	}
 }
