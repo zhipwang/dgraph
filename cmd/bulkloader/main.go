@@ -49,15 +49,13 @@ func main() {
 	for sc.Scan() {
 		x.Check(sc.Err())
 
-		nqTmp, err := rdf.Parse(sc.Text())
-		x.Check(err)
+		nq := parseNQuad(sc.Text())
 
-		fmt.Printf("%#v\n", nqTmp)
+		fmt.Printf("%#v\n", nq.NQuad)
 
 		predicateSchema[nq.GetPredicate()] = nil
 
-		nq := gql.NQuad{&nqTmp}
-		getUid(nqTmp.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
+		getUid(nq.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
 		de, err := nq.ToEdgeUsing(uidMap)
 		x.Check(err)
 		p := posting.NewPosting(de)
@@ -74,7 +72,7 @@ func main() {
 		x.Check(kv.Set(key, val, 0))
 
 		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
-		p := createPredicatePosting(nq.GetPredicate())
+		p = createPredicatePosting(nq.GetPredicate())
 		list = &protos.PostingList{
 			Postings: []*protos.Posting{p},
 			Uids:     bitPackUids([]uint64{p.Uid}),
@@ -98,11 +96,17 @@ func main() {
 	}
 }
 
-func createPredicatePosting(predicate string) *proto.Posting {
+func parseNQuad(line string) gql.NQuad {
+	nq, err := rdf.Parse(line)
+	x.Check(err)
+	return gql.NQuad{NQuad: &nq}
+}
+
+func createPredicatePosting(predicate string) *protos.Posting {
 	fp := farm.Fingerprint64([]byte(predicate))
 	return &protos.Posting{
 		Uid:         fp,
-		Value:       predicate,
+		Value:       []byte(predicate),
 		ValType:     protos.Posting_DEFAULT,
 		PostingType: protos.Posting_VALUE,
 		Op:          3,
