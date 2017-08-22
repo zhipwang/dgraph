@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -71,9 +72,59 @@ func main() {
 		}
 		val, err := list.Marshal()
 		x.Check(err)
+		x.Check(kv.Set(key, val, 0))
 
-		kv.Set(key, val, 0)
+		key = x.DataKey("_predicate_", subject)
+		list = &protos.PostingList{
+			Postings: []*protos.Posting{
+				&protos.Posting{
+					Uid:         407209193152762291, // TODO: Not sure where this comes from. I *think* it's the farm.Fingerprint64 of the value (i.e. predicate).
+					Value:       []byte(predicate),
+					ValType:     protos.Posting_DEFAULT,
+					PostingType: protos.Posting_VALUE,
+					Metadata:    nil,
+					Label:       "",
+					Commit:      0,
+					Facets:      nil,
+					Op:          3,
+				},
+			},
+			Checksum: nil,
+			Commit:   0,
+			Uids:     bitPackUids([]uint64{407209193152762291}),
+		}
+		val, err = list.Marshal()
+		x.Check(err)
+		x.Check(kv.Set(key, val, 0))
 	}
+
+	// Lease
+
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], 10001)
+
+	leaseKey := x.DataKey("_lease_", 1)
+	list := &protos.PostingList{
+		Postings: []*protos.Posting{
+			&protos.Posting{
+				Uid:         math.MaxUint64,
+				Value:       buf[:],
+				ValType:     protos.Posting_INT,
+				PostingType: protos.Posting_VALUE,
+				Metadata:    nil,
+				Label:       "",
+				Commit:      0,
+				Facets:      nil,
+				Op:          3,
+			},
+		},
+		Checksum: nil,
+		Commit:   0,
+		Uids:     bitPackUids([]uint64{math.MaxUint64}),
+	}
+	val, err := list.Marshal()
+	x.Check(err)
+	x.Check(kv.Set(leaseKey, val, 0))
 }
 
 func rdfScanner(f *os.File, filename string) (*bufio.Scanner, error) {
