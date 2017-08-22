@@ -43,6 +43,16 @@ func TestSingleNodeWithNameAndAge(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+/*
+TODO: Don't really understand how this case should work (in general, when the scheme differs among instances of the same predicate.
+func TestInconsistentPredicateSchema(t *testing.T) {
+	rdfs := `
+	<peter> <name> "Peter" .
+	<robot> <name> "1234"^^<xs:int> .`
+	runTestCaseFromString(t, rdfs)
+}
+*/
+
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {
