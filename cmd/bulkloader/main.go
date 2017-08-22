@@ -54,7 +54,7 @@ func main() {
 
 		fmt.Printf("%#v\n", nqTmp)
 
-		//----
+		predicateSchema[nq.GetPredicate()] = nil
 
 		nq := gql.NQuad{&nqTmp}
 		getUid(nqTmp.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
@@ -73,14 +73,7 @@ func main() {
 		x.Check(err)
 		x.Check(kv.Set(key, val, 0))
 
-		predicateSchema[nq.GetPredicate()] = nil
-
 		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
-		//list = &protos.PostingList{
-		////Postings: []*protos.Posting{p},
-		////Uids:
-		//}
-
 		fingerprint := farm.Fingerprint64([]byte(nq.GetPredicate()))
 		list = &protos.PostingList{
 			Postings: []*protos.Posting{
