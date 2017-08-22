@@ -36,3 +36,16 @@ func TestDecodeMsg(t *testing.T) {
 
 	t.Logf("#%v", list)
 }
+
+func TestDecodeSchemaUpdate(t *testing.T) {
+	var msg = []byte{
+		0x10, 0x02,
+	}
+
+	var out protos.SchemaUpdate
+	if err := out.Unmarshal(msg); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("%#v", out)
+}

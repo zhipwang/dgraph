@@ -39,6 +39,11 @@ func main() {
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
+	predicateSchema := map[string]*protos.SchemaUpdate{
+		"_predicate_": nil,
+		"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
+	}
+
 	// Load RDF
 	for sc.Scan() {
 		x.Check(sc.Err())
@@ -51,6 +56,8 @@ func main() {
 		subject := getUid(nq.GetSubject())
 		predicate := nq.GetPredicate()
 		object := nq.GetObjectValue().GetDefaultVal()
+
+		predicateSchema[predicate] = nil
 
 		key := x.DataKey(predicate, subject)
 		list := &protos.PostingList{
@@ -100,21 +107,33 @@ func main() {
 	}
 
 	// Lease
+	lease(kv)
 
-	nqTmp, err := rdf.Parse("<___ROOT___> <_lease_> \"10001\"^^<xs:int> .")
+	// Schema
+	for pred, sch := range predicateSchema {
+		k := x.SchemaKey(pred)
+		var v []byte
+		if sch != nil {
+			v, err = sch.Marshal()
+			x.Check(err)
+		}
+		x.Check(kv.Set(k, v, 0))
+	}
+}
+
+func lease(kv *badger.KV) {
+	nqTmp, err := rdf.Parse("<ROOT> <_lease_> \"10001\"^^<xs:int> .")
 	x.Check(err)
 	nq := gql.NQuad{&nqTmp}
-	de, err := nq.ToEdgeUsing(map[string]uint64{"___ROOT___": 1})
+	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1})
 	x.Check(err)
 	p := posting.NewPosting(de)
 	p.Uid = math.MaxUint64
 	p.Op = 3
 
-	leaseKey := x.DataKey("_lease_", 1)
+	leaseKey := x.DataKey(nq.GetPredicate(), de.GetEntity())
 	list := &protos.PostingList{
 		Postings: []*protos.Posting{p},
-		Checksum: nil,
-		Commit:   0,
 		Uids:     bitPackUids([]uint64{math.MaxUint64}),
 	}
 	val, err := list.Marshal()
