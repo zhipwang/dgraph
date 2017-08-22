@@ -48,46 +48,43 @@ func main() {
 	for sc.Scan() {
 		x.Check(sc.Err())
 
-		nq, err := rdf.Parse(sc.Text())
+		nqTmp, err := rdf.Parse(sc.Text())
 		x.Check(err)
 
-		fmt.Printf("%#v\n", nq)
+		fmt.Printf("%#v\n", nqTmp)
 
-		subject := getUid(nq.GetSubject())
-		predicate := nq.GetPredicate()
-		object := nq.GetObjectValue().GetDefaultVal()
+		//----
 
-		predicateSchema[predicate] = nil
+		nq := gql.NQuad{&nqTmp}
+		getUid(nqTmp.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
+		de, err := nq.ToEdgeUsing(uidMap)
+		x.Check(err)
+		p := posting.NewPosting(de)
+		p.Uid = math.MaxUint64
+		p.Op = 3
 
-		key := x.DataKey(predicate, subject)
+		key := x.DataKey(nq.GetPredicate(), getUid(nq.GetSubject()))
 		list := &protos.PostingList{
-			Postings: []*protos.Posting{
-				&protos.Posting{
-					Uid:         math.MaxUint64,
-					Value:       []byte(object),
-					ValType:     protos.Posting_DEFAULT,
-					PostingType: protos.Posting_VALUE,
-					Metadata:    nil,
-					Label:       "",
-					Commit:      0,
-					Facets:      nil,
-					Op:          3,
-				},
-			},
-			Checksum: nil,
-			Commit:   0,
-			Uids:     bitPackUids([]uint64{math.MaxUint64}),
+			Postings: []*protos.Posting{p},
+			Uids:     bitPackUids([]uint64{p.Uid}),
 		}
 		val, err := list.Marshal()
 		x.Check(err)
 		x.Check(kv.Set(key, val, 0))
 
-		key = x.DataKey("_predicate_", subject)
+		predicateSchema[nq.GetPredicate()] = nil
+
+		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
+		//list = &protos.PostingList{
+		////Postings: []*protos.Posting{p},
+		////Uids:
+		//}
+
 		list = &protos.PostingList{
 			Postings: []*protos.Posting{
 				&protos.Posting{
 					Uid:         407209193152762291, // TODO: Not sure where this comes from. I *think* it's the farm.Fingerprint64 of the value (i.e. predicate).
-					Value:       []byte(predicate),
+					Value:       []byte(nq.GetPredicate()),
 					ValType:     protos.Posting_DEFAULT,
 					PostingType: protos.Posting_VALUE,
 					Metadata:    nil,
@@ -106,7 +103,6 @@ func main() {
 		x.Check(kv.Set(key, val, 0))
 	}
 
-	// Lease
 	lease(kv)
 
 	// Schema
@@ -122,10 +118,13 @@ func main() {
 }
 
 func lease(kv *badger.KV) {
+
+	// TODO: 10001 is hardcoded. Should be calculated dynamically.
+
 	nqTmp, err := rdf.Parse("<ROOT> <_lease_> \"10001\"^^<xs:int> .")
 	x.Check(err)
 	nq := gql.NQuad{&nqTmp}
-	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1})
+	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1}) // TODO: Should I use a global uid map?
 	x.Check(err)
 	p := posting.NewPosting(de)
 	p.Uid = math.MaxUint64
