@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/dgraph/bp128"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/rdf"
 	"github.com/dgraph-io/dgraph/x"
@@ -75,8 +76,7 @@ func main() {
 			},
 			Checksum: nil,
 			Commit:   0,
-			// TODO: Use real compression rather than hardcode.
-			Uids: []byte{0, 0, 0, 1, 128, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			Uids:     bitPackUids([]uint64{math.MaxUint64}),
 		}
 		val, err := list.Marshal()
 		x.Check(err)
@@ -99,4 +99,12 @@ func getUid(str string) uint64 {
 	lastUID++
 	uidMap[str] = lastUID
 	return lastUID
+}
+
+func bitPackUids(uids []uint64) []byte {
+	var bp bp128.BPackEncoder
+	bp.PackAppend(uids)
+	buf := make([]byte, bp.Size())
+	bp.WriteTo(buf)
+	return buf
 }
