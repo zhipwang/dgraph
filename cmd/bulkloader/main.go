@@ -46,10 +46,7 @@ func main() {
 	plBuild := newPlBuilder(*tmpDir)
 	defer plBuild.cleanUp()
 
-	predicateSchema := map[string]*protos.SchemaUpdate{
-		"_predicate_": nil,
-		"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
-	}
+	schemaStore := newSchemaStore()
 
 	// Load RDF
 	for sc.Scan() {
@@ -63,18 +60,7 @@ func main() {
 			x.Check(err)
 		}
 
-		fmt.Printf("NQuad: %#v\n\n", nq.NQuad)
-
-		// TODO: Put schema creation into own function.
-		schema := &protos.SchemaUpdate{
-			ValueType: uint32(nq.GetObjectType()),
-		}
-		if nq.GetObjectValue() == nil {
-			// RDF parser doesn't seem to pick up that objects that are nodes
-			// should have UID value type.
-			schema.ValueType = uint32(protos.Posting_UID)
-		}
-		predicateSchema[nq.GetPredicate()] = schema
+		schemaStore.add(nq.NQuad)
 
 		// Ensure that the subject and object get UIDs.
 		uid(nq.GetSubject())
@@ -117,19 +103,7 @@ func main() {
 
 	lease(kv)
 
-	// Schema
-	fmt.Println("Schema:")
-	for pred, sch := range predicateSchema {
-		k := x.SchemaKey(pred)
-		var v []byte
-		fmt.Printf("%s: %#v\n", pred, sch)
-		if sch != nil {
-			v, err = sch.Marshal()
-			x.Check(err)
-		}
-		x.Check(kv.Set(k, v, 0))
-	}
-	fmt.Println()
+	schemaStore.write(kv)
 
 	printUIDMap()
 
