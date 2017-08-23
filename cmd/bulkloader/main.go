@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -41,12 +42,16 @@ func main() {
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
+	// TODO: Replace using a badger. Keeping in memory now for easier debugging.
+	//
+	// Keys: PostingList Key + UIDOfPosting
+	// Values: Posting, or []byte (implies just the UID)
+	inMemoryMap := map[string][]byte{}
+
 	predicateSchema := map[string]*protos.SchemaUpdate{
 		"_predicate_": nil,
 		"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
 	}
-
-	predicates := map[string][]*protos.Posting{}
 
 	// Load RDF
 	for sc.Scan() {
@@ -85,7 +90,12 @@ func main() {
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
-		predicates[string(key)] = append(predicates[string(key)], p)
+		var uidBuf [8]byte
+		binary.BigEndian.PutUint64(uidBuf[:], p.Uid)
+		kvKey := string(key) + string(uidBuf[:])
+		kvVal, err := p.Marshal()
+		x.Check(err)
+		inMemoryMap[kvKey] = kvVal
 	}
 
 	lease(kv)
@@ -101,34 +111,56 @@ func main() {
 		x.Check(kv.Set(k, v, 0))
 	}
 
-	// Postings
-	for key, postings := range predicates {
-
-		// Deduplicate
-		dedup := map[uint64]*protos.Posting{}
-		for _, p := range postings {
-			dedup[p.Uid] = p
-		}
-		postings = postings[:len(dedup)]
-		uids := make([]uint64, len(dedup))
-		i := 0
-		for uid, p := range dedup {
-			postings[i] = p
-			uids[i] = uid
-			i++
-		}
-
-		// Create PL
-		sort.Slice(postings, func(i, j int) bool { return postings[i].Uid < postings[j].Uid })
-		sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
-		list := &protos.PostingList{
-			Postings: postings,
-			Uids:     bitPackUids(uids),
-		}
-		val, err := list.Marshal()
-		x.Check(err)
-		x.Check(kv.Set([]byte(key), val, 0))
+	// Recreate posting lists.
+	keys := make([]string, len(inMemoryMap))
+	i := 0
+	for kvKey := range inMemoryMap {
+		keys[i] = kvKey
+		i++
 	}
+	sort.Strings(keys)
+
+	pl := &protos.PostingList{}
+	uids := []uint64{}
+	iter := 0
+	k := extractPLKey(keys[0])
+	for iter < len(keys) {
+
+		// Add to PL
+		val := new(protos.Posting)
+		err := val.Unmarshal(inMemoryMap[keys[iter]])
+		x.Check(err)
+		uids = append(uids, val.Uid)
+		pl.Postings = append(pl.Postings, val)
+
+		finalise := false
+		iter++
+		var newK string
+		if iter < len(keys) {
+			newK = extractPLKey(keys[iter])
+			if newK != k {
+				finalise = true
+			}
+		} else {
+			finalise = true
+		}
+		if finalise {
+			// Write out posting list
+			pl.Uids = bitPackUids(uids)
+			plBuf, err := pl.Marshal()
+			x.Check(err)
+			x.Check(kv.Set([]byte(k), plBuf, 0))
+
+			// Reset PL for next time.
+			pl.Uids = nil
+			uids = nil
+		}
+		k = newK
+	}
+}
+
+func extractPLKey(kvKey string) string {
+	return kvKey[:len(kvKey)-8]
 }
 
 func parseNQuad(line string) (gql.NQuad, error) {
