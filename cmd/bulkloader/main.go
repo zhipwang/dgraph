@@ -3,13 +3,11 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
-	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
 	"math"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/dgraph-io/badger"
@@ -42,11 +40,7 @@ func main() {
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
-	// TODO: Replace using a badger. Keeping in memory now for easier debugging.
-	//
-	// Keys: PostingList Key + UIDOfPosting
-	// Values: Posting, or []byte (implies just the UID)
-	inMemoryMap := map[string][]byte{}
+	inMemoryMap := plBuilder{map[string][]byte{}}
 
 	predicateSchema := map[string]*protos.SchemaUpdate{
 		"_predicate_": nil,
@@ -90,12 +84,7 @@ func main() {
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
-		var uidBuf [8]byte
-		binary.BigEndian.PutUint64(uidBuf[:], p.Uid)
-		kvKey := string(key) + string(uidBuf[:])
-		kvVal, err := p.Marshal()
-		x.Check(err)
-		inMemoryMap[kvKey] = kvVal
+		inMemoryMap.addPosting(key, p)
 	}
 
 	lease(kv)
@@ -111,52 +100,7 @@ func main() {
 		x.Check(kv.Set(k, v, 0))
 	}
 
-	// Recreate posting lists.
-	keys := make([]string, len(inMemoryMap))
-	i := 0
-	for kvKey := range inMemoryMap {
-		keys[i] = kvKey
-		i++
-	}
-	sort.Strings(keys)
-
-	pl := &protos.PostingList{}
-	uids := []uint64{}
-	iter := 0
-	k := extractPLKey(keys[0])
-	for iter < len(keys) {
-
-		// Add to PL
-		val := new(protos.Posting)
-		err := val.Unmarshal(inMemoryMap[keys[iter]])
-		x.Check(err)
-		uids = append(uids, val.Uid)
-		pl.Postings = append(pl.Postings, val)
-
-		finalise := false
-		iter++
-		var newK string
-		if iter < len(keys) {
-			newK = extractPLKey(keys[iter])
-			if newK != k {
-				finalise = true
-			}
-		} else {
-			finalise = true
-		}
-		if finalise {
-			// Write out posting list
-			pl.Uids = bitPackUids(uids)
-			plBuf, err := pl.Marshal()
-			x.Check(err)
-			x.Check(kv.Set([]byte(k), plBuf, 0))
-
-			// Reset PL for next time.
-			pl.Uids = nil
-			uids = nil
-		}
-		k = newK
-	}
+	inMemoryMap.buildPostingLists(kv)
 }
 
 func extractPLKey(kvKey string) string {
