@@ -60,6 +60,12 @@ func TestUpdatedValue(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+// TODO: Indexing
+
+// TODO: Addition of schema
+
+// TODO: Reverse edges.
+
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {

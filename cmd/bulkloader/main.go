@@ -67,14 +67,14 @@ func main() {
 		}
 
 		nq.GetObjectValue().GetVal()
-		getUid(nq.GetSubject()) // TODO: Hack, this just makes sure the subject is in the map
+		uid(nq.GetSubject()) // Ensure that the subject is in the UID map.
 		de, err := nq.ToEdgeUsing(uidMap)
 		x.Check(err)
 		p := posting.NewPosting(de)
 		p.Uid = math.MaxUint64
 		p.Op = 3
 
-		key := x.DataKey(nq.GetPredicate(), getUid(nq.GetSubject()))
+		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
 		list := &protos.PostingList{
 			Postings: []*protos.Posting{p},
 			Uids:     bitPackUids([]uint64{p.Uid}),
@@ -83,7 +83,7 @@ func main() {
 		x.Check(err)
 		x.Check(kv.Set(key, val, 0))
 
-		key = x.DataKey("_predicate_", getUid(nq.GetSubject()))
+		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
 		predicates[string(key)] = append(predicates[string(key)], p)
 	}
@@ -196,7 +196,7 @@ var (
 	uidMap  = map[string]uint64{}
 )
 
-func getUid(str string) uint64 {
+func uid(str string) uint64 {
 	uid, ok := uidMap[str]
 	if ok {
 		return uid
