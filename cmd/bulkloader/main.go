@@ -157,7 +157,7 @@ func lease(kv *badger.KV) {
 	nqTmp, err := rdf.Parse("<ROOT> <_lease_> \"10001\"^^<xs:int> .")
 	x.Check(err)
 	nq := gql.NQuad{&nqTmp}
-	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1}) // TODO: Should I use a global uid map?
+	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1})
 	x.Check(err)
 	p := posting.NewPosting(de)
 	p.Uid = math.MaxUint64
