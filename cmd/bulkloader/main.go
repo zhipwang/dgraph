@@ -40,7 +40,8 @@ func main() {
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
-	inMemoryMap := plBuilder{map[string][]byte{}}
+	plBuild := newPlBuilder()
+	defer plBuild.cleanUp()
 
 	predicateSchema := map[string]*protos.SchemaUpdate{
 		"_predicate_": nil,
@@ -84,7 +85,7 @@ func main() {
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
-		inMemoryMap.addPosting(key, p)
+		plBuild.addPosting(key, p)
 	}
 
 	lease(kv)
@@ -100,11 +101,7 @@ func main() {
 		x.Check(kv.Set(k, v, 0))
 	}
 
-	inMemoryMap.buildPostingLists(kv)
-}
-
-func extractPLKey(kvKey string) string {
-	return kvKey[:len(kvKey)-8]
+	plBuild.buildPostingLists(kv)
 }
 
 func parseNQuad(line string) (gql.NQuad, error) {
@@ -182,6 +179,7 @@ func uid(str string) uint64 {
 	return lastUID
 }
 
+// TODO: Candidate for moving into pl_builder.go?
 func bitPackUids(uids []uint64) []byte {
 	var bp bp128.BPackEncoder
 	bp.PackAppend(uids)
