@@ -65,11 +65,29 @@ func TestAppleIsAFruit(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+func TestTwoFruits(t *testing.T) {
+	rdfs := `
+	<apple> <is> <fruit> .
+	<banana> <is> <fruit> .`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestTwoFruitsWithNames(t *testing.T) {
+	rdfs := `
+	<apple> <is> <fruit> .
+	<banana> <is> <fruit> .
+	<apple> <name> "MrApple" .
+	<banana> <name> "MrBanana" .`
+	runTestCaseFromString(t, rdfs)
+}
+
 // TODO: Indexing
 
 // TODO: Addition of schema
 
 // TODO: Reverse edges.
+
+// TODO: Language.
 
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
