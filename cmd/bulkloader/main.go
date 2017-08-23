@@ -62,23 +62,8 @@ func main() {
 
 		schemaStore.add(nq.NQuad)
 
-		// Ensure that the subject and object get UIDs.
-		uid(nq.GetSubject())
-		if nq.GetObjectValue() == nil {
-			uid(nq.GetObjectId())
-		}
-
-		// TODO: Should generate key and value in their own function.
-		de, err := nq.ToEdgeUsing(uidMap)
-		x.Check(err)
-		p := posting.NewPosting(de)
-		if nq.GetObjectValue() != nil {
-			// Use special sentinel UID to represent a literal node.
-			p.Uid = math.MaxUint64
-		}
-		p.Op = 3
-
 		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
+		p := createEdgePosting(nq)
 		plBuild.addPosting(key, p)
 
 		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %#v\n\n",
@@ -129,9 +114,32 @@ func createPredicatePosting(predicate string) *protos.Posting {
 	}
 }
 
+func createEdgePosting(nq gql.NQuad) *protos.Posting {
+
+	// Ensure that the subject and object get UIDs.
+	uid(nq.GetSubject())
+	if nq.GetObjectValue() == nil {
+		uid(nq.GetObjectId())
+	}
+
+	de, err := nq.ToEdgeUsing(uidMap)
+	x.Check(err)
+	p := posting.NewPosting(de)
+	if nq.GetObjectValue() != nil {
+		// Use special sentinel UID to represent a literal node.
+		p.Uid = math.MaxUint64
+	}
+	p.Op = 3
+	return p
+}
+
 func lease(kv *badger.KV) {
 
 	// TODO: 10001 is hardcoded. Should be calculated dynamically.
+
+	// TODO: Can we put this into the temp badger and do most of this function
+	// automatically? Or can we somehow run 'extra' RFDs at the end? This could
+	// be run just as a regular RDF.
 
 	nqTmp, err := rdf.Parse("<ROOT> <_lease_> \"10001\"^^<xs:int> .")
 	x.Check(err)
