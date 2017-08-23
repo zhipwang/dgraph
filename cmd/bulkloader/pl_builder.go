@@ -41,14 +41,30 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 	key := postingListKey
 	key = append(key, uidBuf[:]...)
 
-	val, err := posting.Marshal()
-	x.Check(err)
+	var meta byte
+	var val []byte
+	switch posting.PostingType {
+	case protos.Posting_REF:
+		// val is left nil. When we read back the key/value, the UID is
+		// recovered from the key.
+		meta = 0x01 // Indicates posting UID rather than protos.Posting
+	case protos.Posting_VALUE:
+		var err error
+		val, err = posting.Marshal()
+		x.Check(err)
+	case protos.Posting_VALUE_LANG:
+		x.AssertTrue(false) // TODO
+	default:
+		x.AssertTrue(false)
+	}
 
-	x.Check(b.kv.Set(key, val, 0))
+	x.Check(b.kv.Set(key, val, meta))
 }
 
 func (b *plBuilder) buildPostingLists(target *badger.KV) {
 
+	// TODO: We should really be opening the KV here as well. Better to store
+	// the config in plBuilder rather than the KV itself.
 	defer func() {
 		x.Check(b.kv.Close())
 	}()
@@ -65,11 +81,16 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 	for iter.Valid() {
 
 		// Add to PL
-		val := new(protos.Posting)
-		err := val.Unmarshal(iter.Item().Value())
-		x.Check(err)
-		uids = append(uids, val.Uid)
-		pl.Postings = append(pl.Postings, val)
+		// TODO: Add a check here to make sure all postings have the same user meta.
+		if iter.Item().UserMeta() == 0x01 {
+			uids = append(uids, extractUID(iter.Item().Key()))
+		} else {
+			p := new(protos.Posting)
+			err := p.Unmarshal(iter.Item().Value())
+			x.Check(err)
+			uids = append(uids, p.Uid)
+			pl.Postings = append(pl.Postings, p)
+		}
 
 		// Determine if we're at the end of a single posting list.
 		finalise := false
@@ -87,28 +108,28 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 		// Write posting list out to target.
 		if finalise {
 
+			simplePostingList := len(uids) != len(pl.Postings)
+
 			fmt.Print("KEY:\n" + hex.Dump(k))
 			fmt.Println("POSTINGS:")
-			for _, p := range pl.Postings {
-				fmt.Printf("%#v\n", p)
+			if simplePostingList {
+				for _, p := range uids {
+					fmt.Println(p)
+				}
+			} else {
+				for _, p := range pl.Postings {
+					fmt.Printf("%#v\n", p)
+				}
 			}
 			fmt.Println("END POSTINGS\n")
 
-			x.AssertTrue(len(pl.Postings) > 0)
-			// TODO: Should check to make sure all postings have the same posting type
-			switch pl.Postings[0].PostingType {
-			case protos.Posting_REF:
-				// TODO: This is bad, since we assume the meta data is 1 (could be other things).
-				x.Check(target.Set(k, bitPackUids(uids), 1))
-			case protos.Posting_VALUE:
+			if simplePostingList {
+				x.Check(target.Set(k, bitPackUids(uids), 0x01))
+			} else {
 				pl.Uids = bitPackUids(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
-				x.Check(target.Set(k, plBuf, 0))
-			case protos.Posting_VALUE_LANG:
-				x.AssertTrue(false)
-			default:
-				x.AssertTrue(false)
+				x.Check(target.Set(k, plBuf, 0x00))
 			}
 
 			// Reset for next posting list.
@@ -126,4 +147,8 @@ func extractPLKey(kvKey []byte) []byte {
 	k := make([]byte, len(kvKey)-8)
 	copy(k, kvKey)
 	return k
+}
+
+func extractUID(kvKey []byte) uint64 {
+	return binary.BigEndian.Uint64(kvKey[len(kvKey)-8:])
 }
