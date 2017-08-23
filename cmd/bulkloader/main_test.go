@@ -89,6 +89,8 @@ func TestTwoFruitsWithNames(t *testing.T) {
 
 // TODO: Language.
 
+// TODO: Some really big files.
+
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {

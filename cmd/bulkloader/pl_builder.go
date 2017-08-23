@@ -13,8 +13,8 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func newPlBuilder() plBuilder {
-	badgerDir, err := ioutil.TempDir("", "dgraph_bulkloader")
+func newPlBuilder(tmpDir string) plBuilder {
+	badgerDir, err := ioutil.TempDir(tmpDir, "dgraph_bulkloader")
 	x.Check(err)
 	opt := badger.DefaultOptions
 	opt.Dir = badgerDir

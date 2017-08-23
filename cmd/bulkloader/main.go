@@ -25,6 +25,8 @@ func main() {
 
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
 	badgerDir := flag.String("b", "", "Location of badger data directory")
+	tmpDir := flag.String("tmp", os.TempDir(), "Temp directory used to use for on-disk "+
+		"scratch space. Requires free space proportional to the size of the RDF file.")
 	flag.Parse()
 
 	f, err := os.Open(*rdfFile)
@@ -41,7 +43,7 @@ func main() {
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
-	plBuild := newPlBuilder()
+	plBuild := newPlBuilder(*tmpDir)
 	defer plBuild.cleanUp()
 
 	predicateSchema := map[string]*protos.SchemaUpdate{
