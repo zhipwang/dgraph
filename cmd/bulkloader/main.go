@@ -61,7 +61,7 @@ func main() {
 			x.Check(err)
 		}
 
-		fmt.Printf("%#v\n", nq.NQuad)
+		fmt.Printf("NQuad: %#v\n\n", nq.NQuad)
 
 		// TODO: Put schema creation into own function.
 		schema := &protos.SchemaUpdate{

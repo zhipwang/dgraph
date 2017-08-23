@@ -87,7 +87,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 		// Write posting list out to target.
 		if finalise {
 
-			fmt.Println("KEY:\n" + hex.Dump(k))
+			fmt.Print("KEY:\n" + hex.Dump(k))
 			fmt.Println("POSTINGS:")
 			for _, p := range pl.Postings {
 				fmt.Printf("%#v\n", p)
