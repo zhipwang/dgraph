@@ -53,6 +53,13 @@ func TestInconsistentPredicateSchema(t *testing.T) {
 }
 */
 
+func TestUpdatedValue(t *testing.T) {
+	rdfs := `
+	<peter> <name> "NotPeter" .
+	<peter> <name> "Peter" .`
+	runTestCaseFromString(t, rdfs)
+}
+
 func runTestCaseFromString(t *testing.T, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {

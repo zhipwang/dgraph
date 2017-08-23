@@ -103,11 +103,24 @@ func main() {
 
 	// Postings
 	for key, postings := range predicates {
-		sort.Slice(postings, func(i, j int) bool { return postings[i].Uid < postings[j].Uid })
-		uids := make([]uint64, len(postings))
-		for i := range postings {
-			uids[i] = postings[i].Uid
+
+		// Deduplicate
+		dedup := map[uint64]*protos.Posting{}
+		for _, p := range postings {
+			dedup[p.Uid] = p
 		}
+		postings = postings[:len(dedup)]
+		uids := make([]uint64, len(dedup))
+		i := 0
+		for uid, p := range dedup {
+			postings[i] = p
+			uids[i] = uid
+			i++
+		}
+
+		// Create PL
+		sort.Slice(postings, func(i, j int) bool { return postings[i].Uid < postings[j].Uid })
+		sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
 		list := &protos.PostingList{
 			Postings: postings,
 			Uids:     bitPackUids(uids),
