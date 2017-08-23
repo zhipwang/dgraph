@@ -60,6 +60,11 @@ func TestUpdatedValue(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+func TestAppleIsAFruit(t *testing.T) {
+	rdfs := `<apple> <is> <fruit> .`
+	runTestCaseFromString(t, rdfs)
+}
+
 // TODO: Indexing
 
 // TODO: Addition of schema

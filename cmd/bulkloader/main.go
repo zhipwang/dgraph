@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -62,44 +63,73 @@ func main() {
 
 		fmt.Printf("%#v\n", nq.NQuad)
 
-		predicateSchema[nq.GetPredicate()] = &protos.SchemaUpdate{
-			ValueType: uint32(gql.TypeValFrom(nq.GetObjectValue()).Tid),
+		// TODO: Put schema creation into own function.
+		schema := &protos.SchemaUpdate{
+			ValueType: uint32(nq.GetObjectType()),
+		}
+		if nq.GetObjectValue() == nil {
+			// RDF parser doesn't seem to pick up that objects that are nodes
+			// should have UID value type.
+			schema.ValueType = uint32(protos.Posting_UID)
+		}
+		predicateSchema[nq.GetPredicate()] = schema
+
+		// Ensure that the subject and object get UIDs.
+		uid(nq.GetSubject())
+		if nq.GetObjectValue() == nil {
+			uid(nq.GetObjectId())
 		}
 
-		nq.GetObjectValue().GetVal()
-		uid(nq.GetSubject()) // Ensure that the subject is in the UID map.
+		// TODO: Should generate key and value in their own function.
 		de, err := nq.ToEdgeUsing(uidMap)
 		x.Check(err)
 		p := posting.NewPosting(de)
-		p.Uid = math.MaxUint64
+		if nq.GetObjectValue() != nil {
+			// Use special sentinel UID to represent a literal node.
+			p.Uid = math.MaxUint64
+		}
 		p.Op = 3
 
 		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
-		list := &protos.PostingList{
-			Postings: []*protos.Posting{p},
-			Uids:     bitPackUids([]uint64{p.Uid}),
-		}
-		val, err := list.Marshal()
-		x.Check(err)
-		x.Check(kv.Set(key, val, 0))
+		plBuild.addPosting(key, p)
+
+		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %#v\n\n",
+			nq.GetSubject(),
+			uid(nq.GetSubject()),
+			nq.GetPredicate(),
+			hex.Dump(key),
+			p,
+		)
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		p = createPredicatePosting(nq.GetPredicate())
 		plBuild.addPosting(key, p)
+
+		fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %#v\n\n",
+			nq.GetSubject(),
+			uid(nq.GetSubject()),
+			hex.Dump(key),
+			p,
+		)
 	}
 
 	lease(kv)
 
 	// Schema
+	fmt.Println("Schema:")
 	for pred, sch := range predicateSchema {
 		k := x.SchemaKey(pred)
 		var v []byte
+		fmt.Printf("%s: %#v\n", pred, sch)
 		if sch != nil {
 			v, err = sch.Marshal()
 			x.Check(err)
 		}
 		x.Check(kv.Set(k, v, 0))
 	}
+	fmt.Println()
+
+	printUIDMap()
 
 	plBuild.buildPostingLists(kv)
 }
@@ -177,6 +207,14 @@ func uid(str string) uint64 {
 	lastUID++
 	uidMap[str] = lastUID
 	return lastUID
+}
+
+func printUIDMap() {
+	fmt.Println("UID map:")
+	for str, uid := range uidMap {
+		fmt.Printf("%d: %s\n", uid, str)
+	}
+	fmt.Println()
 }
 
 // TODO: Candidate for moving into pl_builder.go?

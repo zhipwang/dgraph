@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -84,12 +86,33 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 
 		// Write posting list out to target.
 		if finalise {
-			pl.Uids = bitPackUids(uids)
-			plBuf, err := pl.Marshal()
-			x.Check(err)
-			x.Check(target.Set([]byte(k), plBuf, 0))
+
+			fmt.Println("KEY:\n" + hex.Dump(k))
+			fmt.Println("POSTINGS:")
+			for _, p := range pl.Postings {
+				fmt.Printf("%#v\n", p)
+			}
+			fmt.Println("END POSTINGS\n")
+
+			x.AssertTrue(len(pl.Postings) > 0)
+			// TODO: Should check to make sure all postings have the same posting type
+			switch pl.Postings[0].PostingType {
+			case protos.Posting_REF:
+				// TODO: This is bad, since we assume the meta data is 1 (could be other things).
+				x.Check(target.Set(k, bitPackUids(uids), 1))
+			case protos.Posting_VALUE:
+				pl.Uids = bitPackUids(uids)
+				plBuf, err := pl.Marshal()
+				x.Check(err)
+				x.Check(target.Set(k, plBuf, 0))
+			case protos.Posting_VALUE_LANG:
+				x.AssertTrue(false)
+			default:
+				x.AssertTrue(false)
+			}
 
 			// Reset for next posting list.
+			pl.Postings = nil
 			pl.Uids = nil
 			uids = nil
 		}
