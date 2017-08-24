@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/types"
+	"github.com/dgraph-io/dgraph/worker"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -18,52 +19,28 @@ func newSchemaStore() schemaStore {
 		map[string]*protos.SchemaUpdate{
 			"_predicate_": nil,
 			"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
-		}}
-}
-
-func (s schemaStore) add(nq *protos.NQuad) {
-
-	fmt.Printf("NQuad: %#v\n\n", nq)
-
-	if nq.ObjectValue == nil {
-		// RDF parser doesn't seem to pick up that objects that are nodes
-		// should have UID value type.
-		nq.ObjectType = int32(protos.Posting_UID)
-	}
-
-	if sch, ok := s.m[nq.GetPredicate()]; ok {
-		if nq.ObjectType == int32(protos.Posting_DEFAULT) {
-			convertFromDefaultType(nq, sch)
-		}
-	} else {
-		sch := &protos.SchemaUpdate{
-			ValueType: uint32(nq.GetObjectType()),
-		}
-		s.m[nq.GetPredicate()] = sch
+		},
 	}
 }
 
-func convertFromDefaultType(nq *protos.NQuad, sch *protos.SchemaUpdate) {
-	x.AssertTruef(nq.ObjectType == int32(protos.Posting_DEFAULT), "nquad object must have default type")
-	switch protos.Posting_ValType(sch.ValueType) {
-	case protos.Posting_INT:
-		i, err := strconv.ParseInt(nq.GetObjectValue().GetDefaultVal(), 10, 64)
-		if err != nil {
-			// Conversion failed. Leave NQuad as is (with default type).
-			//
-			// TODO: This doesn't seem correct to me given the documentation,
-			// it should be rejected. But it seems to be what dgraph_lodaer
-			// does.
-			return
-		}
-		nq.GetObjectValue().Val = &protos.Value_IntVal{IntVal: i}
-	case protos.Posting_UID, protos.Posting_DEFAULT:
-		// Don't have to do any special conversions.
-	default:
-		// TODO: Other cases. Or better yet, code that already does this.
-		x.AssertTrue(false)
+func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
+
+	if isUIDEdge {
+		de.ValueType = uint32(protos.Posting_UID)
 	}
-	nq.ObjectType = int32(sch.GetValueType())
+
+	schTyp := types.DefaultID
+	if sch, ok := s.m[de.Attr]; ok {
+		schTyp = types.TypeID(sch.ValueType)
+	}
+
+	_ = worker.ValidateAndConvert(de, schTyp)
+	// A return error indicates that the conversion failed. Dgraph simply
+	// continues on in that case, so we do as well to maintain compatibility.
+
+	if _, ok := s.m[de.Attr]; !ok {
+		s.m[de.Attr] = &protos.SchemaUpdate{ValueType: de.ValueType}
+	}
 }
 
 func (s schemaStore) write(kv *badger.KV) {

@@ -23,6 +23,8 @@ import (
 
 func main() {
 
+	fmt.Println()
+
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
 	badgerDir := flag.String("b", "", "Location of badger data directory")
 	tmpDir := flag.String("tmp", os.TempDir(), "Temp directory used to use for on-disk "+
@@ -60,10 +62,8 @@ func main() {
 			x.Check(err)
 		}
 
-		schemaStore.add(nq.NQuad)
-
 		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
-		p := createEdgePosting(nq)
+		p := createEdgePosting(nq, schemaStore)
 		plBuild.addPosting(key, p)
 
 		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %#v\n\n",
@@ -114,7 +114,7 @@ func createPredicatePosting(predicate string) *protos.Posting {
 	}
 }
 
-func createEdgePosting(nq gql.NQuad) *protos.Posting {
+func createEdgePosting(nq gql.NQuad, ss schemaStore) *protos.Posting {
 
 	// Ensure that the subject and object get UIDs.
 	uid(nq.GetSubject())
@@ -122,8 +122,13 @@ func createEdgePosting(nq gql.NQuad) *protos.Posting {
 		uid(nq.GetObjectId())
 	}
 
+	fmt.Printf("NQuad: %+v\n\n", nq.NQuad)
+
 	de, err := nq.ToEdgeUsing(uidMap)
 	x.Check(err)
+
+	ss.fixEdge(de, nq.ObjectValue == nil)
+
 	p := posting.NewPosting(de)
 	if nq.GetObjectValue() != nil {
 		// Use special sentinel UID to represent a literal node.
