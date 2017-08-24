@@ -109,23 +109,15 @@ func TestIntConversionHex(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
-//func TestBadSelfGeneratedSchemaAge(t *testing.T) {
-//rdfs := `
-//<a> <age> "15"^^<xs:int> .
-//<b> <age> "13" .`
-//runTestCaseFromString(t, rdfs)
-//}
-
-// TODO: More complicated example from what is above.
-//func TestBadSelfGeneratedSchemaAge(t *testing.T) {
-//rdfs := `
-//<a> <age> "15"^^<xs:int> .
-//<b> <age> "13" .
-//<c> <age> "14"^^<xs:string> .
-//<d> <age> "14.5"^^<xs:string> .
-//<e> <age> "14.5" .`
-//runTestCaseFromString(t, rdfs)
-//}
+func TestAgeExampleFromDocos(t *testing.T) {
+	rdfs := `
+	<a> <age> "15"^^<xs:int> .
+	<b> <age> "13" .
+	<c> <age> "14"^^<xs:string> .
+	<d> <age> "14.5"^^<xs:string> .
+	<e> <age> "14.5" .`
+	runTestCaseFromString(t, rdfs)
+}
 
 // TODO: Indexing
 

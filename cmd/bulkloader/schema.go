@@ -25,6 +25,12 @@ func (s schemaStore) add(nq *protos.NQuad) {
 
 	fmt.Printf("NQuad: %#v\n\n", nq)
 
+	if nq.ObjectValue == nil {
+		// RDF parser doesn't seem to pick up that objects that are nodes
+		// should have UID value type.
+		nq.ObjectType = int32(protos.Posting_UID)
+	}
+
 	if sch, ok := s.m[nq.GetPredicate()]; ok {
 		if nq.ObjectType == int32(protos.Posting_DEFAULT) {
 			convertFromDefaultType(nq, sch)
@@ -32,11 +38,6 @@ func (s schemaStore) add(nq *protos.NQuad) {
 	} else {
 		sch := &protos.SchemaUpdate{
 			ValueType: uint32(nq.GetObjectType()),
-		}
-		if nq.GetObjectValue() == nil {
-			// RDF parser doesn't seem to pick up that objects that are nodes
-			// should have UID value type.
-			sch.ValueType = uint32(protos.Posting_UID)
 		}
 		s.m[nq.GetPredicate()] = sch
 	}
