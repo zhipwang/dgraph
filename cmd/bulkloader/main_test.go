@@ -202,11 +202,11 @@ func TestStringThenUID(t *testing.T) {
 	runTestCaseFromString(t, rdfs, "")
 }
 
-//func TestSchemaWithPredicateAsString(t *testing.T) {
-//rdfs := `<peter> <name> "Peter" .`
-//sche := `name: string .`
-//runTestCaseFromString(t, rdfs, sche)
-//}
+func TestSchemaWithPredicateAsString(t *testing.T) {
+	rdfs := `<peter> <name> "Peter" .`
+	sche := `name: string .`
+	runTestCaseFromString(t, rdfs, sche)
+}
 
 // TODO: Addition of schema
 
@@ -258,7 +258,7 @@ func runTestCase(t *testing.T, rdfFile string, schemaFile string) {
 	defer os.RemoveAll(bulkLoaderDir)
 
 	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile, schemaFile)
-	loadWithBulkLoader(t, bulkLoaderDir, rdfFile)
+	loadWithBulkLoader(t, bulkLoaderDir, rdfFile, schemaFile)
 
 	cmpBadgers(t,
 		filepath.Join(dgraphLoaderDir, "p"),
@@ -327,13 +327,14 @@ func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile, schemaFile stri
 	}
 }
 
-func loadWithBulkLoader(t *testing.T, dataDir string, rdfFile string) {
+func loadWithBulkLoader(t *testing.T, dataDir string, rdfFile string, schemaFile string) {
 	badgerDir := filepath.Join(dataDir, "p")
 	noErr(t, "Could not create p dir:", os.Mkdir(badgerDir, 0755))
 
 	bl := exec.Command("bulkloader",
 		"-r", rdfFile,
 		"-b", badgerDir,
+		"-s", schemaFile,
 	)
 	buf, err := bl.CombinedOutput()
 	t.Log(string(buf))

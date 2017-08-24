@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"strings"
@@ -17,19 +18,26 @@ import (
 	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/rdf"
+	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/x"
 	farm "github.com/dgryski/go-farm"
 )
+
+// TODO: Could do with some massive refactoring... E.g. run whole thing in a
+// routine (or struct) and just have arg parsing in main().
 
 func main() {
 
 	fmt.Println()
 
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
+	schemaFile := flag.String("s", "", "Location of schema file to load")
 	badgerDir := flag.String("b", "", "Location of badger data directory")
 	tmpDir := flag.String("tmp", os.TempDir(), "Temp directory used to use for on-disk "+
 		"scratch space. Requires free space proportional to the size of the RDF file.")
 	flag.Parse()
+
+	// TODO: Handling to make sure required args have been passed.
 
 	f, err := os.Open(*rdfFile)
 	x.Check(err)
@@ -37,6 +45,20 @@ func main() {
 
 	sc, err := rdfScanner(f, *rdfFile)
 	x.Check(err)
+
+	// TODO: Handle schema that's in gz file.
+	// TODO: What is the expected file extension?
+
+	schemaBuf, err := ioutil.ReadFile(*schemaFile)
+	x.Check(err)
+	schemaUpdates, err := schema.Parse(string(schemaBuf))
+	x.Check(err)
+	fmt.Printf("Initial schema (%d):\n", len(schemaUpdates))
+	for _, sch := range schemaUpdates {
+		fmt.Printf("%+v\n", sch)
+	}
+	fmt.Println()
+	schemaStore := newSchemaStore(schemaUpdates)
 
 	opt := badger.DefaultOptions
 	opt.Dir = *badgerDir
@@ -47,8 +69,6 @@ func main() {
 
 	plBuild := newPlBuilder(*tmpDir)
 	defer plBuild.cleanUp()
-
-	schemaStore := newSchemaStore()
 
 	// Load RDF
 	for sc.Scan() {

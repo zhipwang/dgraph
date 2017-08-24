@@ -14,13 +14,19 @@ type schemaStore struct {
 	m map[string]*protos.SchemaUpdate
 }
 
-func newSchemaStore() schemaStore {
-	return schemaStore{
+func newSchemaStore(initial []*protos.SchemaUpdate) schemaStore {
+	s := schemaStore{
 		map[string]*protos.SchemaUpdate{
 			"_predicate_": nil,
 			"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
 		},
 	}
+	for _, sch := range initial {
+		p := sch.Predicate
+		sch.Predicate = ""
+		s.m[p] = sch
+	}
+	return s
 }
 
 func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
