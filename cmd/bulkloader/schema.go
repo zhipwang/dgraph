@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/protos"
@@ -10,21 +11,26 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
+type schemaState struct {
+	strict bool
+	*protos.SchemaUpdate
+}
+
 type schemaStore struct {
-	m map[string]*protos.SchemaUpdate
+	m map[string]schemaState
 }
 
 func newSchemaStore(initial []*protos.SchemaUpdate) schemaStore {
 	s := schemaStore{
-		map[string]*protos.SchemaUpdate{
-			"_predicate_": nil,
-			"_lease_":     &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)},
+		map[string]schemaState{
+			"_predicate_": {true, nil},
+			"_lease_":     {true, &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)}},
 		},
 	}
 	for _, sch := range initial {
 		p := sch.Predicate
 		sch.Predicate = ""
-		s.m[p] = sch
+		s.m[p] = schemaState{true, sch}
 	}
 	return s
 }
@@ -35,17 +41,21 @@ func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
 		de.ValueType = uint32(protos.Posting_UID)
 	}
 
-	schTyp := types.DefaultID
-	if sch, ok := s.m[de.Attr]; ok {
-		schTyp = types.TypeID(sch.ValueType)
+	sch, ok := s.m[de.Attr]
+	if !ok {
+		sch = schemaState{false, &protos.SchemaUpdate{ValueType: de.ValueType}}
+		s.m[de.Attr] = sch
 	}
 
-	_ = worker.ValidateAndConvert(de, schTyp)
-	// A return error indicates that the conversion failed. Dgraph simply
-	// continues on in that case, so we do as well to maintain compatibility.
-
-	if _, ok := s.m[de.Attr]; !ok {
-		s.m[de.Attr] = &protos.SchemaUpdate{ValueType: de.ValueType}
+	schTyp := types.TypeID(sch.ValueType)
+	err := worker.ValidateAndConvert(de, schTyp)
+	if sch.strict && err != nil {
+		// TODO: It's unclear to me as to why it's only an error to have a bad
+		// conversion if the schema was established explicitly rather than
+		// automatically. I suspect I have a misunderstanding about how things
+		// should work.
+		fmt.Printf("BAD RDF: %v\n", err) // TODO: bubble back properly
+		os.Exit(1)
 	}
 }
 
@@ -56,8 +66,8 @@ func (s schemaStore) write(kv *badger.KV) {
 		k := x.SchemaKey(pred)
 		var v []byte
 		var err error
-		if sch != nil {
-			v, err = sch.Marshal()
+		if sch.SchemaUpdate != nil {
+			v, err = sch.SchemaUpdate.Marshal()
 			x.Check(err)
 		}
 		x.Check(kv.Set(k, v, 0))
