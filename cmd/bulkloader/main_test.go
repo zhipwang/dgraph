@@ -81,6 +81,52 @@ func TestTwoFruitsWithNames(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+func TestBadSelfGeneratedSchema(t *testing.T) {
+	rdfs := `
+	<abc> <pred> "hello"^^<xs:string> .
+	<def> <pred> "42"^^<xs:int> .`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestBadSelfGeneratedSchemaReverse(t *testing.T) {
+	rdfs := `
+	<def> <pred> "42"^^<xs:int> .
+	<abc> <pred> "hello"^^<xs:string> .`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestIntConversion(t *testing.T) {
+	rdfs := `
+	<a> <age> "15"^^<xs:int> .
+	<b> <age> "13" .`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestIntConversionHex(t *testing.T) {
+	rdfs := `
+	<a> <age> "15"^^<xs:int> .
+	<b> <age> "0xff" .`
+	runTestCaseFromString(t, rdfs)
+}
+
+//func TestBadSelfGeneratedSchemaAge(t *testing.T) {
+//rdfs := `
+//<a> <age> "15"^^<xs:int> .
+//<b> <age> "13" .`
+//runTestCaseFromString(t, rdfs)
+//}
+
+// TODO: More complicated example from what is above.
+//func TestBadSelfGeneratedSchemaAge(t *testing.T) {
+//rdfs := `
+//<a> <age> "15"^^<xs:int> .
+//<b> <age> "13" .
+//<c> <age> "14"^^<xs:string> .
+//<d> <age> "14.5"^^<xs:string> .
+//<e> <age> "14.5" .`
+//runTestCaseFromString(t, rdfs)
+//}
+
 // TODO: Indexing
 
 // TODO: Addition of schema

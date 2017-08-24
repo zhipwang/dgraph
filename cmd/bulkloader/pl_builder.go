@@ -56,7 +56,7 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 		val, err = posting.Marshal()
 		x.Check(err)
 	case protos.Posting_VALUE_LANG:
-		x.AssertTrue(false) // TODO
+		x.AssertTrue(false) // TODO: support languages
 	default:
 		x.AssertTrue(false)
 	}

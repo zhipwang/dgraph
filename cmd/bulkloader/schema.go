@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/protos"
@@ -24,15 +25,44 @@ func (s schemaStore) add(nq *protos.NQuad) {
 
 	fmt.Printf("NQuad: %#v\n\n", nq)
 
-	sch := &protos.SchemaUpdate{
-		ValueType: uint32(nq.GetObjectType()),
+	if sch, ok := s.m[nq.GetPredicate()]; ok {
+		if nq.ObjectType == int32(protos.Posting_DEFAULT) {
+			convertFromDefaultType(nq, sch)
+		}
+	} else {
+		sch := &protos.SchemaUpdate{
+			ValueType: uint32(nq.GetObjectType()),
+		}
+		if nq.GetObjectValue() == nil {
+			// RDF parser doesn't seem to pick up that objects that are nodes
+			// should have UID value type.
+			sch.ValueType = uint32(protos.Posting_UID)
+		}
+		s.m[nq.GetPredicate()] = sch
 	}
-	if nq.GetObjectValue() == nil {
-		// RDF parser doesn't seem to pick up that objects that are nodes
-		// should have UID value type.
-		sch.ValueType = uint32(protos.Posting_UID)
+}
+
+func convertFromDefaultType(nq *protos.NQuad, sch *protos.SchemaUpdate) {
+	x.AssertTruef(nq.ObjectType == int32(protos.Posting_DEFAULT), "nquad object must have default type")
+	switch protos.Posting_ValType(sch.ValueType) {
+	case protos.Posting_INT:
+		i, err := strconv.ParseInt(nq.GetObjectValue().GetDefaultVal(), 10, 64)
+		if err != nil {
+			// Conversion failed. Leave NQuad as is (with default type).
+			//
+			// TODO: This doesn't seem correct to me given the documentation,
+			// it should be rejected. But it seems to be what dgraph_lodaer
+			// does.
+			return
+		}
+		nq.GetObjectValue().Val = &protos.Value_IntVal{IntVal: i}
+	case protos.Posting_UID, protos.Posting_DEFAULT:
+		// Don't have to do any special conversions.
+	default:
+		// TODO: Other cases. Or better yet, code that already does this.
+		x.AssertTrue(false)
 	}
-	s.m[nq.GetPredicate()] = sch
+	nq.ObjectType = int32(sch.GetValueType())
 }
 
 func (s schemaStore) write(kv *badger.KV) {
