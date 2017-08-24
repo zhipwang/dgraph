@@ -30,6 +30,9 @@ type plBuilder struct {
 }
 
 func (b *plBuilder) cleanUp() {
+	// Don't need any persistence, but still Close() anyway to close all FDs
+	// before nuking the data directory.
+	x.Check(b.kv.Close())
 	x.Check(os.RemoveAll(b.badgerDir))
 }
 
@@ -62,12 +65,6 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 }
 
 func (b *plBuilder) buildPostingLists(target *badger.KV) {
-
-	// TODO: We should really be opening the KV here as well. Better to store
-	// the config in plBuilder rather than the KV itself.
-	defer func() {
-		x.Check(b.kv.Close())
-	}()
 
 	pl := &protos.PostingList{}
 	uids := []uint64{}
