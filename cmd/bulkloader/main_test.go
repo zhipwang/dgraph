@@ -43,16 +43,6 @@ func TestSingleNodeWithNameAndAge(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
-/*
-TODO: Don't really understand how this case should work (in general, when the scheme differs among instances of the same predicate.
-func TestInconsistentPredicateSchema(t *testing.T) {
-	rdfs := `
-	<peter> <name> "Peter" .
-	<robot> <name> "1234"^^<xs:int> .`
-	runTestCaseFromString(t, rdfs)
-}
-*/
-
 func TestUpdatedValue(t *testing.T) {
 	rdfs := `
 	<peter> <name> "NotPeter" .
@@ -119,6 +109,67 @@ func TestAgeExampleFromDocos(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
+func TestSchemaMismatch(t *testing.T) {
+	rdfs := `
+	<s_default>  <p_default> "default" .
+	<s_string>   <p_default> "str"^^<xs:string> .
+	<s_dateTime> <p_default> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_date>     <p_default> "2017-08-24"^^<xs:date> .
+	<s_int>      <p_default> "100"^^<xs:int> .
+	<s_boolean>  <p_default> "true"^^<xs:boolean> .
+	<s_double>   <p_default> "3.14159"^^<xs:double> .
+
+	<s_string>   <p_string> "str"^^<xs:string> .
+	<s_default>  <p_string> "default" .
+	<s_dateTime> <p_string> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_date>     <p_string> "2017-08-24"^^<xs:date> .
+	<s_int>      <p_string> "100"^^<xs:int> .
+	<s_boolean>  <p_string> "true"^^<xs:boolean> .
+	<s_double>   <p_string> "3.14159"^^<xs:double> .
+
+	<s_dateTime> <p_datetime> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_default>  <p_datetime> "default" .
+	<s_string>   <p_datetime> "str"^^<xs:string> .
+	<s_date>     <p_datetime> "2017-08-24"^^<xs:date> .
+	<s_int>      <p_datetime> "100"^^<xs:int> .
+	<s_boolean>  <p_datetime> "true"^^<xs:boolean> .
+	<s_double>   <p_datetime> "3.14159"^^<xs:double> .
+
+	<s_date>     <p_date> "2017-08-24"^^<xs:date> .
+	<s_dateTime> <p_date> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_default>  <p_date> "default" .
+	<s_string>   <p_date> "str"^^<xs:string> .
+	<s_int>      <p_date> "100"^^<xs:int> .
+	<s_boolean>  <p_date> "true"^^<xs:boolean> .
+	<s_double>   <p_date> "3.14159"^^<xs:double> .
+
+	<s_int>      <p_int> "100"^^<xs:int> .
+	<s_date>     <p_int> "2017-08-24"^^<xs:date> .
+	<s_dateTime> <p_int> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_default>  <p_int> "default" .
+	<s_string>   <p_int> "str"^^<xs:string> .
+	<s_boolean>  <p_int> "true"^^<xs:boolean> .
+	<s_double>   <p_int> "3.14159"^^<xs:double> .
+
+	<s_boolean>  <p_boolean> "true"^^<xs:boolean> .
+	<s_int>      <p_boolean> "100"^^<xs:int> .
+	<s_date>     <p_boolean> "2017-08-24"^^<xs:date> .
+	<s_dateTime> <p_boolean> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_default>  <p_boolean> "default" .
+	<s_string>   <p_boolean> "str"^^<xs:string> .
+	<s_double>   <p_boolean> "3.14159"^^<xs:double> .
+
+	<s_double>   <p_double> "3.14159"^^<xs:double> .
+	<s_boolean>  <p_double> "true"^^<xs:boolean> .
+	<s_int>      <p_double> "100"^^<xs:int> .
+	<s_date>     <p_double> "2017-08-24"^^<xs:date> .
+	<s_dateTime> <p_double> "2017-08-24T14:31:07.475773659"^^<xs:dateTime> .
+	<s_default>  <p_double> "default" .
+	<s_string>   <p_double> "str"^^<xs:string> .
+	`
+	runTestCaseFromString(t, rdfs)
+}
+
 // TODO: Indexing
 
 // TODO: Addition of schema
@@ -142,6 +193,14 @@ func runTestCaseFromString(t *testing.T, rdfs string) {
 	}
 	runTestCase(t, fname)
 }
+
+// TODO: This approach is pretty nasty. Would be super ideal if the whole thing
+// could just be done in process. To get things in process, would have to set
+// everything up to work as a library.
+//
+// But then you get bad isolation when things go wrong... (e.g. x.Check kills
+// the whole test not just the process). Maybe things are okay as they
+// currently are.
 
 func runTestCase(t *testing.T, rdfFile string) {
 

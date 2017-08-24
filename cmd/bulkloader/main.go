@@ -66,7 +66,7 @@ func main() {
 		p := createEdgePosting(nq, schemaStore)
 		plBuild.addPosting(key, p)
 
-		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %#v\n\n",
+		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
 			nq.GetSubject(),
 			uid(nq.GetSubject()),
 			nq.GetPredicate(),
@@ -78,7 +78,7 @@ func main() {
 		p = createPredicatePosting(nq.GetPredicate())
 		plBuild.addPosting(key, p)
 
-		fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %#v\n\n",
+		fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %+v\n\n",
 			nq.GetSubject(),
 			uid(nq.GetSubject()),
 			hex.Dump(key),

@@ -115,7 +115,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 				}
 			} else {
 				for _, p := range pl.Postings {
-					fmt.Printf("%#v\n", p)
+					fmt.Printf("%+v\n", p)
 				}
 			}
 			fmt.Println("END POSTINGS\n")
