@@ -304,7 +304,7 @@ func main() {
 			} else {
 				log.Println(err)
 			}
-			return
+			os.Exit(1)
 		}
 	}
 

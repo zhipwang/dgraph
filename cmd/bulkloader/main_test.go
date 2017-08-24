@@ -32,7 +32,7 @@ func init() {
 
 func TestSingleNodeWithName(t *testing.T) {
 	rdfs := `<peter> <name> "Peter" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestSingleNodeWithNameAndAge(t *testing.T) {
@@ -40,26 +40,26 @@ func TestSingleNodeWithNameAndAge(t *testing.T) {
 	<peter> <name> "Peter" .
 
 	    <peter> <age> "28"^^<xs:int> .` // Also test blank lines/weird spacing while we're here.
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestUpdatedValue(t *testing.T) {
 	rdfs := `
 	<peter> <name> "NotPeter" .
 	<peter> <name> "Peter" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestAppleIsAFruit(t *testing.T) {
 	rdfs := `<apple> <is> <fruit> .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestTwoFruits(t *testing.T) {
 	rdfs := `
 	<apple> <is> <fruit> .
 	<banana> <is> <fruit> .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestTwoFruitsWithNames(t *testing.T) {
@@ -68,35 +68,35 @@ func TestTwoFruitsWithNames(t *testing.T) {
 	<banana> <is> <fruit> .
 	<apple> <name> "MrApple" .
 	<banana> <name> "MrBanana" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestBadSelfGeneratedSchema(t *testing.T) {
 	rdfs := `
 	<abc> <pred> "hello"^^<xs:string> .
 	<def> <pred> "42"^^<xs:int> .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestBadSelfGeneratedSchemaReverse(t *testing.T) {
 	rdfs := `
 	<def> <pred> "42"^^<xs:int> .
 	<abc> <pred> "hello"^^<xs:string> .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestIntConversion(t *testing.T) {
 	rdfs := `
 	<a> <age> "15"^^<xs:int> .
 	<b> <age> "13" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestIntConversionHex(t *testing.T) {
 	rdfs := `
 	<a> <age> "15"^^<xs:int> .
 	<b> <age> "0xff" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestAgeExampleFromDocos(t *testing.T) {
@@ -106,7 +106,7 @@ func TestAgeExampleFromDocos(t *testing.T) {
 	<c> <age> "14"^^<xs:string> .
 	<d> <age> "14.5"^^<xs:string> .
 	<e> <age> "14.5" .`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestSchemaMismatch(t *testing.T) {
@@ -167,7 +167,7 @@ func TestSchemaMismatch(t *testing.T) {
 	<s_default>  <p_double> "default" .
 	<s_string>   <p_double> "str"^^<xs:string> .
 	`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestUIDThenDefaultScalar(t *testing.T) {
@@ -175,7 +175,7 @@ func TestUIDThenDefaultScalar(t *testing.T) {
 	<subject> <predicate> <object> .
 	<subject> <predicate> "object" .
 	`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestDefaultScalarThenUID(t *testing.T) {
@@ -183,7 +183,7 @@ func TestDefaultScalarThenUID(t *testing.T) {
 	<subject> <predicate> "object" .
 	<subject> <predicate> <object> .
 	`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestUIDThenString(t *testing.T) {
@@ -191,7 +191,7 @@ func TestUIDThenString(t *testing.T) {
 	<subject> <predicate> <object> .
 	<subject> <predicate> "object"^^<xs:string> .
 	`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
 
 func TestStringThenUID(t *testing.T) {
@@ -199,8 +199,14 @@ func TestStringThenUID(t *testing.T) {
 	<subject> <predicate> "object"^^<xs:string> .
 	<subject> <predicate> <object> .
 	`
-	runTestCaseFromString(t, rdfs)
+	runTestCaseFromString(t, rdfs, "")
 }
+
+//func TestSchemaWithPredicateAsString(t *testing.T) {
+//rdfs := `<peter> <name> "Peter" .`
+//sche := `name: string .`
+//runTestCaseFromString(t, rdfs, sche)
+//}
 
 // TODO: Addition of schema
 
@@ -212,18 +218,25 @@ func TestStringThenUID(t *testing.T) {
 
 // TODO: Some really big files.
 
-func runTestCaseFromString(t *testing.T, rdfs string) {
+// TODO: XID edges.
+
+func runTestCaseFromString(t *testing.T, rdfs, schema string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
 
-	fname := filepath.Join(dir, "data.rdf")
-	if err := ioutil.WriteFile(fname, []byte(rdfs), 0644); err != nil {
+	rdfFilename := filepath.Join(dir, "data.rdf")
+	if err := ioutil.WriteFile(rdfFilename, []byte(rdfs), 0644); err != nil {
 		t.Fatal(err)
 	}
-	runTestCase(t, fname)
+	schemaFilename := filepath.Join(dir, "schema.json")
+	if err := ioutil.WriteFile(schemaFilename, []byte(schema), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	runTestCase(t, rdfFilename, schemaFilename)
 }
 
 // TODO: This approach is pretty nasty. Would be super ideal if the whole thing
@@ -234,7 +247,7 @@ func runTestCaseFromString(t *testing.T, rdfs string) {
 // the whole test not just the process). Maybe things are okay as they
 // currently are.
 
-func runTestCase(t *testing.T, rdfFile string) {
+func runTestCase(t *testing.T, rdfFile string, schemaFile string) {
 
 	dgraphLoaderDir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	noErr(t, "Could not create temp dir:", err)
@@ -244,7 +257,7 @@ func runTestCase(t *testing.T, rdfFile string) {
 	noErr(t, "Could not create temp dir:", err)
 	defer os.RemoveAll(bulkLoaderDir)
 
-	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile)
+	loadWithDgraphLoader(t, dgraphLoaderDir, rdfFile, schemaFile)
 	loadWithBulkLoader(t, bulkLoaderDir, rdfFile)
 
 	cmpBadgers(t,
@@ -253,7 +266,7 @@ func runTestCase(t *testing.T, rdfFile string) {
 	)
 }
 
-func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
+func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile, schemaFile string) {
 
 	// The "port in use" avoidance strategy is to assign random ports.
 	workerPort := randomPort()
@@ -275,11 +288,15 @@ func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
 	dg.Stderr = dgStderr
 	noErr(t, "Could not start dgraph:", dg.Start())
 
+	// Wait a short amount of time for dgraph to start listening for gRPC.
+	time.Sleep(1000 * time.Millisecond)
+
 	ld := exec.Command(
 		"dgraphloader",
 		"-r", rdfFile,
 		"-d", "localhost:"+grpcPort,
 		"-cd", filepath.Join(dataDir, "c"),
+		"-s", schemaFile,
 	)
 	ldStdout := new(bytes.Buffer)
 	ldStderr := new(bytes.Buffer)
@@ -302,7 +319,7 @@ func loadWithDgraphLoader(t *testing.T, dataDir string, rdfFile string) {
 		t.Fatal("Loader timed out")
 	}
 
-	noErr(t, "Couldnot signal dgraph to stop:", dg.Process.Signal(os.Interrupt))
+	noErr(t, "Couldn't signal dgraph to stop:", dg.Process.Signal(os.Interrupt))
 	if err := dg.Wait(); err != nil {
 		t.Log(dgStdout)
 		t.Log(dgStderr)
