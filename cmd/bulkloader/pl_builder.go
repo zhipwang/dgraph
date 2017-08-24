@@ -56,9 +56,9 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 		val, err = posting.Marshal()
 		x.Check(err)
 	case protos.Posting_VALUE_LANG:
-		x.AssertTrue(false) // TODO: support languages
+		x.AssertTruef(false, "values not yet supported") // TODO
 	default:
-		x.AssertTrue(false)
+		x.AssertTruef(false, "unknown posting type")
 	}
 
 	x.Check(b.kv.Set(key, val, meta))
@@ -104,29 +104,28 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 		// Write posting list out to target.
 		if finalise {
 
-			simplePostingList := len(pl.Postings) == 0
-			x.AssertTrue(simplePostingList || len(uids) == len(pl.Postings))
+			// If we saw any full postings, then use a proto.PostingList as the
+			// value. But include the UID-only postings in the posting list
+			// (not just the proto.Posting values).
+
+			useFullPostings := len(pl.Postings) > 0
 
 			fmt.Print("KEY:\n" + hex.Dump(k))
-			fmt.Println("POSTINGS:")
-			if simplePostingList {
-				for _, p := range uids {
-					fmt.Println(p)
-				}
-			} else {
+			fmt.Printf("POSTINGS: %v\n", uids)
+			if useFullPostings {
 				for _, p := range pl.Postings {
-					fmt.Printf("%+v\n", p)
+					fmt.Printf("Full posting: %+v\n", p)
 				}
 			}
-			fmt.Println("END POSTINGS\n")
+			fmt.Println()
 
-			if simplePostingList {
-				x.Check(target.Set(k, bitPackUids(uids), 0x01))
-			} else {
+			if useFullPostings {
 				pl.Uids = bitPackUids(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
 				x.Check(target.Set(k, plBuf, 0x00))
+			} else {
+				x.Check(target.Set(k, bitPackUids(uids), 0x01))
 			}
 
 			// Reset for next posting list.
@@ -140,7 +139,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 
 func extractPLKey(kvKey []byte) []byte {
 	// Copy value since it's only valid until the iterator is next advanced.
-	x.AssertTrue(len(kvKey) > 8)
+	x.AssertTruef(len(kvKey) > 8, "unexpected key size")
 	k := make([]byte, len(kvKey)-8)
 	copy(k, kvKey)
 	return k

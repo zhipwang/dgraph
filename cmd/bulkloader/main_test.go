@@ -170,9 +170,41 @@ func TestSchemaMismatch(t *testing.T) {
 	runTestCaseFromString(t, rdfs)
 }
 
-// TODO: Indexing
+func TestUIDThenDefaultScalar(t *testing.T) {
+	rdfs := `
+	<subject> <predicate> <object> .
+	<subject> <predicate> "object" .
+	`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestDefaultScalarThenUID(t *testing.T) {
+	rdfs := `
+	<subject> <predicate> "object" .
+	<subject> <predicate> <object> .
+	`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestUIDThenString(t *testing.T) {
+	rdfs := `
+	<subject> <predicate> <object> .
+	<subject> <predicate> "object"^^<xs:string> .
+	`
+	runTestCaseFromString(t, rdfs)
+}
+
+func TestStringThenUID(t *testing.T) {
+	rdfs := `
+	<subject> <predicate> "object"^^<xs:string> .
+	<subject> <predicate> <object> .
+	`
+	runTestCaseFromString(t, rdfs)
+}
 
 // TODO: Addition of schema
+
+// TODO: Indexing
 
 // TODO: Reverse edges.
 
