@@ -78,7 +78,6 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 	for iter.Valid() {
 
 		// Add to PL
-		// TODO: Add a check here to make sure all postings have the same user meta.
 		if iter.Item().UserMeta() == 0x01 {
 			uids = append(uids, extractUID(iter.Item().Key()))
 		} else {
@@ -105,7 +104,8 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 		// Write posting list out to target.
 		if finalise {
 
-			simplePostingList := len(uids) != len(pl.Postings)
+			simplePostingList := len(pl.Postings) == 0
+			x.AssertTrue(simplePostingList || len(uids) == len(pl.Postings))
 
 			fmt.Print("KEY:\n" + hex.Dump(k))
 			fmt.Println("POSTINGS:")
