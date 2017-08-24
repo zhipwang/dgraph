@@ -208,7 +208,16 @@ func TestSchemaWithPredicateAsString(t *testing.T) {
 	runTestCaseFromString(t, rdfs, sche)
 }
 
-// TODO: Addition of schema
+// TODO: Test cases that cause the loader to fail.
+
+// TODO: Causes the loader to fail.
+//func TestSchemaWithPredicateAsInt(t *testing.T) {
+//	sche := `age: int .`
+//	rdfs := `
+//	<pawan> <age> "oaeu"^^<xs:string> .
+//	`
+//	runTestCaseFromString(t, rdfs, sche)
+//}
 
 // TODO: Indexing
 
