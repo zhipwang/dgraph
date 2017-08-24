@@ -208,6 +208,12 @@ func TestSchemaWithPredicateAsString(t *testing.T) {
 	runTestCaseFromString(t, rdfs, sche)
 }
 
+func TestSchemaUID(t *testing.T) {
+	sche := `friend: uid .`
+	rdfs := `<alice> <friend> <bob> .`
+	runTestCaseFromString(t, rdfs, sche)
+}
+
 // TODO: Test cases that cause the loader to fail.
 
 // TODO: Causes the loader to fail.
@@ -215,6 +221,18 @@ func TestSchemaWithPredicateAsString(t *testing.T) {
 //	sche := `age: int .`
 //	rdfs := `
 //	<pawan> <age> "oaeu"^^<xs:string> .
+//	`
+//	runTestCaseFromString(t, rdfs, sche)
+//}
+
+// TODO: Count index
+
+// FAILING:
+//func TestCountIndex(t *testing.T) {
+//	sche := `friend: uid @count .`
+//	rdfs := `
+//	<alice> <friend> <bob> .
+//	<alice> <friend> <carol> .
 //	`
 //	runTestCaseFromString(t, rdfs, sche)
 //}
