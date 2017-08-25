@@ -73,10 +73,12 @@ func valueMismatch(itemA, itemB *badger.KVItem) {
 	fmt.Printf(`
 Equal keys have different values:
 K:
-%vV(A) %d:
+%v%v
+V(A) %d:
 %v%vV(B) %d:
 %v%v`,
 		hex.Dump(itemA.Key()),
+		niceKey(itemA.Key()),
 		itemA.UserMeta(),
 		hex.Dump(itemA.Value()),
 		niceValue(itemA.Value()),
@@ -90,15 +92,22 @@ func keyMismatch(label string, item *badger.KVItem) {
 	fmt.Printf(`
 Key present in one KV store but not the other:
 K(%s):
-%vV(%s) %d:
+%v%v
+V(%s) %d:
 %v%v`,
 		label,
 		hex.Dump(item.Key()),
+		niceKey(item.Key()),
 		label,
 		item.UserMeta(),
 		hex.Dump(item.Value()),
 		niceValue(item.Value()),
 	)
+}
+
+func niceKey(k []byte) string {
+	pk := x.Parse(k)
+	return fmt.Sprintf("Pretty: %+v", pk)
 }
 
 func niceValue(v []byte) string {
