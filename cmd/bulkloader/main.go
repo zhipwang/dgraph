@@ -85,27 +85,42 @@ func main() {
 			x.Check(err)
 		}
 
+		// TODO: Rename to forwardPosting and reversePosting
+		p1, p2 := createEdgePostings(nq, schemaStore)
+
 		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
-		p := createEdgePosting(nq, schemaStore)
-		plBuild.addPosting(key, p)
+		plBuild.addPosting(key, p1)
 
 		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
 			nq.GetSubject(),
 			uid(nq.GetSubject()),
 			nq.GetPredicate(),
 			hex.Dump(key),
-			p,
+			p1,
 		)
 
+		if p2 != nil {
+			key = x.ReverseKey(nq.GetPredicate(), uid(nq.GetObjectId()))
+			plBuild.addPosting(key, p2)
+
+			fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
+				nq.GetObjectId(),
+				uid(nq.GetObjectId()),
+				nq.GetPredicate(),
+				hex.Dump(key),
+				p2,
+			)
+		}
+
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
-		p = createPredicatePosting(nq.GetPredicate())
-		plBuild.addPosting(key, p)
+		pp := createPredicatePosting(nq.GetPredicate())
+		plBuild.addPosting(key, pp)
 
 		fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %+v\n\n",
 			nq.GetSubject(),
 			uid(nq.GetSubject()),
 			hex.Dump(key),
-			p,
+			pp,
 		)
 
 		addIndexPostings(nq, schemaStore, plBuild)
@@ -139,7 +154,7 @@ func createPredicatePosting(predicate string) *protos.Posting {
 	}
 }
 
-func createEdgePosting(nq gql.NQuad, ss schemaStore) *protos.Posting {
+func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.Posting) {
 
 	// Ensure that the subject and object get UIDs.
 	uid(nq.GetSubject())
@@ -160,7 +175,26 @@ func createEdgePosting(nq gql.NQuad, ss schemaStore) *protos.Posting {
 		p.Uid = math.MaxUint64
 	}
 	p.Op = 3
-	return p
+
+	// Early exit for no reverse edge.
+	sch := ss.m[nq.GetPredicate()]
+	if sch.GetDirective() != protos.SchemaUpdate_REVERSE {
+		return p, nil
+	}
+
+	// Reverse predicate
+	x.AssertTruef(nq.GetObjectValue() == nil, "has reverse schema iff object is UID")
+
+	rde, err := nq.ToEdgeUsing(uidMap)
+	x.Check(err)
+	rde.Entity, rde.ValueId = rde.ValueId, rde.Entity
+
+	ss.fixEdge(rde, true)
+
+	rp := posting.NewPosting(rde)
+	rp.Op = 3
+
+	return p, rp
 }
 
 func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {

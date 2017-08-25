@@ -35,6 +35,7 @@ func newSchemaStore(initial []*protos.SchemaUpdate) schemaStore {
 	return s
 }
 
+// TODO: isUIDEdge is a clunky name
 func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
 
 	if isUIDEdge {

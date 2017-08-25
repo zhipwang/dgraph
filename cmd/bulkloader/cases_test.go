@@ -400,6 +400,44 @@ func TestIndexMultiple(t *testing.T) {
 	)
 }
 
+func TestReverseSimple(t *testing.T) {
+	runTestCaseFromString(t,
+		"friend: uid @reverse .",
+		`
+		<a> <friend> <b> .
+		`,
+	)
+}
+
+func TestReverseComplex(t *testing.T) {
+	runTestCaseFromString(t,
+		`friend: uid @reverse .`,
+		`
+		<alice> <friend> <bob> .
+		<alice> <friend> <carol> .
+		`,
+	)
+}
+
+//func TestReverseAndCountSimple(t *testing.T) {
+//runTestCaseFromString(t,
+//"friend: uid @reverse @count .",
+//`
+//<a> <friend> <b> .
+//`,
+//)
+//}
+
+//func TestReverseAndCountComplex(t *testing.T) {
+//runTestCaseFromString(t,
+//`friend: uid @reverse @count .`,
+//`
+//<alice> <friend> <bob> .
+//<alice> <friend> <carol> .
+//`,
+//)
+//}
+
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 
 // TODO: Reverse edges.
