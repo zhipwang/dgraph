@@ -419,24 +419,24 @@ func TestReverseComplex(t *testing.T) {
 	)
 }
 
-//func TestReverseAndCountSimple(t *testing.T) {
-//runTestCaseFromString(t,
-//"friend: uid @reverse @count .",
-//`
-//<a> <friend> <b> .
-//`,
-//)
-//}
+func TestReverseAndCountSimple(t *testing.T) {
+	runTestCaseFromString(t,
+		"friend: uid @reverse @count .",
+		`
+		<a> <friend> <b> .
+		`,
+	)
+}
 
-//func TestReverseAndCountComplex(t *testing.T) {
-//runTestCaseFromString(t,
-//`friend: uid @reverse @count .`,
-//`
-//<alice> <friend> <bob> .
-//<alice> <friend> <carol> .
-//`,
-//)
-//}
+func TestReverseAndCountComplex(t *testing.T) {
+	runTestCaseFromString(t,
+		`friend: uid @reverse @count .`,
+		`
+		<alice> <friend> <bob> .
+		<alice> <friend> <carol> .
+		`,
+	)
+}
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 

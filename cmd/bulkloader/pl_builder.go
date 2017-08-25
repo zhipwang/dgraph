@@ -129,7 +129,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				x.Check(target.Set(k, bitPackUids(uids), 0x01))
 			}
 
-			if parsedK.IsData() && ss.m[parsedK.Attr].GetCount() {
+			if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
 				cnt := len(uids)
 				counts[cnt] = append(counts[cnt], parsedK.Uid)
 			}
@@ -147,7 +147,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			parsedNewK = x.Parse(newK)
 		}
 
-		if !iter.Valid() || parsedNewK.Attr != parsedK.Attr {
+		if !iter.Valid() || (parsedNewK.Attr != parsedK.Attr || parsedNewK.IsReverse() != parsedK.IsReverse()) {
 			// Dump out count posting lists.
 			//
 			// TODO: This isn't an efficient algorithm: it requires full
@@ -158,7 +158,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			for cnt := range counts {
 				for i := highest + 1; i <= cnt; i++ {
 					pl := counts[i]
-					key := x.CountKey(parsedK.Attr, uint32(i), false) // TODO: Reverse flag hardcoded to false... Should be used for something.
+					key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
 					if len(pl) > 0 {
 						val := bitPackUids(pl)
 						x.Check(target.Set(key, val, 0x01))
