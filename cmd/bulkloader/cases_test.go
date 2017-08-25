@@ -459,6 +459,23 @@ func TestLangMultiple(t *testing.T) {
 	)
 }
 
+func TestLangAndStringIndex(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(trigram) .",
+		`
+		<peter1> <name> "Pieter"@af .
+		<peter1> <name> "Peder"@kw  .
+
+		<peter2> <name> "Peddyr"@gv .
+		<peter2> <name> "Pietru"@mt .
+		`,
+
+		// "Ped" has  peter1 and peter2
+		// "ter" has only peter1
+		// "dyr" has only peter2
+	)
+}
+
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 
 // TODO: Some really big files.
