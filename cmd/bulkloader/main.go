@@ -60,10 +60,7 @@ func main() {
 	fmt.Println()
 	schemaStore := newSchemaStore(schemaUpdates)
 
-	opt := badger.DefaultOptions
-	opt.Dir = *badgerDir
-	opt.ValueDir = *badgerDir
-	kv, err := badger.NewKV(&opt)
+	kv, err := defaultBadger(*badgerDir)
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
 
