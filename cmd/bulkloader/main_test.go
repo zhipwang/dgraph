@@ -199,17 +199,75 @@ func TestSchemaUID(t *testing.T) {
 //	runTestCaseFromString(t, rdfs, sche)
 //}
 
-// TODO: Count index
+func TestCountIndexSimple(t *testing.T) {
+	sche := `friend: uid @count .`
+	rdfs := `
+	<alice> <friend> <bob> .
+	<alice> <friend> <carol> .
+	`
+	runTestCaseFromString(t, rdfs, sche)
+}
 
-// FAILING:
-//func TestCountIndex(t *testing.T) {
-//	sche := `friend: uid @count .`
-//	rdfs := `
-//	<alice> <friend> <bob> .
-//	<alice> <friend> <carol> .
-//	`
-//	runTestCaseFromString(t, rdfs, sche)
-//}
+func TestCountIndexComplex(t *testing.T) {
+	sche := `friend: uid @count .`
+	rdfs := `
+	<alice> <friend> <bob>   .
+	<alice> <friend> <carol> .
+	<alice> <friend> <dave>  .
+
+	<bob>   <friend> <carol> .
+
+	<carol> <friend> <bob>   .
+	<carol> <friend> <dave>  .
+
+	<erin>  <friend> <bob>   .
+	<erin>  <friend> <carol> .
+
+	<frank> <friend> <carol> .
+	<frank> <friend> <dave>  .
+	<frank> <friend> <erin>  .
+
+	<grace> <friend> <alice> .
+	<grace> <friend> <bob>   .
+	<grace> <friend> <carol> .
+	<grace> <friend> <dave>  .
+	<grace> <friend> <erin>  .
+	<grace> <friend> <frank> .
+	`
+	runTestCaseFromString(t, rdfs, sche)
+}
+
+func TestCountIndexMultiplePredicates(t *testing.T) {
+	sche := `
+	a: uid @count .
+	b: uid @count .
+	c: uid @count .
+	b: uid @count .
+	`
+	rdfs := `
+	<a1> <a> <a3> .
+	<a2> <a> <a1> .
+	<a2> <a> <a3> .
+
+	<b1> <b> <b2> .
+
+	<c1> <c> <c2> .
+	<c2> <c> <c1> .
+
+	<d1> <d> <d2> .
+	<d1> <d> <d3> .
+	<d3> <d> <d1> .
+	<d3> <d> <d2> .
+	<d3> <d> <d4> .
+
+	<d4> <d> <d1> .
+	<d4> <d> <d2> .
+	<d4> <d> <d3> .
+	`
+	runTestCaseFromString(t, rdfs, sche)
+}
+
+// TODO: Count test with multiple predicates
 
 // TODO: Indexing
 

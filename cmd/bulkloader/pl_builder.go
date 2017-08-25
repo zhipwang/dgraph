@@ -61,7 +61,9 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 	x.Check(b.kv.Set(key, val, meta))
 }
 
-func (b *plBuilder) buildPostingLists(target *badger.KV) {
+func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
+
+	counts := map[int][]uint64{}
 
 	pl := &protos.PostingList{}
 	uids := []uint64{}
@@ -98,6 +100,9 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 			finalise = true
 		}
 
+		parsedK := x.Parse(k)
+		x.AssertTruef(parsedK.IsData(), "must be data key")
+
 		// Write posting list out to target.
 		if finalise {
 
@@ -125,11 +130,47 @@ func (b *plBuilder) buildPostingLists(target *badger.KV) {
 				x.Check(target.Set(k, bitPackUids(uids), 0x01))
 			}
 
+			if ss.m[parsedK.Attr].GetCount() {
+				cnt := len(uids)
+				counts[cnt] = append(counts[cnt], parsedK.Uid)
+			}
+
 			// Reset for next posting list.
 			pl.Postings = nil
 			pl.Uids = nil
 			uids = nil
 		}
+
+		var parsedNewK *x.ParsedKey // TODO: We're double parsing each key. With clever tracking between outside of the loop, could eliminate this.
+		if iter.Valid() {
+			parsedNewK = x.Parse(newK)
+			x.AssertTruef(parsedNewK.IsData(), "must be data key")
+		}
+
+		if !iter.Valid() || parsedNewK.Attr != parsedK.Attr {
+			// Dump out count posting lists.
+			//
+			// TODO: This isn't an efficient algorithm: it requires full
+			// iteration over the map and max(counts) map lookups. It's
+			// possible to just iterate over the map, store in a slice, and
+			// fill in the gaps while iterating the slice.
+			highest := -1
+			for cnt := range counts {
+				for i := highest + 1; i <= cnt; i++ {
+					pl := counts[i]
+					key := x.CountKey(parsedK.Attr, uint32(i), false) // TODO: Reverse flag hardcoded to false... Should be used for something.
+					if len(pl) > 0 {
+						val := bitPackUids(pl)
+						x.Check(target.Set(key, val, 0x01))
+					} else {
+						x.Check(target.Set(key, nil, 0x00))
+					}
+				}
+				highest = cnt
+			}
+			counts = map[int][]uint64{} // TODO: Possibly fast to clear map while iterating. Profile to work out.
+		}
+
 		k = newK
 	}
 }

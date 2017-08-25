@@ -109,7 +109,7 @@ func main() {
 
 	printUIDMap()
 
-	plBuild.buildPostingLists(kv)
+	plBuild.buildPostingLists(kv, schemaStore)
 }
 
 func parseNQuad(line string) (gql.NQuad, error) {
