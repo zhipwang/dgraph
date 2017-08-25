@@ -440,8 +440,6 @@ func TestReverseAndCountComplex(t *testing.T) {
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 
-// TODO: Reverse edges.
-
 // TODO: Language.
 
 // TODO: Some really big files.
