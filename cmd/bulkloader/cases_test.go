@@ -267,9 +267,10 @@ func TestCountIndexMultiplePredicates(t *testing.T) {
 	runTestCaseFromString(t, rdfs, sche)
 }
 
-// TODO: Count test with multiple predicates
-
 // TODO: Indexing
+
+func TestCountIndexInt(t *testing.T) {
+}
 
 // TODO: Reverse edges.
 
