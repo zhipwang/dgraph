@@ -461,8 +461,6 @@ func TestLangMultiple(t *testing.T) {
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 
-// TODO: Language.
-
 // TODO: Some really big files.
 
 // TODO: XID edges.
