@@ -6,7 +6,7 @@ import (
 
 func TestSingleNodeWithName(t *testing.T) {
 	rdfs := `<peter> <name> "Peter" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestSingleNodeWithNameAndAge(t *testing.T) {
@@ -14,26 +14,26 @@ func TestSingleNodeWithNameAndAge(t *testing.T) {
 	<peter> <name> "Peter" .
 
 	    <peter> <age> "28"^^<xs:int> .` // Also test blank lines/weird spacing while we're here.
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestUpdatedValue(t *testing.T) {
 	rdfs := `
 	<peter> <name> "NotPeter" .
 	<peter> <name> "Peter" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestAppleIsAFruit(t *testing.T) {
 	rdfs := `<apple> <is> <fruit> .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestTwoFruits(t *testing.T) {
 	rdfs := `
 	<apple> <is> <fruit> .
 	<banana> <is> <fruit> .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestTwoFruitsWithNames(t *testing.T) {
@@ -42,35 +42,35 @@ func TestTwoFruitsWithNames(t *testing.T) {
 	<banana> <is> <fruit> .
 	<apple> <name> "MrApple" .
 	<banana> <name> "MrBanana" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestBadSelfGeneratedSchema(t *testing.T) {
 	rdfs := `
 	<abc> <pred> "hello"^^<xs:string> .
 	<def> <pred> "42"^^<xs:int> .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestBadSelfGeneratedSchemaReverse(t *testing.T) {
 	rdfs := `
 	<def> <pred> "42"^^<xs:int> .
 	<abc> <pred> "hello"^^<xs:string> .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestIntConversion(t *testing.T) {
 	rdfs := `
 	<a> <age> "15"^^<xs:int> .
 	<b> <age> "13" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestIntConversionHex(t *testing.T) {
 	rdfs := `
 	<a> <age> "15"^^<xs:int> .
 	<b> <age> "0xff" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestAgeExampleFromDocos(t *testing.T) {
@@ -80,7 +80,7 @@ func TestAgeExampleFromDocos(t *testing.T) {
 	<c> <age> "14"^^<xs:string> .
 	<d> <age> "14.5"^^<xs:string> .
 	<e> <age> "14.5" .`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestSchemaMismatch(t *testing.T) {
@@ -141,7 +141,7 @@ func TestSchemaMismatch(t *testing.T) {
 	<s_default>  <p_double> "default" .
 	<s_string>   <p_double> "str"^^<xs:string> .
 	`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestUIDThenDefaultScalar(t *testing.T) {
@@ -149,7 +149,7 @@ func TestUIDThenDefaultScalar(t *testing.T) {
 	<subject> <predicate> <object> .
 	<subject> <predicate> "object" .
 	`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestDefaultScalarThenUID(t *testing.T) {
@@ -157,7 +157,7 @@ func TestDefaultScalarThenUID(t *testing.T) {
 	<subject> <predicate> "object" .
 	<subject> <predicate> <object> .
 	`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestUIDThenString(t *testing.T) {
@@ -165,7 +165,7 @@ func TestUIDThenString(t *testing.T) {
 	<subject> <predicate> <object> .
 	<subject> <predicate> "object"^^<xs:string> .
 	`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestStringThenUID(t *testing.T) {
@@ -173,19 +173,19 @@ func TestStringThenUID(t *testing.T) {
 	<subject> <predicate> "object"^^<xs:string> .
 	<subject> <predicate> <object> .
 	`
-	runTestCaseFromString(t, rdfs, "")
+	runTestCaseFromString(t, "", rdfs)
 }
 
 func TestSchemaWithPredicateAsString(t *testing.T) {
 	rdfs := `<peter> <name> "Peter" .`
 	sche := `name: string .`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestSchemaUID(t *testing.T) {
 	sche := `friend: uid .`
 	rdfs := `<alice> <friend> <bob> .`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 // TODO: Test cases that cause the loader to fail.
@@ -196,7 +196,7 @@ func TestSchemaUID(t *testing.T) {
 //	rdfs := `
 //	<pawan> <age> "oaeu"^^<xs:string> .
 //	`
-//	runTestCaseFromString(t, rdfs, sche)
+//	runTestCaseFromString(t, sche, rdfs)
 //}
 
 func TestCountIndexSimple(t *testing.T) {
@@ -205,7 +205,7 @@ func TestCountIndexSimple(t *testing.T) {
 	<alice> <friend> <bob> .
 	<alice> <friend> <carol> .
 	`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestCountIndexComplex(t *testing.T) {
@@ -234,7 +234,7 @@ func TestCountIndexComplex(t *testing.T) {
 	<grace> <friend> <erin>  .
 	<grace> <friend> <frank> .
 	`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestCountIndexMultiplePredicates(t *testing.T) {
@@ -264,13 +264,13 @@ func TestCountIndexMultiplePredicates(t *testing.T) {
 	<d4> <d> <d2> .
 	<d4> <d> <d3> .
 	`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestIndexIntSimple(t *testing.T) {
 	sche := `age: int @index(int) .`
 	rdfs := `<peter> <age> "28"^^<xs:int> .`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestIndexIntMultiple(t *testing.T) {
@@ -281,7 +281,7 @@ func TestIndexIntMultiple(t *testing.T) {
 	<adam>  <age> "42"^^<xs:int> .
 	<jess>  <age> "42"^^<xs:int> .
 	`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestIndexFloat(t *testing.T) {
@@ -290,11 +290,12 @@ func TestIndexFloat(t *testing.T) {
 	<peter> <shoe_size> "9.5"<xs:float> .
 	<young_peter> <shoe_size> "2" .
 	`
-	runTestCaseFromString(t, rdfs, sche)
+	runTestCaseFromString(t, sche, rdfs)
 }
 
 func TestIndexBool(t *testing.T) {
 	runTestCaseFromString(t,
+		"exists: bool @index(bool) .",
 		`
 		<santa>           <exists> "false" .
 		<climate_change>  <exists> "true"  .
@@ -302,7 +303,6 @@ func TestIndexBool(t *testing.T) {
 		<chuck_norris>    <exists> "true"  .
 		<rumpelstiltskin> <exists> "false" .
 		`,
-		"exists: bool @index(bool) .",
 	)
 }
 

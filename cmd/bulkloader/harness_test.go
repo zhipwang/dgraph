@@ -39,7 +39,7 @@ func init() {
 	}
 }
 
-func runTestCaseFromString(t *testing.T, rdfs, schema string) {
+func runTestCaseFromString(t *testing.T, schema, rdfs string) {
 	dir, err := ioutil.TempDir("", "dgraph_bulk_loader_test")
 	if err != nil {
 		t.Fatal(err)
