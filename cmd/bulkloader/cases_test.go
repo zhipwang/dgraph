@@ -306,6 +306,102 @@ func TestIndexBool(t *testing.T) {
 	)
 }
 
+func TestIndexGeo(t *testing.T) {
+	runTestCaseFromString(t,
+		"location: geo @index(geo) .",
+		`
+		<presidio_visitor_center> <location> "{'type':'Point','coordinates':[-122.4560447,37.8012321]}"^^<geo:geojson> .
+		`,
+	)
+}
+
+func TestIndexStringExact(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(exact) .",
+		`
+		<peter> <name> "Peter" .
+		<doppelganger> <name> "Peter" .
+		<john> <name> "John" .
+		`,
+	)
+}
+
+func TestIndexStringHash(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(hash) .",
+		`
+		<peter> <name> "Peter" .
+		<doppelganger> <name> "Peter" .
+		<john> <name> "John" .
+		`,
+	)
+}
+
+func TestIndexStringTerm(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(term) .",
+		`
+		<ps> <name> "Peter Stace" .
+		<pj> <name> "Peter Jackson" .
+		`,
+	)
+}
+
+// TODO: I don't really understand what this index does. Something to with
+// languages. Revisit this once language support has been implemented.
+func TestIndexStringFullText(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(fulltext) .",
+		`
+		<ps> <name> "Peter Stace" .
+		<pj> <name> "Peter Jackson" .
+		`,
+	)
+}
+
+func TestIndexStringTrigram(t *testing.T) {
+	runTestCaseFromString(t,
+		"text: string @index(trigram) .",
+		`
+		<lorum> <text> "Sed ut perspiciatis, unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam eaque ipsa, quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt, explicabo. Nemo enim ipsam voluptatem, quia voluptas sit, aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos, qui ratione voluptatem sequi nesciunt, neque porro quisquam est, qui dolorem ipsum, quia dolor sit amet consectetur adipisci[ng] velit, sed quia non numquam [do] eius modi tempora inci[di]dunt, ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit, qui in ea voluptate velit esse, quam nihil molestiae consequatur, vel illum, qui dolorem eum fugiat, quo voluptas nulla pariatur?" .
+		<ipsum> <text> "At vero eos et accusamus et iusto odio dignissimos ducimus, qui blanditiis praesentium voluptatum deleniti atque corrupti, quos dolores et quas molestias excepturi sint, obcaecati cupiditate non provident, similique sunt in culpa, qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio, cumque nihil impedit, quo minus id, quod maxime placeat, facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet, ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat" .
+		`,
+	)
+}
+
+const birthdayRDFs = `
+	<a> <birthday> "1997-08-24"^^<xs:dateTime> .
+	<b> <birthday> "1997-04-17"^^<xs:dateTime> .
+	<c> <birthday> "1998-04-17"^^<xs:dateTime> .
+	<d> <birthday> "1998-04-04"^^<xs:dateTime> .
+`
+
+func TestIndexDateTimeYear(t *testing.T) {
+	runTestCaseFromString(t,
+		"birthday: dateTime @index(year) .",
+		birthdayRDFs,
+	)
+}
+
+func TestIndexDateTimeMonth(t *testing.T) {
+	runTestCaseFromString(t,
+		"birthday: dateTime @index(month) .",
+		birthdayRDFs,
+	)
+}
+
+func TestIndexMultiple(t *testing.T) {
+	runTestCaseFromString(t,
+		"name: string @index(exact, hash, term, fulltext, trigram). ",
+		`
+		<ps> <name> "Peter Stace" .
+		<pj> <name> "Peter Jackson" .
+		`,
+	)
+}
+
+// TODO: Inappropriate use of indexes (e.g. exact on an int field).
+
 // TODO: Reverse edges.
 
 // TODO: Language.
