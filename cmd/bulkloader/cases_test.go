@@ -267,13 +267,13 @@ func TestCountIndexMultiplePredicates(t *testing.T) {
 	runTestCaseFromString(t, rdfs, sche)
 }
 
-func TestCountIndexIntSimple(t *testing.T) {
+func TestIndexIntSimple(t *testing.T) {
 	sche := `age: int @index(int) .`
 	rdfs := `<peter> <age> "28"^^<xs:int> .`
 	runTestCaseFromString(t, rdfs, sche)
 }
 
-func TestCountIndexIntMultiple(t *testing.T) {
+func TestIndexIntMultiple(t *testing.T) {
 	sche := `age: int @index(int) .`
 	rdfs := `
 	<peter> <age> "28"^^<xs:int> .
@@ -282,6 +282,28 @@ func TestCountIndexIntMultiple(t *testing.T) {
 	<jess>  <age> "42"^^<xs:int> .
 	`
 	runTestCaseFromString(t, rdfs, sche)
+}
+
+func TestIndexFloat(t *testing.T) {
+	sche := `shoe_size: float @index(float) .`
+	rdfs := `
+	<peter> <shoe_size> "9.5"<xs:float> .
+	<young_peter> <shoe_size> "2" .
+	`
+	runTestCaseFromString(t, rdfs, sche)
+}
+
+func TestIndexBool(t *testing.T) {
+	runTestCaseFromString(t,
+		`
+		<santa>           <exists> "false" .
+		<climate_change>  <exists> "true"  .
+		<xenu>            <exists> "false" .
+		<chuck_norris>    <exists> "true"  .
+		<rumpelstiltskin> <exists> "false" .
+		`,
+		"exists: bool @index(bool) .",
+	)
 }
 
 // TODO: Reverse edges.
