@@ -63,6 +63,7 @@ func main() {
 	kv, err := defaultBadger(*badgerDir)
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
+	// TODO: Check to make sure the badger is empty.
 
 	plBuild := newPlBuilder(*tmpDir)
 	defer plBuild.cleanUp()

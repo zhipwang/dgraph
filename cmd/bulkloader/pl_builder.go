@@ -168,7 +168,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				}
 				highest = cnt
 			}
-			counts = map[int][]uint64{} // TODO: Possibly fast to clear map while iterating. Profile to work out.
+			counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
 		}
 
 		k = newK
