@@ -127,8 +127,10 @@ func niceValue(v []byte) string {
 	}
 
 	var bp bp128.BPackIterator
-	bp.Init(v, 0)
-	if bp.Valid() {
+	err = catch(func() {
+		bp.Init(v, 0) // Panics if the data is not as expected.
+	})
+	if err == nil && bp.Valid() {
 		uids := bp.Uids()
 		result += fmt.Sprintf("Pretty: uids:%v\n", uids)
 	}
@@ -137,4 +139,14 @@ func niceValue(v []byte) string {
 		return "Pretty: unknown conversion"
 	}
 	return result
+}
+
+func catch(f func()) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+	f()
+	return
 }

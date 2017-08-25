@@ -171,8 +171,14 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.
 
 	p := posting.NewPosting(de)
 	if nq.GetObjectValue() != nil {
-		// Use special sentinel UID to represent a literal node.
-		p.Uid = math.MaxUint64
+		if lang := de.GetLang(); lang == "" {
+			// Use special sentinel UID to represent a non-language literal node.
+			p.Uid = math.MaxUint64
+		} else {
+			// Allow multiple versions of the same string (each with a
+			// different language) by using a unique UID for each version.
+			p.Uid = farm.Fingerprint64([]byte(lang))
+		}
 	}
 	p.Op = 3
 

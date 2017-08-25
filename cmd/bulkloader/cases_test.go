@@ -438,6 +438,27 @@ func TestReverseAndCountComplex(t *testing.T) {
 	)
 }
 
+func TestLangSingleEn(t *testing.T) {
+	runTestCaseFromString(t,
+		"",
+		`<peter> <name> "Peter"@en .`,
+	)
+}
+
+func TestLangMultiple(t *testing.T) {
+	runTestCaseFromString(t,
+		"",
+		`
+		<peter> <name> "Peter"     .
+		<peter> <name> "Peter"@en  .
+		<peter> <name> "Peder"@kw  .
+		<peter> <name> "Pieter"@af .
+		<peter> <name> "Pietru"@mt .
+		<peter> <name> "Peddyr"@gv .
+		`,
+	)
+}
+
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
 
 // TODO: Language.

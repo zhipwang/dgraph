@@ -48,12 +48,10 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 		// val is left nil. When we read back the key/value, the UID is
 		// recovered from the key.
 		meta = 0x01 // Indicates posting UID rather than protos.Posting
-	case protos.Posting_VALUE:
+	case protos.Posting_VALUE, protos.Posting_VALUE_LANG:
 		var err error
 		val, err = posting.Marshal()
 		x.Check(err)
-	case protos.Posting_VALUE_LANG:
-		x.AssertTruef(false, "values not yet supported") // TODO
 	default:
 		x.AssertTruef(false, "unknown posting type")
 	}
