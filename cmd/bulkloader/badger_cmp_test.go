@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/dgraph/bp128"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
 )
@@ -114,6 +115,13 @@ func niceValue(v []byte) string {
 	err = su.Unmarshal(v)
 	if err == nil {
 		result += fmt.Sprintf("Pretty: %+v\n", su)
+	}
+
+	var bp bp128.BPackIterator
+	bp.Init(v, 0)
+	if bp.Valid() {
+		uids := bp.Uids()
+		result += fmt.Sprintf("Pretty: uids:%v\n", uids)
 	}
 
 	if result == "" {
