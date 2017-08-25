@@ -477,7 +477,3 @@ func TestLangAndStringIndex(t *testing.T) {
 }
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field).
-
-// TODO: Some really big files.
-
-// TODO: XID edges.

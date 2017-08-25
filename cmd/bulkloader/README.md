@@ -4,5 +4,6 @@
 
 - Performance analysis
 - Some really big files
+- Test cases where the loader should fail
 - XID edges
 - Facets
