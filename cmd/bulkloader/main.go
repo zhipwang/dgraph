@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math"
 	"os"
 	"strings"
@@ -19,9 +20,13 @@ import (
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/rdf"
 	"github.com/dgraph-io/dgraph/schema"
+	"github.com/dgraph-io/dgraph/tok"
+	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
 	farm "github.com/dgryski/go-farm"
 )
+
+var verbose = true
 
 // TODO: Could do with some massive refactoring... E.g. run whole thing in a
 // routine (or struct) and just have arg parsing in main().
@@ -102,6 +107,8 @@ func main() {
 			hex.Dump(key),
 			p,
 		)
+
+		addIndexPostings(nq, schemaStore, plBuild)
 	}
 
 	lease(kv)
@@ -154,6 +161,60 @@ func createEdgePosting(nq gql.NQuad, ss schemaStore) *protos.Posting {
 	}
 	p.Op = 3
 	return p
+}
+
+func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
+
+	if nq.GetObjectValue() == nil {
+		return // Cannot index UIDs
+	}
+
+	sch := ss.m[nq.GetPredicate()].SchemaUpdate
+
+	for _, tokerName := range sch.GetTokenizer() {
+
+		if verbose {
+			log.Printf("[INDEX] TokenizerName: %q", tokerName)
+		}
+
+		// Find tokeniser.
+		toker, ok := tok.GetTokenizer(tokerName)
+		if !ok {
+			x.Check(fmt.Errorf("unknown tokenizer: %v", tokerName))
+		}
+
+		// Create storage value. // TODO: Reuse the edge from create edge posting.
+		de, err := nq.ToEdgeUsing(uidMap)
+		x.Check(err)
+		storageVal := types.Val{
+			Tid:   types.TypeID(de.GetValueType()),
+			Value: de.GetValue(),
+		}
+
+		// Convert from storage type to schema type.
+		var schemaVal types.Val
+		schemaVal, err = types.Convert(storageVal, types.TypeID(sch.GetValueType()))
+		x.Check(err) // Shouldn't error, since we've already checked for convertibility when doing edge postings.
+
+		// Extract tokens.
+		toks, err := toker.Tokens(schemaVal)
+		if verbose {
+			for _, tok := range toks {
+				log.Printf("[INDEX] Token: %v", []byte(tok))
+			}
+		}
+
+		// Store index posting.
+		for _, t := range toks {
+			plb.addPosting(
+				x.IndexKey(nq.Predicate, t),
+				&protos.Posting{
+					Uid:         de.GetEntity(),
+					PostingType: protos.Posting_REF,
+				},
+			)
+		}
+	}
 }
 
 func lease(kv *badger.KV) {

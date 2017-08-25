@@ -267,9 +267,21 @@ func TestCountIndexMultiplePredicates(t *testing.T) {
 	runTestCaseFromString(t, rdfs, sche)
 }
 
-// TODO: Indexing
+func TestCountIndexIntSimple(t *testing.T) {
+	sche := `age: int @index(int) .`
+	rdfs := `<peter> <age> "28"^^<xs:int> .`
+	runTestCaseFromString(t, rdfs, sche)
+}
 
-func TestCountIndexInt(t *testing.T) {
+func TestCountIndexIntMultiple(t *testing.T) {
+	sche := `age: int @index(int) .`
+	rdfs := `
+	<peter> <age> "28"^^<xs:int> .
+	<jim>   <age> "100"^^<xs:int> .
+	<adam>  <age> "42"^^<xs:int> .
+	<jess>  <age> "42"^^<xs:int> .
+	`
+	runTestCaseFromString(t, rdfs, sche)
 }
 
 // TODO: Reverse edges.

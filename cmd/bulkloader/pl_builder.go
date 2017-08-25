@@ -13,12 +13,12 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func newPlBuilder(tmpDir string) plBuilder {
+func newPlBuilder(tmpDir string) *plBuilder {
 	badgerDir, err := ioutil.TempDir(tmpDir, "dgraph_bulkloader")
 	x.Check(err)
 	kv, err := defaultBadger(badgerDir)
 	x.Check(err)
-	return plBuilder{kv, badgerDir}
+	return &plBuilder{kv, badgerDir}
 }
 
 type plBuilder struct {
@@ -101,7 +101,6 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		}
 
 		parsedK := x.Parse(k)
-		x.AssertTruef(parsedK.IsData(), "must be data key")
 
 		// Write posting list out to target.
 		if finalise {
@@ -130,7 +129,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				x.Check(target.Set(k, bitPackUids(uids), 0x01))
 			}
 
-			if ss.m[parsedK.Attr].GetCount() {
+			if parsedK.IsData() && ss.m[parsedK.Attr].GetCount() {
 				cnt := len(uids)
 				counts[cnt] = append(counts[cnt], parsedK.Uid)
 			}
@@ -141,10 +140,11 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			uids = nil
 		}
 
-		var parsedNewK *x.ParsedKey // TODO: We're double parsing each key. With clever tracking between outside of the loop, could eliminate this.
+		// TODO: We're double parsing each key. With clever tracking between
+		// outside of the loop, could eliminate this.
+		var parsedNewK *x.ParsedKey
 		if iter.Valid() {
 			parsedNewK = x.Parse(newK)
-			x.AssertTruef(parsedNewK.IsData(), "must be data key")
 		}
 
 		if !iter.Valid() || parsedNewK.Attr != parsedK.Attr {
