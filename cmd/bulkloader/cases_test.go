@@ -491,6 +491,8 @@ func TestLargePostingList(t *testing.T) {
 	runTestBigFanout(t, 257)
 }
 
+// This test is useful, but consumes a large amount of memory (for some unknown reason).
+/*
 func TestLeaseBoundary(t *testing.T) {
 	runTestBigFanout(t, 9997)
 	runTestBigFanout(t, 9998)
@@ -501,5 +503,6 @@ func TestLeaseBoundary(t *testing.T) {
 	runTestBigFanout(t, 20000)
 	runTestBigFanout(t, 30001)
 }
+*/
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field)
