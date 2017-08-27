@@ -259,9 +259,6 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 
 func lease(kv *badger.KV) {
 
-	// Assume that the lease is the 'next' available UID. Not yet sure how it is calculated. Seems to be blocks of 10,000.
-	// E.g. 10,001, 30,001,
-
 	// lastUID => newLease
 	//    9999 => 10001
 	//   10000 => 10001
@@ -274,11 +271,8 @@ func lease(kv *badger.KV) {
 		log.Printf("[LEASE] lastUID:%d newLeaseUID:%d", lastUID, newLease)
 	}
 
-	// TODO: 10001 is hardcoded. Should be calculated dynamically.
-
-	// TODO: Can we put this into the temp badger and do most of this function
-	// automatically? Or can we somehow run 'extra' RFDs at the end? This could
-	// be run just as a regular RDF.
+	// Would be nice to be able to run this as a regular RDF, rather than as a
+	// special case.
 
 	leaseRDF := fmt.Sprintf("<ROOT> <_lease_> \"%d\"^^<xs:int> .", newLease)
 
