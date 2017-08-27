@@ -491,4 +491,15 @@ func TestLargePostingList(t *testing.T) {
 	runTestBigFanout(t, 257)
 }
 
+func TestLeaseBoundary(t *testing.T) {
+	runTestBigFanout(t, 9997)
+	runTestBigFanout(t, 9998)
+	runTestBigFanout(t, 9999)
+	runTestBigFanout(t, 10000)
+	runTestBigFanout(t, 10001)
+	runTestBigFanout(t, 19999)
+	runTestBigFanout(t, 20000)
+	runTestBigFanout(t, 30001)
+}
+
 // TODO: Inappropriate use of indexes (e.g. exact on an int field)

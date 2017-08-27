@@ -257,26 +257,18 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 	}
 }
 
-func calculateLease(lastUID uint64) uint64 {
-	//  9999 => 10001
-	// 10000 => 10001
-	// 10001 => 20001
-	// 10002 => 20001
-
-	// Subtract 1.
-	// Round down to 10,000
-	// Add 10,001
-
-	//return (lastUID-1)/10000*10000 + 10001
-	return (lastUID)/10000*10000 + 10001
-}
-
 func lease(kv *badger.KV) {
 
 	// Assume that the lease is the 'next' available UID. Not yet sure how it is calculated. Seems to be blocks of 10,000.
 	// E.g. 10,001, 30,001,
 
-	newLease := calculateLease(lastUID)
+	// lastUID => newLease
+	//    9999 => 10001
+	//   10000 => 10001
+	//   10001 => 10001
+	//   10002 => 20001
+	//   10003 => 20001
+	newLease := (lastUID-2)/10000*10000 + 10001
 
 	if verbose {
 		log.Printf("[LEASE] lastUID:%d newLeaseUID:%d", lastUID, newLease)
