@@ -257,7 +257,30 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 	}
 }
 
+func calculateLease(lastUID uint64) uint64 {
+	//  9999 => 10001
+	// 10000 => 10001
+	// 10001 => 20001
+	// 10002 => 20001
+
+	// Subtract 1.
+	// Round down to 10,000
+	// Add 10,001
+
+	//return (lastUID-1)/10000*10000 + 10001
+	return (lastUID)/10000*10000 + 10001
+}
+
 func lease(kv *badger.KV) {
+
+	// Assume that the lease is the 'next' available UID. Not yet sure how it is calculated. Seems to be blocks of 10,000.
+	// E.g. 10,001, 30,001,
+
+	newLease := calculateLease(lastUID)
+
+	if verbose {
+		log.Printf("[LEASE] lastUID:%d newLeaseUID:%d", lastUID, newLease)
+	}
 
 	// TODO: 10001 is hardcoded. Should be calculated dynamically.
 
@@ -265,7 +288,9 @@ func lease(kv *badger.KV) {
 	// automatically? Or can we somehow run 'extra' RFDs at the end? This could
 	// be run just as a regular RDF.
 
-	nqTmp, err := rdf.Parse("<ROOT> <_lease_> \"10001\"^^<xs:int> .")
+	leaseRDF := fmt.Sprintf("<ROOT> <_lease_> \"%d\"^^<xs:int> .", newLease)
+
+	nqTmp, err := rdf.Parse(leaseRDF)
 	x.Check(err)
 	nq := gql.NQuad{&nqTmp}
 	de, err := nq.ToEdgeUsing(map[string]uint64{"ROOT": 1})

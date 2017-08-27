@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -476,4 +477,17 @@ func TestLangAndStringIndex(t *testing.T) {
 	)
 }
 
-// TODO: Inappropriate use of indexes (e.g. exact on an int field).
+func runTestBigFanout(t *testing.T, fanout int) {
+	var rdfs string
+	for i := 0; i < fanout; i++ {
+		rdfs += fmt.Sprintf("<s> <p> <o_%06d> .\n", i)
+	}
+	runTestCaseFromString(t, "", rdfs)
+}
+
+//func TestMultipleByteSorting(t *testing.T) {
+//// Test originally showed some problems with PL encoding/sorting.
+//runTestBigFanout(t, 257)
+//}
+
+// TODO: Inappropriate use of indexes (e.g. exact on an int field)
