@@ -302,7 +302,7 @@ func lease(kv *badger.KV) {
 	leaseKey := x.DataKey(nq.GetPredicate(), de.GetEntity())
 	list := &protos.PostingList{
 		Postings: []*protos.Posting{p},
-		Uids:     bitPackUids([]uint64{math.MaxUint64}),
+		Uids:     bp128.DeltaPack([]uint64{math.MaxUint64}),
 	}
 	val, err := list.Marshal()
 	x.Check(err)
@@ -348,13 +348,4 @@ func printUIDMap() {
 		fmt.Printf("%d: %s\n", uid, str)
 	}
 	fmt.Println()
-}
-
-// TODO: Candidate for moving into pl_builder.go?
-func bitPackUids(uids []uint64) []byte {
-	var bp bp128.BPackEncoder
-	bp.PackAppend(uids)
-	buf := make([]byte, bp.Size())
-	bp.WriteTo(buf)
-	return buf
 }

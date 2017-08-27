@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/dgraph/bp128"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
 )
@@ -119,12 +120,12 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			fmt.Println()
 
 			if useFullPostings {
-				pl.Uids = bitPackUids(uids)
+				pl.Uids = bp128.DeltaPack(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
 				x.Check(target.Set(k, plBuf, 0x00))
 			} else {
-				x.Check(target.Set(k, bitPackUids(uids), 0x01))
+				x.Check(target.Set(k, bp128.DeltaPack(uids), 0x01))
 			}
 
 			if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
@@ -158,7 +159,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 					pl := counts[i]
 					key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
 					if len(pl) > 0 {
-						val := bitPackUids(pl)
+						val := bp128.DeltaPack(pl)
 						x.Check(target.Set(key, val, 0x01))
 					} else {
 						x.Check(target.Set(key, nil, 0x00))

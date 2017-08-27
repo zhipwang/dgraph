@@ -485,9 +485,10 @@ func runTestBigFanout(t *testing.T, fanout int) {
 	runTestCaseFromString(t, "", rdfs)
 }
 
-//func TestMultipleByteSorting(t *testing.T) {
-//// Test originally showed some problems with PL encoding/sorting.
-//runTestBigFanout(t, 257)
-//}
+func TestLargePostingList(t *testing.T) {
+	// Test originally showed some problems with PL encoding/sorting when PL
+	// size is >256.
+	runTestBigFanout(t, 257)
+}
 
 // TODO: Inappropriate use of indexes (e.g. exact on an int field)
