@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"hash/crc64"
 	"io/ioutil"
 	"log"
 	"os"
@@ -37,33 +37,33 @@ func (b *plBuilder) cleanUp() {
 
 func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 
-	var uidBuf [8]byte
-	binary.BigEndian.PutUint64(uidBuf[:], posting.Uid)
+	plKeyHash := crc64.Checksum(postingListKey, crc64.MakeTable(crc64.ISO))
+	var kBuf [16]byte
+	binary.BigEndian.PutUint64(kBuf[:8], plKeyHash)   // Byte order doesn't matter (it's for grouping).
+	binary.BigEndian.PutUint64(kBuf[8:], posting.Uid) // Byte order is important for iteration order.
 
-	key := postingListKey
-	key = append(key, uidBuf[:]...)
+	// TODO: We could save 4 bytes for UID postings by omitting the posting
+	// list length.
 
-	var meta byte
-	var val []byte
-	switch posting.PostingType {
-	case protos.Posting_REF:
-		// val is left nil. When we read back the key/value, the UID is
-		// recovered from the key.
-		meta = 0x01 // Indicates posting UID rather than protos.Posting
-	case protos.Posting_VALUE, protos.Posting_VALUE_LANG:
-		var err error
-		val, err = posting.Marshal()
+	if posting.GetPostingType() == protos.Posting_REF {
+		vBuf := make([]byte, 4+len(postingListKey))
+		binary.BigEndian.PutUint32(vBuf, uint32(len(postingListKey)))
+		copy(vBuf[4:], postingListKey)
+		x.Check(b.kv.Set(kBuf[:], vBuf, 0x01))
+	} else {
+		postingBuf, err := posting.Marshal()
 		x.Check(err)
-	default:
-		x.AssertTruef(false, "unknown posting type")
+		vBuf := make([]byte, 4+len(postingListKey)+len(postingBuf))
+		binary.BigEndian.PutUint32(vBuf, uint32(len(postingListKey)))
+		copy(vBuf[4:], postingListKey)
+		copy(vBuf[4+len(postingListKey):], postingBuf)
+		x.Check(b.kv.Set(kBuf[:], vBuf, 0x00))
 	}
-
-	x.Check(b.kv.Set(key, val, meta))
 }
 
 func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 
-	counts := map[int][]uint64{}
+	//counts := map[int][]uint64{}
 
 	pl := &protos.PostingList{}
 	uids := []uint64{}
@@ -73,17 +73,17 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		// There were no posting lists to build.
 		return
 	}
-	k := extractPLKey(iter.Item().Key())
+	if verbose {
+		log.Printf("[K]\n%s", strings.TrimSpace(hex.Dump(iter.Item().Key())))
+	}
+	k := unpackPostingListKey(iter.Item())
+	kHash := unpackPostingListKeyHash(iter.Item())
 	for iter.Valid() {
 
 		// Add to PL
-		if iter.Item().UserMeta() == 0x01 {
-			uids = append(uids, extractUID(iter.Item().Key()))
-		} else {
-			p := new(protos.Posting)
-			err := p.Unmarshal(iter.Item().Value())
-			x.Check(err)
-			uids = append(uids, p.Uid)
+		uids = append(uids, unpackUidPosting(iter.Item()))
+		if iter.Item().UserMeta() == 0x00 {
+			p := unpackFullPosting(iter.Item())
 			pl.Postings = append(pl.Postings, p)
 		}
 
@@ -91,9 +91,11 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		finalise := false
 		iter.Next()
 		var newK []byte
+		var newKHash uint64
 		if iter.Valid() {
-			newK = extractPLKey(iter.Item().Key())
-			if bytes.Compare(newK, k) != 0 {
+			newK = unpackPostingListKey(iter.Item())
+			newKHash = unpackPostingListKeyHash(iter.Item())
+			if kHash != newKHash {
 				finalise = true
 			}
 		} else {
@@ -134,10 +136,10 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				x.Check(target.Set(k, bp128.DeltaPack(uids), 0x01))
 			}
 
-			if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
-				cnt := len(uids)
-				counts[cnt] = append(counts[cnt], parsedK.Uid)
-			}
+			//if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
+			//cnt := len(uids)
+			//counts[cnt] = append(counts[cnt], parsedK.Uid)
+			//}
 
 			// Reset for next posting list.
 			pl.Postings = nil
@@ -145,49 +147,63 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			uids = nil
 		}
 
-		// TODO: We're double parsing each key. With clever tracking between
-		// outside of the loop, could eliminate this.
-		var parsedNewK *x.ParsedKey
-		if iter.Valid() {
-			parsedNewK = x.Parse(newK)
-		}
+		// // TODO: We're double parsing each key. With clever tracking between
+		// // outside of the loop, could eliminate this.
+		// var parsedNewK *x.ParsedKey
+		// if iter.Valid() {
+		// 	parsedNewK = x.Parse(newK)
+		// }
 
-		if !iter.Valid() || (parsedNewK.Attr != parsedK.Attr || parsedNewK.IsReverse() != parsedK.IsReverse()) {
-			// Dump out count posting lists.
-			//
-			// TODO: This isn't an efficient algorithm: it requires full
-			// iteration over the map and max(counts) map lookups. It's
-			// possible to just iterate over the map, store in a slice, and
-			// fill in the gaps while iterating the slice.
-			highest := -1
-			for cnt := range counts {
-				for i := highest + 1; i <= cnt; i++ {
-					pl := counts[i]
-					key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
-					if len(pl) > 0 {
-						val := bp128.DeltaPack(pl)
-						x.Check(target.Set(key, val, 0x01))
-					} else {
-						x.Check(target.Set(key, nil, 0x00))
-					}
-				}
-				highest = cnt
-			}
-			counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
-		}
+		//if !iter.Valid() || (parsedNewK.Attr != parsedK.Attr || parsedNewK.IsReverse() != parsedK.IsReverse()) {
+		//	// Dump out count posting lists.
+		//	//
+		//	// TODO: This isn't an efficient algorithm: it requires full
+		//	// iteration over the map and max(counts) map lookups. It's
+		//	// possible to just iterate over the map, store in a slice, and
+		//	// fill in the gaps while iterating the slice.
+		//	highest := -1
+		//	for cnt := range counts {
+		//		for i := highest + 1; i <= cnt; i++ {
+		//			pl := counts[i]
+		//			key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
+		//			if len(pl) > 0 {
+		//				val := bp128.DeltaPack(pl)
+		//				x.Check(target.Set(key, val, 0x01))
+		//			} else {
+		//				x.Check(target.Set(key, nil, 0x00))
+		//			}
+		//		}
+		//		highest = cnt
+		//	}
+		//	counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
+		//}
 
 		k = newK
+		kHash = newKHash
 	}
 }
 
-func extractPLKey(kvKey []byte) []byte {
-	// Copy value since it's only valid until the iterator is next advanced.
-	x.AssertTruef(len(kvKey) > 8, "unexpected key size")
-	k := make([]byte, len(kvKey)-8)
-	copy(k, kvKey)
-	return k
+func unpackPostingListKey(item *badger.KVItem) []byte {
+	v := item.Value()
+	plKeyLen := binary.BigEndian.Uint32(v)
+	plKey := v[4 : 4+plKeyLen]
+	return plKey
 }
 
-func extractUID(kvKey []byte) uint64 {
-	return binary.BigEndian.Uint64(kvKey[len(kvKey)-8:])
+func unpackPostingListKeyHash(item *badger.KVItem) uint64 {
+	return binary.BigEndian.Uint64(item.Key()[:8])
+}
+
+// unpacks a full posting into the posting list key and posting.
+func unpackFullPosting(item *badger.KVItem) *protos.Posting {
+	v := item.Value()
+	plKeyLen := binary.BigEndian.Uint32(v)
+	posting := new(protos.Posting)
+	x.Check(posting.Unmarshal(v[4+plKeyLen:]))
+	return posting
+}
+
+// unpacks a UID posting into the posting list key and uid.
+func unpackUidPosting(item *badger.KVItem) uint64 {
+	return binary.BigEndian.Uint64(item.Key()[8:])
 }

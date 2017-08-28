@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
+	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -140,33 +141,23 @@ func niceValue(item *badger.KVItem) string {
 
 	var result string
 
-	//var pl protos.PostingList
-	//err := pl.Unmarshal(v)
-	//if err == nil {
-	//result += fmt.Sprintf("Pretty: %+v\n", pl)
-	//}
+	var pl protos.PostingList
+	err := pl.Unmarshal(v)
+	if err == nil {
+		result += fmt.Sprintf("Pretty: %+v\n", pl)
+	}
 
-	//var su protos.SchemaUpdate
-	//err = su.Unmarshal(v)
-	//if err == nil {
-	//result += fmt.Sprintf("Pretty: %+v\n", su)
-	//}
+	var su protos.SchemaUpdate
+	err = su.Unmarshal(v)
+	if err == nil {
+		result += fmt.Sprintf("Pretty: %+v\n", su)
+	}
 
 	if result == "" {
 		return "Pretty: unknown conversion"
 	}
 	return result
 }
-
-//func catch(f func()) (err error) {
-//defer func() {
-//if r := recover(); r != nil {
-//err = fmt.Errorf("%v", r)
-//}
-//}()
-//f()
-//return
-//}
 
 func defaultBadger(dir string) (*badger.KV, error) {
 	opt := badger.DefaultOptions
