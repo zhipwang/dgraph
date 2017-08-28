@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"flag"
 	"fmt"
+	"os"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -11,7 +13,22 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func CompareBadgers(badgerA, badgerB string) bool {
+func main() {
+	a := flag.String("a", "", "directory of badger A")
+	b := flag.String("b", "", "directory of badger B")
+	flag.Parse()
+	if *a == "" || *b == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+	if !compareBadgers(*a, *b) {
+		fmt.Println("Badgers not equal")
+		os.Exit(1)
+	}
+	fmt.Println("Badgers the same!")
+}
+
+func compareBadgers(badgerA, badgerB string) bool {
 
 	kvA, err := defaultBadger(badgerA)
 	x.Check(err)
@@ -65,7 +82,6 @@ func CompareBadgers(badgerA, badgerB string) bool {
 		itB.Next()
 	}
 
-	fmt.Printf("\nEqual count: %d\n", countEq)
 	return cmpEq
 }
 
@@ -149,4 +165,11 @@ func catch(f func()) (err error) {
 	}()
 	f()
 	return
+}
+
+func defaultBadger(dir string) (*badger.KV, error) {
+	opt := badger.DefaultOptions
+	opt.Dir = dir
+	opt.ValueDir = dir
+	return badger.NewKV(&opt)
 }

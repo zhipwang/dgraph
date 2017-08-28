@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/hex"
-	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -45,7 +44,9 @@ func main() {
 	// TODO: Handling to make sure required args have been passed.
 
 	f, err := os.Open(*rdfFile)
-	x.Check(err)
+	if err != nil {
+		log.Fatalf("could not read rdf file: %v", err)
+	}
 	defer f.Close()
 
 	sc, err := rdfScanner(f, *rdfFile)
@@ -55,7 +56,9 @@ func main() {
 	// TODO: What is the expected file extension?
 
 	schemaBuf, err := ioutil.ReadFile(*schemaFile)
-	x.Check(err)
+	if err != nil {
+		log.Fatalf("could not read schema file: %v", err)
+	}
 	schemaUpdates, err := schema.Parse(string(schemaBuf))
 	x.Check(err)
 	fmt.Printf("Initial schema (%d):\n", len(schemaUpdates))
@@ -265,7 +268,12 @@ func lease(kv *badger.KV) {
 	//   10001 => 10001
 	//   10002 => 20001
 	//   10003 => 20001
-	newLease := (lastUID-2)/10000*10000 + 10001
+	var newLease uint64
+	if lastUID <= 2 {
+		newLease = 10001
+	} else {
+		newLease = (lastUID-2)/10000*10000 + 10001
+	}
 
 	if verbose {
 		log.Printf("[LEASE] lastUID:%d newLeaseUID:%d", lastUID, newLease)
@@ -296,21 +304,14 @@ func lease(kv *badger.KV) {
 }
 
 func rdfScanner(f *os.File, filename string) (*bufio.Scanner, error) {
-	isRdf := strings.HasSuffix(filename, ".rdf")
-	isRdfGz := strings.HasSuffix(filename, "rdf.gz")
-	if !isRdf && !isRdfGz {
-		return nil, errors.New("Can only use .rdf or .rdf.gz file")
-
+	if !strings.HasSuffix(filename, ".gz") {
+		return bufio.NewScanner(f), nil
 	}
-	var sc *bufio.Scanner
-	if isRdfGz {
-		gr, err := gzip.NewReader(f)
-		x.Check(err)
-		sc = bufio.NewScanner(gr)
-	} else {
-		sc = bufio.NewScanner(f)
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
 	}
-	return sc, nil
+	return bufio.NewScanner(gr), nil
 }
 
 var (
