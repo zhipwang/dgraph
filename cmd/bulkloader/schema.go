@@ -61,9 +61,9 @@ func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
 }
 
 func (s schemaStore) write(kv *badger.KV) {
-	fmt.Println("Schema:")
+	//fmt.Println("Schema:")
 	for pred, sch := range s.m {
-		fmt.Printf("%s: %+v\n", pred, sch)
+		//fmt.Printf("%s: %+v\n", pred, sch)
 		k := x.SchemaKey(pred)
 		var v []byte
 		var err error
@@ -73,5 +73,5 @@ func (s schemaStore) write(kv *badger.KV) {
 		}
 		x.Check(kv.Set(k, v, 0))
 	}
-	fmt.Println()
+	//fmt.Println()
 }

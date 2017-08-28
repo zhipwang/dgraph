@@ -3,13 +3,13 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/dgraph-io/badger"
@@ -31,8 +31,6 @@ var verbose = true
 // routine (or struct) and just have arg parsing in main().
 
 func main() {
-
-	fmt.Println()
 
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
 	schemaFile := flag.String("s", "", "Location of schema file to load")
@@ -61,11 +59,11 @@ func main() {
 	}
 	schemaUpdates, err := schema.Parse(string(schemaBuf))
 	x.Check(err)
-	fmt.Printf("Initial schema (%d):\n", len(schemaUpdates))
-	for _, sch := range schemaUpdates {
-		fmt.Printf("%+v\n", sch)
-	}
-	fmt.Println()
+	//fmt.Printf("Initial schema (%d):\n", len(schemaUpdates))
+	//for _, sch := range schemaUpdates {
+	//fmt.Printf("%+v\n", sch)
+	//}
+	//fmt.Println()
 	schemaStore := newSchemaStore(schemaUpdates)
 
 	kv, err := defaultBadger(*badgerDir)
@@ -94,37 +92,37 @@ func main() {
 		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
 		plBuild.addPosting(key, p1)
 
-		fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
-			nq.GetSubject(),
-			uid(nq.GetSubject()),
-			nq.GetPredicate(),
-			hex.Dump(key),
-			p1,
-		)
+		//fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
+		//nq.GetSubject(),
+		//uid(nq.GetSubject()),
+		//nq.GetPredicate(),
+		//hex.Dump(key),
+		//p1,
+		//)
 
 		if p2 != nil {
 			key = x.ReverseKey(nq.GetPredicate(), uid(nq.GetObjectId()))
 			plBuild.addPosting(key, p2)
 
-			fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
-				nq.GetObjectId(),
-				uid(nq.GetObjectId()),
-				nq.GetPredicate(),
-				hex.Dump(key),
-				p2,
-			)
+			//fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
+			//nq.GetObjectId(),
+			//uid(nq.GetObjectId()),
+			//nq.GetPredicate(),
+			//hex.Dump(key),
+			//p2,
+			//)
 		}
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		pp := createPredicatePosting(nq.GetPredicate())
 		plBuild.addPosting(key, pp)
 
-		fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %+v\n\n",
-			nq.GetSubject(),
-			uid(nq.GetSubject()),
-			hex.Dump(key),
-			pp,
-		)
+		//fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %+v\n\n",
+		//nq.GetSubject(),
+		//uid(nq.GetSubject()),
+		//hex.Dump(key),
+		//pp,
+		//)
 
 		addIndexPostings(nq, schemaStore, plBuild)
 	}
@@ -165,7 +163,7 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.
 		uid(nq.GetObjectId())
 	}
 
-	fmt.Printf("NQuad: %+v\n\n", nq.NQuad)
+	//fmt.Printf("NQuad: %+v\n\n", nq.NQuad)
 
 	de, err := nq.ToEdgeUsing(uidMap)
 	x.Check(err)
@@ -217,13 +215,13 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 	for _, tokerName := range sch.GetTokenizer() {
 
 		if verbose {
-			log.Printf("[INDEX] TokenizerName: %q", tokerName)
+			log.Printf("[INDEX] TokenizerName=%q", tokerName)
 		}
 
 		// Find tokeniser.
 		toker, ok := tok.GetTokenizer(tokerName)
 		if !ok {
-			x.Check(fmt.Errorf("unknown tokenizer: %v", tokerName))
+			log.Fatalf("unknown tokenizer %q", tokerName)
 		}
 
 		// Create storage value. // TODO: Reuse the edge from create edge posting.
@@ -243,12 +241,15 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 		toks, err := toker.Tokens(schemaVal)
 		if verbose {
 			for _, tok := range toks {
-				log.Printf("[INDEX] Token: %v", []byte(tok))
+				log.Printf("[INDEX] Token=%q", tok[1:])
 			}
 		}
 
 		// Store index posting.
 		for _, t := range toks {
+			if verbose {
+				log.Printf("[INDEX] pred=%q tok=%q uid=%d", nq.Predicate, t[1:], de.GetEntity())
+			}
 			plb.addPosting(
 				x.IndexKey(nq.Predicate, t),
 				&protos.Posting{
@@ -320,19 +321,37 @@ var (
 )
 
 func uid(str string) uint64 {
+
+	hint, err := strconv.ParseUint(str, 10, 64)
+	if err == nil {
+		uid, ok := uidMap[str]
+		if ok {
+			if uid == hint {
+				return uid
+			} else {
+				log.Fatalf("bad node hint: %v", str)
+			}
+		} else {
+			uidMap[str] = hint
+			log.Printf("[UID] uid=%d str=%q", hint, str)
+			return hint
+		}
+	}
+
 	uid, ok := uidMap[str]
 	if ok {
 		return uid
 	}
 	lastUID++
 	uidMap[str] = lastUID
+	log.Printf("[UID] uid=%d str=%q", lastUID, str)
 	return lastUID
 }
 
 func printUIDMap() {
-	fmt.Println("UID map:")
-	for str, uid := range uidMap {
-		fmt.Printf("%d: %s\n", uid, str)
-	}
-	fmt.Println()
+	//fmt.Println("UID map:")
+	//for str, uid := range uidMap {
+	//fmt.Printf("%d: %s\n", uid, str)
+	//}
+	//fmt.Println()
 }

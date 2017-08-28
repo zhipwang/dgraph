@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
-	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -97,10 +96,10 @@ V(A) %d:
 		niceKey(itemA.Key()),
 		itemA.UserMeta(),
 		hex.Dump(itemA.Value()),
-		niceValue(itemA.Value()),
+		niceValue(itemA),
 		itemB.UserMeta(),
 		hex.Dump(itemB.Value()),
-		niceValue(itemB.Value()),
+		niceValue(itemB),
 	)
 }
 
@@ -117,7 +116,7 @@ V(%s) %d:
 		label,
 		item.UserMeta(),
 		hex.Dump(item.Value()),
-		niceValue(item.Value()),
+		niceValue(item),
 	)
 }
 
@@ -126,30 +125,32 @@ func niceKey(k []byte) string {
 	return fmt.Sprintf("Pretty: %+v", pk)
 }
 
-func niceValue(v []byte) string {
+func niceValue(item *badger.KVItem) string {
+
+	v := item.Value()
+
+	if item.UserMeta() == 0x01 {
+		var bp bp128.BPackIterator
+		bp.Init(v, 0)
+		x.AssertTruef(bp.Valid(), "must be valid")
+		uids := make([]uint64, bp.Length())
+		bp128.DeltaUnpack(v, uids)
+		return fmt.Sprintf("Pretty: uids(%d):%v\n", len(uids), uids)
+	}
 
 	var result string
 
-	var pl protos.PostingList
-	err := pl.Unmarshal(v)
-	if err == nil {
-		result += fmt.Sprintf("Pretty: %+v\n", pl)
-	}
+	//var pl protos.PostingList
+	//err := pl.Unmarshal(v)
+	//if err == nil {
+	//result += fmt.Sprintf("Pretty: %+v\n", pl)
+	//}
 
-	var su protos.SchemaUpdate
-	err = su.Unmarshal(v)
-	if err == nil {
-		result += fmt.Sprintf("Pretty: %+v\n", su)
-	}
-
-	var bp bp128.BPackIterator
-	err = catch(func() {
-		bp.Init(v, 0) // Panics if the data is not as expected.
-	})
-	if err == nil && bp.Valid() {
-		uids := bp.Uids()
-		result += fmt.Sprintf("Pretty: uids:%v\n", uids)
-	}
+	//var su protos.SchemaUpdate
+	//err = su.Unmarshal(v)
+	//if err == nil {
+	//result += fmt.Sprintf("Pretty: %+v\n", su)
+	//}
 
 	if result == "" {
 		return "Pretty: unknown conversion"
@@ -157,15 +158,15 @@ func niceValue(v []byte) string {
 	return result
 }
 
-func catch(f func()) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-	f()
-	return
-}
+//func catch(f func()) (err error) {
+//defer func() {
+//if r := recover(); r != nil {
+//err = fmt.Errorf("%v", r)
+//}
+//}()
+//f()
+//return
+//}
 
 func defaultBadger(dir string) (*badger.KV, error) {
 	opt := badger.DefaultOptions

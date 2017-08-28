@@ -39,7 +39,7 @@ function run_test {
 	sleep 0.5
 
 	# Run the dgraph loader
-	dgraphloader -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c 2>&1 | sed "s/.*/$yellow&$default/"
+	dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c 2>&1 | sed "s/.*/$yellow&$default/"
 
 	# Stop dgraph. We'll wait for it to finish later.
 	kill -s SIGINT $dgPid
@@ -86,6 +86,27 @@ function run_test_schema_str {
 
 	run_test $tmpDir/sch.schema $rdfFile
 }
+
+# Reproduces a bug:
+run_test_str '
+	name: string @index(term) .
+' '
+	<foo> <name> "1" .
+	<bar> <name> "11" .
+	<17216961135462248174> <name> "1" .
+'
+
+exit 0
+
+run_test_schema_str '
+director.film:        uid @reverse @count .
+genre:                uid @reverse .
+initial_release_date: dateTime @index(year) .
+name:                 string @index(term) .
+starring:             uid @count .
+' /home/petsta/1million.rdf.gz
+
+exit 0
 
 run_test_str '' '
 	<peter> <name> "Peter" .
@@ -423,11 +444,3 @@ run_test_str '' "$(fanout_rdfs 10001)"
 run_test_str '' "$(fanout_rdfs 19999)"
 run_test_str '' "$(fanout_rdfs 20000)"
 run_test_str '' "$(fanout_rdfs 30001)"
-
-run_test_schema_str '
-director.film:        uid @reverse @count .
-genre:                uid @reverse .
-initial_release_date: dateTime @index(year) .
-name:                 string @index(term) .
-starring:             uid @count .
-' /home/petsta/1million.rdf.gz

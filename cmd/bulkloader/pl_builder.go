@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -101,8 +102,16 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 
 		parsedK := x.Parse(k)
 
+		if verbose {
+			log.Printf("[BUILD] key={%+v} finalise=%t", parsedK, finalise)
+		}
+
 		// Write posting list out to target.
 		if finalise {
+
+			if verbose {
+				log.Printf("[FIN_KEY]\n%s", strings.TrimSpace(hex.Dump(k)))
+			}
 
 			// If we saw any full postings, then use a proto.PostingList as the
 			// value. But include the UID-only postings in the posting list
@@ -110,21 +119,18 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 
 			useFullPostings := len(pl.Postings) > 0
 
-			fmt.Print("KEY:\n" + hex.Dump(k))
-			fmt.Printf("POSTINGS: %v\n", uids)
 			if useFullPostings {
-				for _, p := range pl.Postings {
-					fmt.Printf("Full posting: %+v\n", p)
+				if verbose {
+					log.Printf("[FIN_FULL]")
 				}
-			}
-			fmt.Println()
-
-			if useFullPostings {
 				pl.Uids = bp128.DeltaPack(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
 				x.Check(target.Set(k, plBuf, 0x00))
 			} else {
+				if verbose {
+					log.Printf("[FIN_COMPACT] uids=%v", uids)
+				}
 				x.Check(target.Set(k, bp128.DeltaPack(uids), 0x01))
 			}
 
