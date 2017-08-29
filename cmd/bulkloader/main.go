@@ -25,8 +25,6 @@ import (
 	farm "github.com/dgryski/go-farm"
 )
 
-var verbose = true
-
 // TODO: Could do with some massive refactoring... E.g. run whole thing in a
 // routine (or struct) and just have arg parsing in main().
 
