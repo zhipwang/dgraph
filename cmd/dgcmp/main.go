@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"hash/crc64"
 	"os"
 
 	"github.com/dgraph-io/badger"
@@ -44,8 +45,6 @@ func compareBadgers(badgerA, badgerB string) bool {
 
 	cmpEq := true
 
-	countEq := 0
-
 	for itA.Valid() && itB.Valid() {
 		itemA := itA.Item()
 		itemB := itB.Item()
@@ -59,7 +58,6 @@ func compareBadgers(badgerA, badgerB string) bool {
 			}
 			itA.Next()
 			itB.Next()
-			countEq++
 		} else if keyCmp < 0 {
 			keyMismatch("A", itemA)
 			cmpEq = false
@@ -81,6 +79,11 @@ func compareBadgers(badgerA, badgerB string) bool {
 		keyMismatch("B", itB.Item())
 		itB.Next()
 	}
+
+	fmt.Printf("Badger A full hash : %X\n", hash(kvA, true))
+	fmt.Printf("Badger B full hash : %X\n", hash(kvB, true))
+	fmt.Printf("Badger A key hash  : %X\n", hash(kvA, false))
+	fmt.Printf("Badger B key hash  : %X\n", hash(kvB, false))
 
 	return cmpEq
 }
@@ -164,4 +167,19 @@ func defaultBadger(dir string) (*badger.KV, error) {
 	opt.Dir = dir
 	opt.ValueDir = dir
 	return badger.NewKV(&opt)
+}
+
+func hash(kv *badger.KV, full bool) uint64 {
+	table := crc64.MakeTable(crc64.ISO)
+	hash := crc64.New(table)
+	it := kv.NewIterator(badger.DefaultIteratorOptions)
+	for it.Rewind(); it.Valid(); it.Next() {
+		item := it.Item()
+		hash.Write(item.Key())
+		if full {
+			hash.Write(item.Value())
+			hash.Write([]byte{item.UserMeta()})
+		}
+	}
+	return hash.Sum64()
 }
