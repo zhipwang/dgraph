@@ -111,7 +111,7 @@ loc                  : geo @index(geo) .
 name                 : string @index(hash, fulltext, trigram) .
 starring             : uid @count .
 _share_hash_         : string @index(exact) .
-' /home/petsta/Downloads/21million.rdf.gz
+' ~/Downloads/21million.rdf.gz
 
 exit 0 # Disable remaining tests for now while iterating on performance
 
@@ -121,7 +121,7 @@ genre:                uid @reverse .
 initial_release_date: dateTime @index(year) .
 name:                 string @index(term) .
 starring:             uid @count .
-' /home/petsta/1million.rdf.gz
+' ~/1million.rdf.gz
  
 # Reproduces a bug:
 run_test_str '
