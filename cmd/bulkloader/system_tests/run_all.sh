@@ -27,8 +27,8 @@ function run_test {
 	rdfFile=$2
 
 	# Create temp dirs
-	dgLoaderDir=$(mktemp -d --suffix="_bulk_loader_system_test")
-	blLoaderDir=$(mktemp -d --suffix="_bulk_loader_system_test")
+	dgLoaderDir=$(mktemp -p ~/tmp -d --suffix="_bulk_loader_system_test")
+	blLoaderDir=$(mktemp -p ~/tmp -d --suffix="_bulk_loader_system_test")
 	h1 () { rm -r $dgLoaderDir $blLoaderDir; }
 	trap h1 EXIT
 
@@ -52,7 +52,7 @@ function run_test {
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	t=$(date +%s.%N)
-	bulkloader -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$cyan&$default/"
+	bulkloader -tmp ~/tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$cyan&$default/"
 	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
 	# Wait for dgraph to finish.
@@ -100,14 +100,27 @@ function run_test_schema_str {
 }
 
 run_test_schema_str '
+director.film        : uid @reverse @count .
+actor.film           : uid @count .
+genre                : uid @reverse @count .
+initial_release_date : datetime @index(year) .
+rating               : uid @reverse .
+country              : uid @reverse .
+loc                  : geo @index(geo) .
+name                 : string @index(term, exact, fulltext, trigram) .
+starring             : uid @count .
+_share_hash_         : string @index(exact) .
+' /home/petsta/Downloads/21million.rdf.gz
+
+exit 0 # Disable remaining tests for now while iterating on performance
+
+run_test_schema_str '
 director.film:        uid @reverse @count .
 genre:                uid @reverse .
 initial_release_date: dateTime @index(year) .
 name:                 string @index(term) .
 starring:             uid @count .
 ' /home/petsta/1million.rdf.gz
-
-exit 0 # Disable remaining tests for now while iterating on performance
  
 # Reproduces a bug:
 run_test_str '
