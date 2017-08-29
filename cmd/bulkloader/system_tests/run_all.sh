@@ -19,12 +19,13 @@ default=$(tput sgr0)
 
 function run_test {
 
-	if [[ $# != 2 ]]; then
+	if [[ $# != 2 && $# != 3 ]]; then
 		echo "incorrect args"
 		exit 1
 	fi
 	schemaFile=$1
 	rdfFile=$2
+	runBoth=${3:-true}
 
 	# Create temp dirs
 	dgLoaderDir=$(mktemp -p ~/tmp -d --suffix="_bulk_loader_system_test")
@@ -32,47 +33,53 @@ function run_test {
 	h1 () { rm -r $dgLoaderDir $blLoaderDir; }
 	trap h1 EXIT
 
-	# Start dgraph
-	dgraph -memory_mb=1024 -p $dgLoaderDir/p -w $dgLoaderDir/w &
-	dgPid=$!
-	h2 () { h1; kill $dgPid || true; } ## OK if this fails, we have probably already cleaned up the proc.
-	trap h2 EXIT
+	if $runBoth; then
+		# Start dgraph
+		dgraph -memory_mb=1024 -p $dgLoaderDir/p -w $dgLoaderDir/w &
+		dgPid=$!
+		h2 () { h1; kill $dgPid || true; } ## OK if this fails, we have probably already cleaned up the proc.
+		trap h2 EXIT
 
-	# Wait small amount of time for dgraph to start listening for gRPC.
-	sleep 0.5
+		# Wait small amount of time for dgraph to start listening for gRPC.
+		sleep 0.5
 
-	# Run the dgraph loader
-	t=$(date +%s.%N)
-	dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c 2>&1 | sed "s/.*/$yellow&$default/"
-	dgT=$(echo "$(date +%s.%n) - $t" | bc)
+		# Run the dgraph loader
+		t=$(date +%s.%N)
+		dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c 2>&1 | sed "s/.*/$yellow&$default/"
+		dgT=$(echo "$(date +%s.%n) - $t" | bc)
 
-	# Stop dgraph. We'll wait for it to finish later.
-	kill -s SIGINT $dgPid
+		# Stop dgraph. We'll wait for it to finish later.
+		kill -s SIGINT $dgPid
+	fi
 
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	t=$(date +%s.%N)
-	mkdir ~/tmp
+	mkdir -p ~/tmp
 	bulkloader -tmp ~/tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$cyan&$default/"
 	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
-	# Wait for dgraph to finish.
-	while ps -p $dgPid 1>/dev/null; do
-		sleep 0.1 
-	done
+	if $runBoth; then
+		# Wait for dgraph to finish.
+		while ps -p $dgPid 1>/dev/null; do
+			sleep 0.1
+		done
 
-	# Compare the two badgers.
-	dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$magenta&$default/" || true # TODO: for now, ignore failure.
+		# Compare the two badgers.
+		dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$magenta&$default/" || true # TODO: for now, ignore failure.
+	fi
 
-	# TODO: Timing
+	# Timing
 	echo "=== TIMING ==="
-	echo "DgraphLoader: $dgT"
+	if $runBoth; then
+		echo "DgraphLoader: $dgT"
+	fi
 	echo "BulkLoader:   $blT"
 }
 
 function run_test_str {
 
-	[[ $# == 2 ]] || { echo "incorrect args"; exit 1; }
+	[[ $# == 2 || $# == 3 ]] || { echo "incorrect args"; exit 1; }
 	schema=$1
 	rdfs=$2
 
@@ -82,12 +89,12 @@ function run_test_str {
 	echo "$schema" > $tmpDir/sch.schema
 	echo "$rdfs"   > $tmpDir/data.rdf
 
-	run_test $tmpDir/sch.schema $tmpDir/data.rdf
+	run_test $tmpDir/sch.schema $tmpDir/data.rdf ${3:-true}
 }
 
 function run_test_schema_str {
 
-	[[ $# == 2 ]] || { echo "incorrect args"; exit 1; }
+	[[ $# == 2 || $# == 3 ]] || { echo "incorrect args"; exit 1; }
 	schema=$1
 	rdfFile=$2
 
@@ -97,7 +104,7 @@ function run_test_schema_str {
 	echo "$schema" > $tmpDir/sch.schema
 	cat $tmpDir/sch.schema
 
-	run_test $tmpDir/sch.schema $rdfFile
+	run_test $tmpDir/sch.schema $rdfFile ${3:-true}
 }
 
 run_test_schema_str '
@@ -111,9 +118,9 @@ loc                  : geo @index(geo) .
 name                 : string @index(hash, fulltext, trigram) .
 starring             : uid @count .
 _share_hash_         : string @index(exact) .
-' ~/Downloads/21million.rdf.gz
+' ~/Downloads/21million.rdf.gz false
 
-exit 0 # Disable remaining tests for now while iterating on performance
+exit 0 # Disable remaining tests
 
 run_test_schema_str '
 director.film:        uid @reverse @count .
