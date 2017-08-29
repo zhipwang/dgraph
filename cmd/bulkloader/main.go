@@ -106,8 +106,6 @@ func main() {
 
 	schemaStore.write(kv)
 
-	printUIDMap()
-
 	plBuild.buildPostingLists(kv, schemaStore)
 }
 
@@ -189,10 +187,6 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 
 	for _, tokerName := range sch.GetTokenizer() {
 
-		if verbose {
-			log.Printf("[INDEX] TokenizerName=%q", tokerName)
-		}
-
 		// Find tokeniser.
 		toker, ok := tok.GetTokenizer(tokerName)
 		if !ok {
@@ -214,17 +208,9 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 
 		// Extract tokens.
 		toks, err := toker.Tokens(schemaVal)
-		if verbose {
-			for _, tok := range toks {
-				log.Printf("[INDEX] Token=%q", tok[1:])
-			}
-		}
 
 		// Store index posting.
 		for _, t := range toks {
-			if verbose {
-				log.Printf("[INDEX] pred=%q tok=%q uid=%d", nq.Predicate, t[1:], de.GetEntity())
-			}
 			plb.addPosting(
 				x.IndexKey(nq.Predicate, t),
 				&protos.Posting{
@@ -250,10 +236,6 @@ func lease(kv *badger.KV) {
 		newLease = 10001
 	} else {
 		newLease = (lastUID-2)/10000*10000 + 10001
-	}
-
-	if verbose {
-		log.Printf("[LEASE] lastUID:%d newLeaseUID:%d", lastUID, newLease)
 	}
 
 	// Would be nice to be able to run this as a regular RDF, rather than as a
@@ -309,7 +291,6 @@ func uid(str string) uint64 {
 			}
 		} else {
 			uidMap[str] = hint
-			log.Printf("[UID] uid=%d str=%q", hint, str)
 			return hint
 		}
 	}
@@ -320,14 +301,5 @@ func uid(str string) uint64 {
 	}
 	lastUID++
 	uidMap[str] = lastUID
-	log.Printf("[UID] uid=%d str=%q", lastUID, str)
 	return lastUID
-}
-
-func printUIDMap() {
-	//fmt.Println("UID map:")
-	//for str, uid := range uidMap {
-	//fmt.Printf("%d: %s\n", uid, str)
-	//}
-	//fmt.Println()
 }
