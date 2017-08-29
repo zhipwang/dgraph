@@ -10,6 +10,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -31,6 +32,11 @@ import (
 // routine (or struct) and just have arg parsing in main().
 
 func main() {
+
+	// Setting a higher number here allows more disk I/O calls to be scheduled, hence considerably
+	// improving throughput. The extra CPU overhead is almost negligible in comparison. The
+	// benchmark notes are located in badger-bench/randread.
+	runtime.GOMAXPROCS(128)
 
 	rdfFile := flag.String("r", "", "Location of rdf file to load")
 	schemaFile := flag.String("s", "", "Location of schema file to load")
