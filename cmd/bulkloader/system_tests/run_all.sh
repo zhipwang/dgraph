@@ -52,6 +52,7 @@ function run_test {
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	t=$(date +%s.%N)
+	mkdir ~/tmp
 	bulkloader -tmp ~/tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$cyan&$default/"
 	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
