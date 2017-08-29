@@ -18,18 +18,18 @@ func newPlBuilder(tmpDir string) *plBuilder {
 	x.Check(err)
 	kv, err := defaultBadger(badgerDir)
 	x.Check(err)
-	return &plBuilder{kv, badgerDir}
+	return &plBuilder{NewKVWriter(kv), badgerDir}
 }
 
 type plBuilder struct {
-	kv        *badger.KV
+	kvw       *KVWriter
 	badgerDir string
 }
 
 func (b *plBuilder) cleanUp() {
 	// Don't need any persistence, but still Close() anyway to close all FDs
 	// before nuking the data directory.
-	x.Check(b.kv.Close())
+	x.Check(b.kvw.kv.Close())
 	x.Check(os.RemoveAll(b.badgerDir))
 }
 
@@ -52,7 +52,7 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, c
 		vBuf := make([]byte, 4+len(postingListKey))
 		binary.BigEndian.PutUint32(vBuf, uint32(len(postingListKey)))
 		copy(vBuf[4:], postingListKey)
-		x.Check(b.kv.Set(kBuf[:], vBuf, 0x01))
+		b.kvw.Set(kBuf[:], vBuf, 0x01)
 	} else {
 		postingBuf, err := posting.Marshal()
 		x.Check(err)
@@ -60,18 +60,22 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, c
 		binary.BigEndian.PutUint32(vBuf, uint32(len(postingListKey)))
 		copy(vBuf[4:], postingListKey)
 		copy(vBuf[4+len(postingListKey):], postingBuf)
-		x.Check(b.kv.Set(kBuf[:], vBuf, 0x00))
+		b.kvw.Set(kBuf[:], vBuf, 0x00)
 	}
 }
 
 func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 
+	b.kvw.Wait()
+
+	batchTarget := NewKVWriter(target)
+
 	counts := map[int][]uint64{}
 
 	pl := &protos.PostingList{}
 	uids := []uint64{}
-	iter := b.kv.NewIterator(badger.DefaultIteratorOptions)
-	iter.Seek(nil)
+	iter := b.kvw.kv.NewIterator(badger.DefaultIteratorOptions)
+	iter.Rewind()
 	if !iter.Valid() {
 		// There were no posting lists to build.
 		return
@@ -117,9 +121,9 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				pl.Uids = bp128.DeltaPack(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
-				x.Check(target.Set(k, plBuf, 0x00))
+				batchTarget.Set(k, plBuf, 0x00)
 			} else {
-				x.Check(target.Set(k, bp128.DeltaPack(uids), 0x01))
+				batchTarget.Set(k, bp128.DeltaPack(uids), 0x01)
 			}
 
 			parsedK := x.Parse(k)
@@ -157,9 +161,9 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 							// TODO: Is sort.Slice slow due to reflection? If so, use a faster sort method.
 							sort.Slice(pl, func(i, j int) bool { return pl[i] < pl[j] })
 							val := bp128.DeltaPack(pl)
-							x.Check(target.Set(key, val, 0x01))
+							batchTarget.Set(key, val, 0x01)
 						} else {
-							x.Check(target.Set(key, nil, 0x00))
+							batchTarget.Set(key, nil, 0x00)
 						}
 					}
 					highest = cnt
@@ -171,6 +175,8 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		k = newK
 		kHash = newKHash
 	}
+
+	batchTarget.Wait()
 }
 
 func unpackPostingListKey(item *badger.KVItem) []byte {

@@ -108,7 +108,7 @@ starring:             uid @count .
 ' /home/petsta/1million.rdf.gz
 
 exit 0 # Disable remaining tests for now while iterating on performance
-
+ 
 # Reproduces a bug:
 run_test_str '
 	name: string @index(term) .
@@ -117,11 +117,9 @@ run_test_str '
 	<bar> <name> "11" .
 	<17216961135462248174> <name> "1" .
 '
-
 run_test_str '' '
 	<peter> <name> "Peter" .
 '
-
 run_test_str '' '
 	<peter> <name> "Peter" .
 	<peter> <age> "28"^^<xs:int> .
