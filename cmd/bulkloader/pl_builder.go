@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"hash/crc64"
 	"io/ioutil"
 	"os"
-	"strings"
+	"sort"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -34,15 +33,20 @@ func (b *plBuilder) cleanUp() {
 	x.Check(os.RemoveAll(b.badgerDir))
 }
 
-func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
+func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, countGroupHash uint64) {
 
 	plKeyHash := crc64.Checksum(postingListKey, crc64.MakeTable(crc64.ISO))
-	var kBuf [16]byte
-	binary.BigEndian.PutUint64(kBuf[:8], plKeyHash)   // Byte order doesn't matter (it's for grouping).
-	binary.BigEndian.PutUint64(kBuf[8:], posting.Uid) // Byte order is important for iteration order.
+	var kBuf [24]byte
+	binary.BigEndian.PutUint64(kBuf[:], countGroupHash) // Byte order doesn't matter (it's for grouping).
+	binary.BigEndian.PutUint64(kBuf[8:], plKeyHash)     // Byte order doesn't matter (it's for grouping).
+	binary.BigEndian.PutUint64(kBuf[16:], posting.Uid)  // Byte order is important for iteration order.
 
 	// TODO: We could save 4 bytes for UID postings by omitting the posting
 	// list length.
+
+	// TODO: Another space saving could be to store PLKs separately, i.e. in
+	// another set of keys #(PLK) => PLK. Could use the meta byte to
+	// differentiate.
 
 	if posting.GetPostingType() == protos.Posting_REF {
 		vBuf := make([]byte, 4+len(postingListKey))
@@ -62,7 +66,7 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting) {
 
 func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 
-	//counts := map[int][]uint64{}
+	counts := map[int][]uint64{}
 
 	pl := &protos.PostingList{}
 	uids := []uint64{}
@@ -82,6 +86,8 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			p := unpackFullPosting(iter.Item())
 			pl.Postings = append(pl.Postings, p)
 		}
+
+		countGroupHash := unpackCountGroupHash(iter.Item())
 
 		// Determine if we're at the end of a single posting list.
 		finalise := false
@@ -116,47 +122,51 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				x.Check(target.Set(k, bp128.DeltaPack(uids), 0x01))
 			}
 
-			//if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
-			//cnt := len(uids)
-			//counts[cnt] = append(counts[cnt], parsedK.Uid)
-			//}
+			parsedK := x.Parse(k)
+			if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
+				cnt := len(uids)
+				counts[cnt] = append(counts[cnt], parsedK.Uid)
+			}
 
 			// Reset for next posting list.
 			pl.Postings = nil
 			pl.Uids = nil
 			uids = nil
+
+			// TODO: We're double parsing each key. With clever tracking between
+			// outside of the loop, could eliminate this.
+
+			var endOfPredicateCountGroup = true
+			if iter.Valid() {
+				endOfPredicateCountGroup = countGroupHash != unpackCountGroupHash(iter.Item())
+			}
+			if endOfPredicateCountGroup {
+
+				// Dump out count posting lists.
+				//
+				// TODO: This isn't an efficient algorithm: it requires full
+				// iteration over the map and max(counts) map lookups. It's
+				// possible to just iterate over the map, store in a slice, and
+				// fill in the gaps while iterating the slice.
+				highest := -1
+				for cnt := range counts {
+					for i := highest + 1; i <= cnt; i++ {
+						pl := counts[i]
+						key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
+						if len(pl) > 0 {
+							// TODO: Is sort.Slice slow due to reflection? If so, use a faster sort method.
+							sort.Slice(pl, func(i, j int) bool { return pl[i] < pl[j] })
+							val := bp128.DeltaPack(pl)
+							x.Check(target.Set(key, val, 0x01))
+						} else {
+							x.Check(target.Set(key, nil, 0x00))
+						}
+					}
+					highest = cnt
+				}
+				counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
+			}
 		}
-
-		// // TODO: We're double parsing each key. With clever tracking between
-		// // outside of the loop, could eliminate this.
-		// var parsedNewK *x.ParsedKey
-		// if iter.Valid() {
-		// 	parsedNewK = x.Parse(newK)
-		// }
-
-		//if !iter.Valid() || (parsedNewK.Attr != parsedK.Attr || parsedNewK.IsReverse() != parsedK.IsReverse()) {
-		//	// Dump out count posting lists.
-		//	//
-		//	// TODO: This isn't an efficient algorithm: it requires full
-		//	// iteration over the map and max(counts) map lookups. It's
-		//	// possible to just iterate over the map, store in a slice, and
-		//	// fill in the gaps while iterating the slice.
-		//	highest := -1
-		//	for cnt := range counts {
-		//		for i := highest + 1; i <= cnt; i++ {
-		//			pl := counts[i]
-		//			key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
-		//			if len(pl) > 0 {
-		//				val := bp128.DeltaPack(pl)
-		//				x.Check(target.Set(key, val, 0x01))
-		//			} else {
-		//				x.Check(target.Set(key, nil, 0x00))
-		//			}
-		//		}
-		//		highest = cnt
-		//	}
-		//	counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
-		//}
 
 		k = newK
 		kHash = newKHash
@@ -172,7 +182,7 @@ func unpackPostingListKey(item *badger.KVItem) []byte {
 }
 
 func unpackPostingListKeyHash(item *badger.KVItem) uint64 {
-	return binary.BigEndian.Uint64(item.Key()[:8])
+	return binary.BigEndian.Uint64(item.Key()[8:])
 }
 
 // unpacks a full posting into the posting list key and posting.
@@ -186,5 +196,9 @@ func unpackFullPosting(item *badger.KVItem) *protos.Posting {
 
 // unpacks a UID posting into the posting list key and uid.
 func unpackUidPosting(item *badger.KVItem) uint64 {
-	return binary.BigEndian.Uint64(item.Key()[8:])
+	return binary.BigEndian.Uint64(item.Key()[16:])
+}
+
+func unpackCountGroupHash(item *badger.KVItem) uint64 {
+	return binary.BigEndian.Uint64(item.Key())
 }

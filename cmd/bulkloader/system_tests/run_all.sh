@@ -237,63 +237,63 @@ run_test_str '
 ' '
 	<alice> <friend> <bob> .
 '
-#run_test_str '
-#	friend: uid @count .
-#' '
-#	<alice> <friend> <bob> .
-#	<alice> <friend> <carol> .
-#'
-#run_test_str '
-#	friend: uid @count .
-#' '
-#	<alice> <friend> <bob>   .
-#	<alice> <friend> <carol> .
-#	<alice> <friend> <dave>  .
-#
-#	<bob>   <friend> <carol> .
-#
-#	<carol> <friend> <bob>   .
-#	<carol> <friend> <dave>  .
-#
-#	<erin>  <friend> <bob>   .
-#	<erin>  <friend> <carol> .
-#
-#	<frank> <friend> <carol> .
-#	<frank> <friend> <dave>  .
-#	<frank> <friend> <erin>  .
-#
-#	<grace> <friend> <alice> .
-#	<grace> <friend> <bob>   .
-#	<grace> <friend> <carol> .
-#	<grace> <friend> <dave>  .
-#	<grace> <friend> <erin>  .
-#	<grace> <friend> <frank> .
-#'
-#run_test_str '
-#	a: uid @count .
-#	b: uid @count .
-#	c: uid @count .
-#	b: uid @count .
-#' '
-#	<a1> <a> <a3> .
-#	<a2> <a> <a1> .
-#	<a2> <a> <a3> .
-#
-#	<b1> <b> <b2> .
-#
-#	<c1> <c> <c2> .
-#	<c2> <c> <c1> .
-#
-#	<d1> <d> <d2> .
-#	<d1> <d> <d3> .
-#	<d3> <d> <d1> .
-#	<d3> <d> <d2> .
-#	<d3> <d> <d4> .
-#
-#	<d4> <d> <d1> .
-#	<d4> <d> <d2> .
-#	<d4> <d> <d3> .
-#'
+run_test_str '
+	friend: uid @count .
+' '
+	<alice> <friend> <bob> .
+	<alice> <friend> <carol> .
+'
+run_test_str '
+	friend: uid @count .
+' '
+	<alice> <friend> <bob>   .
+	<alice> <friend> <carol> .
+	<alice> <friend> <dave>  .
+
+	<bob>   <friend> <carol> .
+
+	<carol> <friend> <bob>   .
+	<carol> <friend> <dave>  .
+
+	<erin>  <friend> <bob>   .
+	<erin>  <friend> <carol> .
+
+	<frank> <friend> <carol> .
+	<frank> <friend> <dave>  .
+	<frank> <friend> <erin>  .
+
+	<grace> <friend> <alice> .
+	<grace> <friend> <bob>   .
+	<grace> <friend> <carol> .
+	<grace> <friend> <dave>  .
+	<grace> <friend> <erin>  .
+	<grace> <friend> <frank> .
+'
+run_test_str '
+	a: uid @count .
+	b: uid @count .
+	c: uid @count .
+	b: uid @count .
+' '
+	<a1> <a> <a3> .
+	<a2> <a> <a1> .
+	<a2> <a> <a3> .
+
+	<b1> <b> <b2> .
+
+	<c1> <c> <c2> .
+	<c2> <c> <c1> .
+
+	<d1> <d> <d2> .
+	<d1> <d> <d3> .
+	<d3> <d> <d1> .
+	<d3> <d> <d2> .
+	<d3> <d> <d4> .
+
+	<d4> <d> <d1> .
+	<d4> <d> <d2> .
+	<d4> <d> <d3> .
+'
 run_test_str '
 	age: int @index(int) .
 ' '
@@ -392,17 +392,17 @@ run_test_str '
 	<alice> <friend> <bob> .
 	<alice> <friend> <carol> .
 '
-#run_test_str '
-#	friend: uid @reverse @count .
-#' '
-#	<a> <friend> <b> .
-#'
-#run_test_str '
-#	friend: uid @reverse @count .
-#' '
-#	<alice> <friend> <bob> .
-#	<alice> <friend> <carol> .
-#'
+run_test_str '
+	friend: uid @reverse @count .
+' '
+	<a> <friend> <b> .
+'
+run_test_str '
+	friend: uid @reverse @count .
+' '
+	<alice> <friend> <bob> .
+	<alice> <friend> <carol> .
+'
 run_test_str '' '
 	<peter> <name> "Peter"@en .
 '

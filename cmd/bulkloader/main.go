@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"flag"
 	"fmt"
+	"hash/crc64"
 	"io/ioutil"
 	"log"
 	"math"
@@ -57,11 +58,6 @@ func main() {
 	}
 	schemaUpdates, err := schema.Parse(string(schemaBuf))
 	x.Check(err)
-	//fmt.Printf("Initial schema (%d):\n", len(schemaUpdates))
-	//for _, sch := range schemaUpdates {
-	//fmt.Printf("%+v\n", sch)
-	//}
-	//fmt.Println()
 	schemaStore := newSchemaStore(schemaUpdates)
 
 	kv, err := defaultBadger(*badgerDir)
@@ -87,40 +83,21 @@ func main() {
 		// TODO: Rename to forwardPosting and reversePosting
 		p1, p2 := createEdgePostings(nq, schemaStore)
 
-		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
-		plBuild.addPosting(key, p1)
+		countGroupHash := crc64.Checksum([]byte(nq.GetPredicate()), crc64.MakeTable(crc64.ISO))
 
-		//fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
-		//nq.GetSubject(),
-		//uid(nq.GetSubject()),
-		//nq.GetPredicate(),
-		//hex.Dump(key),
-		//p1,
-		//)
+		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
+		plBuild.addPosting(key, p1, countGroupHash)
 
 		if p2 != nil {
 			key = x.ReverseKey(nq.GetPredicate(), uid(nq.GetObjectId()))
-			plBuild.addPosting(key, p2)
-
-			//fmt.Printf("Inserting key: %s(%d):%s\n%sValue: %+v\n\n",
-			//nq.GetObjectId(),
-			//uid(nq.GetObjectId()),
-			//nq.GetPredicate(),
-			//hex.Dump(key),
-			//p2,
-			//)
+			// Reverse predicates are counted separately from normal
+			// predicates, so the hash is inverted to give a separate hash.
+			plBuild.addPosting(key, p2, ^countGroupHash)
 		}
 
 		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
 		pp := createPredicatePosting(nq.GetPredicate())
-		plBuild.addPosting(key, pp)
-
-		//fmt.Printf("Inserting key: %s(%d):_predicate_\n%sValue: %+v\n\n",
-		//nq.GetSubject(),
-		//uid(nq.GetSubject()),
-		//hex.Dump(key),
-		//pp,
-		//)
+		plBuild.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
 
 		addIndexPostings(nq, schemaStore, plBuild)
 	}
@@ -254,6 +231,7 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 					Uid:         de.GetEntity(),
 					PostingType: protos.Posting_REF,
 				},
+				0,
 			)
 		}
 	}
