@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -13,17 +14,18 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func newPlBuilder(tmpDir string) *plBuilder {
+func newPlBuilder(tmpDir string, prog *progress) *plBuilder {
 	badgerDir, err := ioutil.TempDir(tmpDir, "dgraph_bulkloader")
 	x.Check(err)
 	kv, err := defaultBadger(badgerDir)
 	x.Check(err)
-	return &plBuilder{NewKVWriter(kv), badgerDir}
+	return &plBuilder{NewKVWriter(kv), badgerDir, prog}
 }
 
 type plBuilder struct {
 	kvw       *KVWriter
 	badgerDir string
+	prog      *progress
 }
 
 func (b *plBuilder) cleanUp() {
@@ -34,6 +36,8 @@ func (b *plBuilder) cleanUp() {
 }
 
 func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, countGroupHash uint64) {
+
+	atomic.AddInt64(&b.prog.tmpKeyTotal, 1)
 
 	plKeyHash := crc64.Checksum(postingListKey, crc64.MakeTable(crc64.ISO))
 	var kBuf [24]byte
@@ -96,6 +100,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		// Determine if we're at the end of a single posting list.
 		finalise := false
 		iter.Next()
+		atomic.AddInt64(&b.prog.tmpKeyProg, 1)
 		var newK []byte
 		var newKHash uint64
 		if iter.Valid() {

@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -65,12 +66,17 @@ func main() {
 	defer func() { x.Check(kv.Close()) }()
 	// TODO: Check to make sure the badger is empty.
 
-	plBuild := newPlBuilder(*tmpDir)
+	prog := progress{}
+	go prog.reportProgress()
+
+	plBuild := newPlBuilder(*tmpDir, &prog)
 	defer plBuild.cleanUp()
 
 	// Load RDF
 	for sc.Scan() {
 		x.Check(sc.Err())
+
+		atomic.AddInt64(&prog.rdfProg, 1)
 
 		nq, err := parseNQuad(sc.Text())
 		if err != nil {
