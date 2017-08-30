@@ -5,8 +5,8 @@ set -euo pipefail
 while [[ $# -gt 1 ]]; do
 	key="$1"
 	case $key in
-		--tmpDir)
-			tmpDir="$2"
+		--tmp)
+			tmp="$2"
 			shift
 			;;
 		*)
@@ -17,7 +17,7 @@ while [[ $# -gt 1 ]]; do
 	shift
 done
 
-tmpDir=${tmpDir:-/tmp}
+tmp=${tmp:-/tmp}
 
 # TODO: Traps didn't work how I thought they did... they work per script rather
 # than per function. So need to rethink the cleanup situation.
@@ -44,9 +44,8 @@ function run_test {
 	rdfFile=$2
 	runBoth=${3:-true}
 
-	# Create temp dirs
-	dgLoaderDir=$(mktemp -p $tmpDir -d --suffix="_bulk_loader_system_test")
-	blLoaderDir=$(mktemp -p $tmpDir -d --suffix="_bulk_loader_system_test")
+	dgLoaderDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
+	blLoaderDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
 	h1 () { rm -r $dgLoaderDir $blLoaderDir; }
 	trap h1 EXIT
 
@@ -72,7 +71,7 @@ function run_test {
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	t=$(date +%s.%N)
-	bulkloader -tmp $tmpDir -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
+	bulkloader -tmp $tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
 	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
 	if $runBoth; then
