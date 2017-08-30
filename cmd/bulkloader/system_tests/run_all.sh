@@ -2,16 +2,33 @@
 
 set -euo pipefail
 
+while [[ $# -gt 1 ]]; do
+	key="$1"
+	case $key in
+		--tmpDir)
+			tmpDir="$2"
+			shift
+			;;
+		*)
+			echo "unknown option $1"
+			exit 1
+			;;
+	esac
+	shift
+done
+
+tmpDir=${tmpDir:-/tmp}
+
 # TODO: Traps didn't work how I thought they did... they work per script rather
 # than per function. So need to rethink the cleanup situation.
+
+# TODO: Assumes that $GOPATH/bin is in $PATH.
 
 go install github.com/dgraph-io/dgraph/cmd/dgraph
 go install github.com/dgraph-io/dgraph/cmd/dgraphloader
 go install github.com/dgraph-io/dgraph/cmd/bulkloader
 go install github.com/dgraph-io/dgraph/cmd/dgcmp
 
-#red=$(tput setaf 1)
-#green=$(tput setaf 2)
 yellow=$(tput setaf 3)
 magenta=$(tput setaf 5)
 cyan=$(tput setaf 6)
@@ -28,14 +45,14 @@ function run_test {
 	runBoth=${3:-true}
 
 	# Create temp dirs
-	dgLoaderDir=$(mktemp -p ~/tmp -d --suffix="_bulk_loader_system_test")
-	blLoaderDir=$(mktemp -p ~/tmp -d --suffix="_bulk_loader_system_test")
+	dgLoaderDir=$(mktemp -p $tmpDir -d --suffix="_bulk_loader_system_test")
+	blLoaderDir=$(mktemp -p $tmpDir -d --suffix="_bulk_loader_system_test")
 	h1 () { rm -r $dgLoaderDir $blLoaderDir; }
 	trap h1 EXIT
 
 	if $runBoth; then
 		# Start dgraph
-		dgraph -memory_mb=1024 -p $dgLoaderDir/p -w $dgLoaderDir/w &
+		dgraph -memory_mb=4096 -p $dgLoaderDir/p -w $dgLoaderDir/w &
 		dgPid=$!
 		h2 () { h1; kill $dgPid || true; } ## OK if this fails, we have probably already cleaned up the proc.
 		trap h2 EXIT
@@ -45,7 +62,7 @@ function run_test {
 
 		# Run the dgraph loader
 		t=$(date +%s.%N)
-		dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c 2>&1 | sed "s/.*/$yellow&$default/"
+		dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c
 		dgT=$(echo "$(date +%s.%n) - $t" | bc)
 
 		# Stop dgraph. We'll wait for it to finish later.
@@ -55,8 +72,7 @@ function run_test {
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	t=$(date +%s.%N)
-	mkdir -p ~/tmp
-	bulkloader -tmp ~/tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$cyan&$default/"
+	bulkloader -tmp $tmpDir -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
 	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
 	if $runBoth; then
@@ -66,7 +82,7 @@ function run_test {
 		done
 
 		# Compare the two badgers.
-		dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$magenta&$default/" || true # TODO: for now, ignore failure.
+		dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$cyan&$default/" || true # TODO: for now, ignore failure.
 	fi
 
 	# Timing
