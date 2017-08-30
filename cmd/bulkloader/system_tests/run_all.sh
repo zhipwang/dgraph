@@ -9,6 +9,10 @@ while [[ $# -gt 1 ]]; do
 			tmp="$2"
 			shift
 			;;
+		--race)
+			race="$2"
+			shift
+			;;
 		*)
 			echo "unknown option $1"
 			exit 1
@@ -18,16 +22,25 @@ while [[ $# -gt 1 ]]; do
 done
 
 tmp=${tmp:-/tmp}
+race=${race:-true}
 
 # TODO: Traps didn't work how I thought they did... they work per script rather
 # than per function. So need to rethink the cleanup situation.
 
 # TODO: Assumes that $GOPATH/bin is in $PATH.
 
+if $race; then
+	raceFlag="-race"
+else
+	raceFlag=""
+fi
+
+set -x
 go install github.com/dgraph-io/dgraph/cmd/dgraph
 go install github.com/dgraph-io/dgraph/cmd/dgraphloader
-go install github.com/dgraph-io/dgraph/cmd/bulkloader
-go install github.com/dgraph-io/dgraph/cmd/dgcmp
+go install $raceFlag github.com/dgraph-io/dgraph/cmd/bulkloader
+go install $raceFlag github.com/dgraph-io/dgraph/cmd/dgcmp
+set +x
 
 yellow=$(tput setaf 3)
 magenta=$(tput setaf 5)
@@ -79,7 +92,7 @@ function run_test_str {
 	schema=$1
 	rdfs=$2
 
-	tmpDir=$(mktemp -d --suffix="_bulk_loader_system_test")
+	tmpDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
 	trap "{ rm -r $tmpDir; }" EXIT
 
 	echo "$schema" > $tmpDir/sch.schema
@@ -94,7 +107,7 @@ function run_test_schema_str {
 	schema=$1
 	rdfFile=$2
 
-	tmpDir=$(mktemp -d --suffix="_bulk_loader_system_test")
+	tmpDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
 	trap "{ rm -r $tmpDir; }" EXIT
 
 	echo "$schema" > $tmpDir/sch.schema
