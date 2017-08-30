@@ -40,8 +40,8 @@ func compareBadgers(badgerA, badgerB string) bool {
 
 	itA := kvA.NewIterator(badger.DefaultIteratorOptions)
 	itB := kvB.NewIterator(badger.DefaultIteratorOptions)
-	itA.Seek(nil)
-	itB.Seek(nil)
+	itA.Rewind()
+	itB.Rewind()
 
 	cmpEq := true
 
@@ -56,28 +56,28 @@ func compareBadgers(badgerA, badgerB string) bool {
 				valueMismatch(itemA, itemB)
 				cmpEq = false
 			}
-			itA.Next()
-			itB.Next()
+			next(itA)
+			next(itB)
 		} else if keyCmp < 0 {
 			keyMismatch("A", itemA)
 			cmpEq = false
-			itA.Next()
+			next(itA)
 		} else {
 			keyMismatch("B", itemB)
 			cmpEq = false
-			itB.Next()
+			next(itB)
 		}
 
 	}
 	for itA.Valid() {
 		cmpEq = false
 		keyMismatch("A", itA.Item())
-		itA.Next()
+		next(itA)
 	}
 	for itB.Valid() {
 		cmpEq = false
 		keyMismatch("B", itB.Item())
-		itB.Next()
+		next(itB)
 	}
 
 	fmt.Printf("Badger A full hash : %X\n", hash(kvA, true))
@@ -173,7 +173,7 @@ func hash(kv *badger.KV, full bool) uint64 {
 	table := crc64.MakeTable(crc64.ISO)
 	hash := crc64.New(table)
 	it := kv.NewIterator(badger.DefaultIteratorOptions)
-	for it.Rewind(); it.Valid(); it.Next() {
+	for it.Rewind(); it.Valid(); next(it) {
 		item := it.Item()
 		hash.Write(item.Key())
 		if full {
@@ -182,4 +182,18 @@ func hash(kv *badger.KV, full bool) uint64 {
 		}
 	}
 	return hash.Sum64()
+}
+
+func canIgnore(item *badger.KVItem) bool {
+	// Sometimes dgraph produces these K/V pairs, other times it doesn't. The
+	// presence/absence of the pair is semantically identical.
+	parsedKey := x.Parse(item.Key())
+	return parsedKey.IsCount() && len(item.Value()) == 0
+}
+
+func next(iter *badger.Iterator) {
+	iter.Next()
+	for iter.Valid() && canIgnore(iter.Item()) {
+		iter.Next()
+	}
 }
