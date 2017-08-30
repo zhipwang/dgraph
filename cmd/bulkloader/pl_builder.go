@@ -14,28 +14,37 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func newPlBuilder(tmpDir string, prog *progress) *plBuilder {
+// TODO: Rename
+func newPostingListBuilder(tmpDir string, prog *progress, targetKV *badger.KV, ss schemaStore) *postingListBuilder {
 	badgerDir, err := ioutil.TempDir(tmpDir, "dgraph_bulkloader")
 	x.Check(err)
-	kv, err := defaultBadger(badgerDir)
+	tmpKV, err := defaultBadger(badgerDir)
 	x.Check(err)
-	return &plBuilder{NewKVWriter(kv), badgerDir, prog}
+	return &postingListBuilder{
+		NewKVWriter(tmpKV),
+		badgerDir,
+		prog,
+		NewKVWriter(targetKV),
+		ss,
+	}
 }
 
-type plBuilder struct {
+type postingListBuilder struct {
 	kvw       *KVWriter
 	badgerDir string
 	prog      *progress
+	target    *KVWriter
+	ss        schemaStore
 }
 
-func (b *plBuilder) cleanUp() {
+func (b *postingListBuilder) cleanUp() {
 	// Don't need any persistence, but still Close() anyway to close all FDs
 	// before nuking the data directory.
 	x.Check(b.kvw.kv.Close())
 	x.Check(os.RemoveAll(b.badgerDir))
 }
 
-func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, countGroupHash uint64) {
+func (b *postingListBuilder) addPosting(postingListKey []byte, posting *protos.Posting, countGroupHash uint64) {
 
 	atomic.AddInt64(&b.prog.tmpKeyTotal, 1)
 
@@ -68,11 +77,9 @@ func (b *plBuilder) addPosting(postingListKey []byte, posting *protos.Posting, c
 	}
 }
 
-func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
+func (b *postingListBuilder) buildPostingLists() {
 
 	b.kvw.Wait()
-
-	batchTarget := NewKVWriter(target)
 
 	counts := map[int][]uint64{}
 
@@ -126,13 +133,13 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 				pl.Uids = bp128.DeltaPack(uids)
 				plBuf, err := pl.Marshal()
 				x.Check(err)
-				batchTarget.Set(k, plBuf, 0x00)
+				b.target.Set(k, plBuf, 0x00)
 			} else {
-				batchTarget.Set(k, bp128.DeltaPack(uids), 0x01)
+				b.target.Set(k, bp128.DeltaPack(uids), 0x01)
 			}
 
 			parsedK := x.Parse(k)
-			if (parsedK.IsData() || parsedK.IsReverse()) && ss.m[parsedK.Attr].GetCount() {
+			if (parsedK.IsData() || parsedK.IsReverse()) && b.ss.m[parsedK.Attr].GetCount() {
 				cnt := len(uids)
 				counts[cnt] = append(counts[cnt], parsedK.Uid)
 			}
@@ -149,7 +156,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 					sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
 					key := x.CountKey(parsedK.Attr, uint32(cnt), parsedK.IsReverse())
 					val := bp128.DeltaPack(uids)
-					batchTarget.Set(key, val, 0x01)
+					b.target.Set(key, val, 0x01)
 				}
 				counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
 			}
@@ -159,7 +166,7 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 		kHash = newKHash
 	}
 
-	batchTarget.Wait()
+	b.target.Wait()
 }
 
 func unpackPostingListKey(item *badger.KVItem) []byte {
@@ -174,7 +181,6 @@ func unpackPostingListKeyHash(item *badger.KVItem) uint64 {
 	return binary.BigEndian.Uint64(item.Key()[8:])
 }
 
-// unpacks a full posting into the posting list key and posting.
 func unpackFullPosting(item *badger.KVItem) *protos.Posting {
 	v := item.Value()
 	plKeyLen := binary.BigEndian.Uint32(v)
@@ -183,7 +189,6 @@ func unpackFullPosting(item *badger.KVItem) *protos.Posting {
 	return posting
 }
 
-// unpacks a UID posting into the posting list key and uid.
 func unpackUidPosting(item *badger.KVItem) uint64 {
 	return binary.BigEndian.Uint64(item.Key()[16:])
 }

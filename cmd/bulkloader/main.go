@@ -25,8 +25,13 @@ func main() {
 
 	// TODO: Handling to make sure required args have been passed.
 
-	if err := run(opt); err != nil {
+	app, err := newApp(opt)
+	if err != nil {
 		fmt.Println(err)
-		os.Exit(2) // 2 to differentiate from 1 from x.Check and similar.
+		os.Exit(1)
+	}
+	if err := app.run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

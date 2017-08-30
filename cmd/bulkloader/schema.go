@@ -17,15 +17,17 @@ type schemaState struct {
 }
 
 type schemaStore struct {
-	m map[string]schemaState
+	m  map[string]schemaState
+	kv *badger.KV
 }
 
-func newSchemaStore(initial []*protos.SchemaUpdate) schemaStore {
+func newSchemaStore(initial []*protos.SchemaUpdate, kv *badger.KV) schemaStore {
 	s := schemaStore{
 		map[string]schemaState{
 			"_predicate_": {true, nil},
 			"_lease_":     {true, &protos.SchemaUpdate{ValueType: uint32(protos.Posting_INT)}},
 		},
+		kv,
 	}
 	for _, sch := range initial {
 		p := sch.Predicate
@@ -60,10 +62,8 @@ func (s schemaStore) fixEdge(de *protos.DirectedEdge, isUIDEdge bool) {
 	}
 }
 
-func (s schemaStore) write(kv *badger.KV) {
-	//fmt.Println("Schema:")
+func (s schemaStore) write() {
 	for pred, sch := range s.m {
-		//fmt.Printf("%s: %+v\n", pred, sch)
 		k := x.SchemaKey(pred)
 		var v []byte
 		var err error
@@ -71,7 +71,6 @@ func (s schemaStore) write(kv *badger.KV) {
 			v, err = sch.SchemaUpdate.Marshal()
 			x.Check(err)
 		}
-		x.Check(kv.Set(k, v, 0))
+		x.Check(s.kv.Set(k, v, 0))
 	}
-	//fmt.Println()
 }

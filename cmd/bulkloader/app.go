@@ -32,39 +32,66 @@ type options struct {
 	tmpDir     string
 }
 
-func run(opt options) error {
-	f, err := os.Open(opt.rdfFile)
+type app struct {
+	opt options
+	um  *uidMap
+	ss  schemaStore
+	pb  *postingListBuilder
+	kv  *badger.KV
+}
+
+func newApp(opt options) (*app, error) {
+
+	// Load schema
+	schemaBuf, err := ioutil.ReadFile(opt.schemaFile)
+	if err != nil {
+		return nil, x.Wrapf(err, "Could not load schema.")
+	}
+	initialSchema, err := schema.Parse(string(schemaBuf))
+	if err != nil {
+		return nil, x.Wrapf(err, "Could not parse schema.")
+	}
+
+	// Create target badger.
+	kv, err := defaultBadger(opt.badgerDir)
+	if err != nil {
+		return nil, x.Wrapf(err, "Could not create target badger.")
+	}
+	x.Check(err)
+
+	prog := new(progress)
+	ss := newSchemaStore(initialSchema, kv)
+	return &app{
+		opt: opt,
+		um:  newUIDMap(),
+		ss:  ss,
+		pb:  newPostingListBuilder(opt.tmpDir, prog, kv, ss),
+		kv:  kv,
+	}, nil
+
+	// TODO: Goroutines start here when we get some parallelism.
+}
+
+func (a *app) run() error {
+	f, err := os.Open(a.opt.rdfFile)
 	if err != nil {
 		log.Fatalf("could not read rdf file: %v", err)
 	}
 	defer f.Close()
 
-	sc, err := rdfScanner(f, opt.rdfFile)
+	sc, err := rdfScanner(f, a.opt.rdfFile)
 	x.Check(err)
 
 	// TODO: Handle schema that's in gz file.
 	// TODO: What is the expected file extension?
 
-	schemaBuf, err := ioutil.ReadFile(opt.schemaFile)
-	if err != nil {
-		log.Fatalf("could not read schema file: %v", err)
-	}
-	schemaUpdates, err := schema.Parse(string(schemaBuf))
-	x.Check(err)
-	schemaStore := newSchemaStore(schemaUpdates)
-
-	var um = newUIDMap()
-
-	kv, err := defaultBadger(opt.badgerDir)
-	x.Check(err)
-	defer func() { x.Check(kv.Close()) }()
+	defer func() { x.Check(a.kv.Close()) }()
 	// TODO: Check to make sure the badger is empty.
 
 	prog := progress{}
 	go prog.reportProgress()
 
-	plBuild := newPlBuilder(opt.tmpDir, &prog)
-	defer plBuild.cleanUp()
+	defer a.pb.cleanUp()
 
 	// Load RDF
 	for sc.Scan() {
@@ -81,32 +108,32 @@ func run(opt options) error {
 		}
 
 		// TODO: Rename to forwardPosting and reversePosting
-		p1, p2 := createEdgePostings(nq, schemaStore, um)
+		p1, p2 := a.createEdgePostings(nq)
 
 		countGroupHash := crc64.Checksum([]byte(nq.GetPredicate()), crc64.MakeTable(crc64.ISO))
 
-		key := x.DataKey(nq.GetPredicate(), um.uid(nq.GetSubject()))
-		plBuild.addPosting(key, p1, countGroupHash)
+		key := x.DataKey(nq.GetPredicate(), a.um.uid(nq.GetSubject()))
+		a.pb.addPosting(key, p1, countGroupHash)
 
 		if p2 != nil {
-			key = x.ReverseKey(nq.GetPredicate(), um.uid(nq.GetObjectId()))
+			key = x.ReverseKey(nq.GetPredicate(), a.um.uid(nq.GetObjectId()))
 			// Reverse predicates are counted separately from normal
 			// predicates, so the hash is inverted to give a separate hash.
-			plBuild.addPosting(key, p2, ^countGroupHash)
+			a.pb.addPosting(key, p2, ^countGroupHash)
 		}
 
-		key = x.DataKey("_predicate_", um.uid(nq.GetSubject()))
+		key = x.DataKey("_predicate_", a.um.uid(nq.GetSubject()))
 		pp := createPredicatePosting(nq.GetPredicate())
-		plBuild.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
+		a.pb.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
 
-		addIndexPostings(nq, schemaStore, plBuild, um)
+		a.addIndexPostings(nq)
 	}
 
-	lease(kv, um)
+	a.createLeaseEdge()
 
-	schemaStore.write(kv)
+	a.ss.write()
 
-	plBuild.buildPostingLists(kv, schemaStore)
+	a.pb.buildPostingLists()
 
 	return nil
 }
@@ -130,18 +157,18 @@ func createPredicatePosting(predicate string) *protos.Posting {
 	}
 }
 
-func createEdgePostings(nq gql.NQuad, ss schemaStore, um *uidMap) (*protos.Posting, *protos.Posting) {
+func (a *app) createEdgePostings(nq gql.NQuad) (*protos.Posting, *protos.Posting) {
 
 	// Ensure that the subject and object get UIDs.
-	um.uid(nq.GetSubject())
+	a.um.uid(nq.GetSubject())
 	if nq.GetObjectValue() == nil {
-		um.uid(nq.GetObjectId())
+		a.um.uid(nq.GetObjectId())
 	}
 
-	de, err := nq.ToEdgeUsing(um.uids)
+	de, err := nq.ToEdgeUsing(a.um.uids)
 	x.Check(err)
 
-	ss.fixEdge(de, nq.ObjectValue == nil)
+	a.ss.fixEdge(de, nq.ObjectValue == nil)
 
 	p := posting.NewPosting(de)
 	if nq.GetObjectValue() != nil {
@@ -157,7 +184,7 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore, um *uidMap) (*protos.Posti
 	p.Op = 3
 
 	// Early exit for no reverse edge.
-	sch := ss.m[nq.GetPredicate()]
+	sch := a.ss.m[nq.GetPredicate()]
 	if sch.GetDirective() != protos.SchemaUpdate_REVERSE {
 		return p, nil
 	}
@@ -165,11 +192,11 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore, um *uidMap) (*protos.Posti
 	// Reverse predicate
 	x.AssertTruef(nq.GetObjectValue() == nil, "has reverse schema iff object is UID")
 
-	rde, err := nq.ToEdgeUsing(um.uids)
+	rde, err := nq.ToEdgeUsing(a.um.uids)
 	x.Check(err)
 	rde.Entity, rde.ValueId = rde.ValueId, rde.Entity
 
-	ss.fixEdge(rde, true)
+	a.ss.fixEdge(rde, true)
 
 	rp := posting.NewPosting(rde)
 	rp.Op = 3
@@ -177,13 +204,13 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore, um *uidMap) (*protos.Posti
 	return p, rp
 }
 
-func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder, um *uidMap) {
+func (a *app) addIndexPostings(nq gql.NQuad) {
 
 	if nq.GetObjectValue() == nil {
 		return // Cannot index UIDs
 	}
 
-	sch := ss.m[nq.GetPredicate()].SchemaUpdate
+	sch := a.ss.m[nq.GetPredicate()].SchemaUpdate
 
 	for _, tokerName := range sch.GetTokenizer() {
 
@@ -194,7 +221,7 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder, um *uidMap) 
 		}
 
 		// Create storage value. // TODO: Reuse the edge from create edge posting.
-		de, err := nq.ToEdgeUsing(um.uids)
+		de, err := nq.ToEdgeUsing(a.um.uids)
 		x.Check(err)
 		storageVal := types.Val{
 			Tid:   types.TypeID(de.GetValueType()),
@@ -211,7 +238,7 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder, um *uidMap) 
 
 		// Store index posting.
 		for _, t := range toks {
-			plb.addPosting(
+			a.pb.addPosting(
 				x.IndexKey(nq.Predicate, t),
 				&protos.Posting{
 					Uid:         de.GetEntity(),
@@ -223,9 +250,9 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder, um *uidMap) 
 	}
 }
 
-func lease(kv *badger.KV, um *uidMap) {
+func (a *app) createLeaseEdge() {
 
-	newLease := um.lease()
+	newLease := a.um.lease()
 
 	// Would be nice to be able to run this as a regular RDF, rather than as a
 	// special case.
@@ -248,7 +275,7 @@ func lease(kv *badger.KV, um *uidMap) {
 	}
 	val, err := list.Marshal()
 	x.Check(err)
-	x.Check(kv.Set(leaseKey, val, 0))
+	x.Check(a.kv.Set(leaseKey, val, 0))
 }
 
 func rdfScanner(f *os.File, filename string) (*bufio.Scanner, error) {
