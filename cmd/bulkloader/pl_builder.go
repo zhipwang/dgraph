@@ -142,36 +142,14 @@ func (b *plBuilder) buildPostingLists(target *badger.KV, ss schemaStore) {
 			pl.Uids = nil
 			uids = nil
 
-			// TODO: We're double parsing each key. With clever tracking between
-			// outside of the loop, could eliminate this.
-
-			var endOfPredicateCountGroup = true
-			if iter.Valid() {
-				endOfPredicateCountGroup = countGroupHash != unpackCountGroupHash(iter.Item())
-			}
-			if endOfPredicateCountGroup {
-
-				// Dump out count posting lists.
-				//
-				// TODO: This isn't an efficient algorithm: it requires full
-				// iteration over the map and max(counts) map lookups. It's
-				// possible to just iterate over the map, store in a slice, and
-				// fill in the gaps while iterating the slice.
-				highest := -1
-				for cnt := range counts {
-					for i := highest + 1; i <= cnt; i++ {
-						pl := counts[i]
-						key := x.CountKey(parsedK.Attr, uint32(i), parsedK.IsReverse())
-						if len(pl) > 0 {
-							// TODO: Is sort.Slice slow due to reflection? If so, use a faster sort method.
-							sort.Slice(pl, func(i, j int) bool { return pl[i] < pl[j] })
-							val := bp128.DeltaPack(pl)
-							batchTarget.Set(key, val, 0x01)
-						} else {
-							batchTarget.Set(key, nil, 0x00)
-						}
-					}
-					highest = cnt
+			// Create PLs for count index.
+			if !iter.Valid() || countGroupHash != unpackCountGroupHash(iter.Item()) {
+				for cnt, uids := range counts {
+					// TODO: Is sort.Slice slow due to reflection? If so, use a faster sort method.
+					sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
+					key := x.CountKey(parsedK.Attr, uint32(cnt), parsedK.IsReverse())
+					val := bp128.DeltaPack(uids)
+					batchTarget.Set(key, val, 0x01)
 				}
 				counts = map[int][]uint64{} // TODO: Possibly faster to clear map while iterating. Profile to work out.
 			}
