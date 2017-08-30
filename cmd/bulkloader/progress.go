@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
 )
@@ -27,19 +26,35 @@ func (p *progress) reportProgress() {
 		pct := float64(tmpKeyProg) / float64(tmpKeyTotal) * 100
 
 		elapsed := time.Since(start)
-		elapsedStr := fmt.Sprintf("[%02d:%02d:%02d]",
-			int(elapsed.Hours()), int(elapsed.Minutes()), int(elapsed.Seconds()))
+		elapsed = elapsed / 1e9 * 1e9 // round to second
+		elapsedStr := fmt.Sprintf("[%10s]", elapsed.String())
 
 		// TODO: Overwrite the same line each time so we don't scroll the screen.
 		if tmpKeyProg == 0 {
-			log.Printf("%s [Phase 1/2] RDF count: %d (%d per second)", elapsedStr, rdfProg, rdfProg-lastRdfProg)
+			fmt.Printf("%s [Phase 1/2] RDF count: %s  Processing speed: %s per sec\n",
+				elapsedStr, engNotation(float64(rdfProg)), engNotation(float64(rdfProg-lastRdfProg)))
 		} else {
-			log.Printf("%s [Phase 2/2] Key progress:%6.2f%% (%.3f%% per second)", elapsedStr, pct, pct-lastPct)
+			fmt.Printf("%s [Phase 2/2] Key progress: %5.2f%%  Processing Speed: %.3f%% per sec\n",
+				elapsedStr, pct, pct-lastPct)
 		}
 
 		lastRdfProg = rdfProg
 		lastPct = pct
 	}
+}
 
-	// TODO: Summary at end
+func engNotation(x float64) string {
+	e := 0
+	for x >= 1000 {
+		x /= 1000
+		e += 3
+	}
+	switch {
+	case x >= 100:
+		return fmt.Sprintf("%5.1fe%d", x, e)
+	case x >= 10:
+		return fmt.Sprintf("%5.2fe%d", x, e)
+	default:
+		return fmt.Sprintf("%5.3fe%d", x, e)
+	}
 }
