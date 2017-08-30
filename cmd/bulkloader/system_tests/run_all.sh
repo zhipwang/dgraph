@@ -36,54 +36,46 @@ default=$(tput sgr0)
 
 function run_test {
 
-	if [[ $# != 2 && $# != 3 ]]; then
-		echo "incorrect args"
-		exit 1
-	fi
+	[[ $# == 2 ]] || { echo "incorrect args for run_test $#"; exit 1; }
 	schemaFile=$1
 	rdfFile=$2
-	runBoth=${3:-true}
 
 	dgLoaderDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
 	blLoaderDir=$(mktemp -p $tmp -d --suffix="_bulk_loader_system_test")
 	h1 () { rm -r $dgLoaderDir $blLoaderDir; }
 	trap h1 EXIT
 
-	if $runBoth; then
-		# Start dgraph
-		dgraph -memory_mb=4096 -p $dgLoaderDir/p -w $dgLoaderDir/w &
-		dgPid=$!
-		h2 () { h1; kill $dgPid || true; } ## OK if this fails, we have probably already cleaned up the proc.
-		trap h2 EXIT
+	# Start dgraph
+	dgraph -memory_mb=4096 -p $dgLoaderDir/p -w $dgLoaderDir/w &
+	dgPid=$!
+	h2 () { h1; kill $dgPid || true; } ## OK if this fails, we have probably already cleaned up the proc.
+	trap h2 EXIT
 
-		# Wait small amount of time for dgraph to start listening for gRPC.
-		sleep 0.5
+	# Wait small amount of time for dgraph to start listening for gRPC.
+	sleep 0.5
 
-		# Run the dgraph loader
-		dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c
+	# Run the dgraph loader
+	dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c
 
-		# Stop dgraph. We'll wait for it to finish later.
-		kill -s SIGINT $dgPid
-	fi
+	# Stop dgraph. We'll wait for it to finish later.
+	kill -s SIGINT $dgPid
 
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
 	bulkloader -tmp $tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
 
-	if $runBoth; then
-		# Wait for dgraph to finish.
-		while ps -p $dgPid 1>/dev/null; do
-			sleep 0.1
-		done
+	# Wait for dgraph to finish.
+	while ps -p $dgPid 1>/dev/null; do
+		sleep 0.1
+	done
 
-		# Compare the two badgers.
-		dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$cyan&$default/" || true # TODO: for now, ignore failure.
-	fi
+	# Compare the two badgers.
+	dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$cyan&$default/"
 }
 
 function run_test_str {
 
-	[[ $# == 2 || $# == 3 ]] || { echo "incorrect args"; exit 1; }
+	[[ $# == 2 ]] || { echo "incorrect args for run_test_str $#"; exit 1; }
 	schema=$1
 	rdfs=$2
 
@@ -93,12 +85,12 @@ function run_test_str {
 	echo "$schema" > $tmpDir/sch.schema
 	echo "$rdfs"   > $tmpDir/data.rdf
 
-	run_test $tmpDir/sch.schema $tmpDir/data.rdf ${3:-true}
+	run_test $tmpDir/sch.schema $tmpDir/data.rdf
 }
 
 function run_test_schema_str {
 
-	[[ $# == 2 || $# == 3 ]] || { echo "incorrect args"; exit 1; }
+	[[ $# == 2 ]] || { echo "incorrect args for run_test_schema_str $#"; exit 1; }
 	schema=$1
 	rdfFile=$2
 
@@ -108,32 +100,23 @@ function run_test_schema_str {
 	echo "$schema" > $tmpDir/sch.schema
 	cat $tmpDir/sch.schema
 
-	run_test $tmpDir/sch.schema $rdfFile ${3:-true}
+	run_test $tmpDir/sch.schema $rdfFile
 }
 
-run_test_schema_str '
-director.film        : uid @reverse @count .
-actor.film           : uid @count .
-genre                : uid @reverse @count .
-initial_release_date : datetime @index(year) .
-rating               : uid @reverse .
-country              : uid @reverse .
-loc                  : geo @index(geo) .
-name                 : string @index(hash, fulltext, trigram) .
-starring             : uid @count .
-_share_hash_         : string @index(exact) .
-' ~/Downloads/21million.rdf.gz false
+#run_test_schema_str '
+#director.film        : uid @reverse @count .
+#actor.film           : uid @count .
+#genre                : uid @reverse @count .
+#initial_release_date : datetime @index(year) .
+#rating               : uid @reverse .
+#country              : uid @reverse .
+#loc                  : geo @index(geo) .
+#name                 : string @index(hash, fulltext, trigram) .
+#starring             : uid @count .
+#_share_hash_         : string @index(exact) .
+#' ~/Downloads/21million.rdf.gz
+#exit 0
 
-exit 0 # Disable remaining tests
-
-run_test_schema_str '
-director.film:        uid @reverse @count .
-genre:                uid @reverse .
-initial_release_date: dateTime @index(year) .
-name:                 string @index(term) .
-starring:             uid @count .
-' ~/1million.rdf.gz
- 
 # Reproduces a bug:
 run_test_str '
 	name: string @index(term) .
@@ -477,3 +460,11 @@ run_test_str '' "$(fanout_rdfs 10001)"
 run_test_str '' "$(fanout_rdfs 19999)"
 run_test_str '' "$(fanout_rdfs 20000)"
 run_test_str '' "$(fanout_rdfs 30001)"
+
+run_test_schema_str '
+director.film:        uid @reverse @count .
+genre:                uid @reverse .
+initial_release_date: dateTime @index(year) .
+name:                 string @index(term) .
+starring:             uid @count .
+' ~/1million.rdf.gz
