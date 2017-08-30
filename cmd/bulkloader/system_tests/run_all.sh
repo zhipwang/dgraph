@@ -60,9 +60,7 @@ function run_test {
 		sleep 0.5
 
 		# Run the dgraph loader
-		t=$(date +%s.%N)
 		dgraphloader -c 1 -s $schemaFile -r $rdfFile -cd $dgLoaderDir/c
-		dgT=$(echo "$(date +%s.%n) - $t" | bc)
 
 		# Stop dgraph. We'll wait for it to finish later.
 		kill -s SIGINT $dgPid
@@ -70,9 +68,7 @@ function run_test {
 
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
-	t=$(date +%s.%N)
 	bulkloader -tmp $tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
-	blT=$(echo "$(date +%s.%n) - $t" | bc)
 
 	if $runBoth; then
 		# Wait for dgraph to finish.
@@ -83,13 +79,6 @@ function run_test {
 		# Compare the two badgers.
 		dgcmp -a $dgLoaderDir/p -b $blLoaderDir/p 2>&1 | sed "s/.*/$cyan&$default/" || true # TODO: for now, ignore failure.
 	fi
-
-	# Timing
-	echo "=== TIMING ==="
-	if $runBoth; then
-		echo "DgraphLoader: $dgT"
-	fi
-	echo "BulkLoader:   $blT"
 }
 
 function run_test_str {
