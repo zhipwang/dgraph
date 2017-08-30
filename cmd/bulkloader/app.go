@@ -43,7 +43,8 @@ type app struct {
 
 	wg sync.WaitGroup // decremented to zero after all RDFs have been processed
 
-	rdfCh chan string
+	rdfCh   chan string
+	nquadCh chan gql.NQuad
 }
 
 func newApp(opt options) (*app, error) {
@@ -69,18 +70,20 @@ func newApp(opt options) (*app, error) {
 	ss := newSchemaStore(initialSchema, kv)
 
 	a := &app{
-		opt:   opt,
-		um:    newUIDMap(),
-		ss:    ss,
-		pb:    newPostingListBuilder(opt.tmpDir, prog, kv, ss),
-		kv:    kv,
-		prog:  prog,
-		wg:    sync.WaitGroup{},
-		rdfCh: make(chan string), // TODO: Buffered?
+		opt:     opt,
+		um:      newUIDMap(),
+		ss:      ss,
+		pb:      newPostingListBuilder(opt.tmpDir, prog, kv, ss),
+		kv:      kv,
+		prog:    prog,
+		wg:      sync.WaitGroup{},
+		rdfCh:   make(chan string),    // TODO: Buffered?
+		nquadCh: make(chan gql.NQuad), // TODO: Buffer?
 	}
 
 	go prog.reportProgress()
 	go a.processRDFs()
+	go a.processNQuads()
 
 	return a, nil
 
@@ -122,8 +125,6 @@ func (a *app) run() {
 
 func (a *app) processRDFs() {
 	for rdfLine := range a.rdfCh {
-		atomic.AddInt64(&a.prog.rdfProg, 1)
-
 		nq, err := parseNQuad(rdfLine)
 		if err != nil {
 			if err == rdf.ErrEmpty {
@@ -131,7 +132,22 @@ func (a *app) processRDFs() {
 			}
 			x.Check(err)
 		}
+		a.nquadCh <- nq
+		atomic.AddInt64(&a.prog.rdfProg, 1)
+	}
+	close(a.nquadCh)
+}
 
+func parseNQuad(line string) (gql.NQuad, error) {
+	nq, err := rdf.Parse(line)
+	if err != nil {
+		return gql.NQuad{}, err
+	}
+	return gql.NQuad{NQuad: &nq}, nil
+}
+
+func (a *app) processNQuads() {
+	for nq := range a.nquadCh {
 		// TODO: Rename to forwardPosting and reversePosting
 		p1, p2 := a.createEdgePostings(nq)
 
@@ -154,14 +170,6 @@ func (a *app) processRDFs() {
 		a.addIndexPostings(nq)
 	}
 	a.wg.Done()
-}
-
-func parseNQuad(line string) (gql.NQuad, error) {
-	nq, err := rdf.Parse(line)
-	if err != nil {
-		return gql.NQuad{}, err
-	}
-	return gql.NQuad{NQuad: &nq}, nil
 }
 
 func createPredicatePosting(predicate string) *protos.Posting {
