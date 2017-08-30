@@ -33,11 +33,12 @@ type options struct {
 }
 
 type app struct {
-	opt options
-	um  *uidMap
-	ss  schemaStore
-	pb  *postingListBuilder
-	kv  *badger.KV
+	opt  options
+	um   *uidMap
+	ss   schemaStore
+	pb   *postingListBuilder
+	kv   *badger.KV
+	prog *progress
 }
 
 func newApp(opt options) (*app, error) {
@@ -61,15 +62,17 @@ func newApp(opt options) (*app, error) {
 
 	prog := new(progress)
 	ss := newSchemaStore(initialSchema, kv)
-	return &app{
-		opt: opt,
-		um:  newUIDMap(),
-		ss:  ss,
-		pb:  newPostingListBuilder(opt.tmpDir, prog, kv, ss),
-		kv:  kv,
-	}, nil
 
-	// TODO: Goroutines start here when we get some parallelism.
+	go prog.reportProgress()
+
+	return &app{
+		opt:  opt,
+		um:   newUIDMap(),
+		ss:   ss,
+		pb:   newPostingListBuilder(opt.tmpDir, prog, kv, ss),
+		kv:   kv,
+		prog: prog,
+	}, nil
 }
 
 func (a *app) run() error {
@@ -88,16 +91,13 @@ func (a *app) run() error {
 	defer func() { x.Check(a.kv.Close()) }()
 	// TODO: Check to make sure the badger is empty.
 
-	prog := progress{}
-	go prog.reportProgress()
-
 	defer a.pb.cleanUp()
 
 	// Load RDF
 	for sc.Scan() {
 		x.Check(sc.Err())
 
-		atomic.AddInt64(&prog.rdfProg, 1)
+		atomic.AddInt64(&a.prog.rdfProg, 1)
 
 		nq, err := parseNQuad(sc.Text())
 		if err != nil {
