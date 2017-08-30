@@ -17,16 +17,20 @@ import (
 func main() {
 	a := flag.String("a", "", "directory of badger A")
 	b := flag.String("b", "", "directory of badger B")
+	h := flag.String("h", "", "directory of badger to hash")
 	flag.Parse()
-	if *a == "" || *b == "" {
-		flag.Usage()
-		os.Exit(1)
+
+	if *h != "" {
+		kv, err := defaultBadger(*h)
+		x.Check(err)
+		fmt.Printf("%X\n", hash(kv, true))
+	} else {
+		if !compareBadgers(*a, *b) {
+			fmt.Println("Badgers not equal")
+			os.Exit(1)
+		}
+		fmt.Println("Badgers the same!")
 	}
-	if !compareBadgers(*a, *b) {
-		fmt.Println("Badgers not equal")
-		os.Exit(1)
-	}
-	fmt.Println("Badgers the same!")
 }
 
 func compareBadgers(badgerA, badgerB string) bool {
