@@ -148,19 +148,19 @@ func parseNQuad(line string) (gql.NQuad, error) {
 
 func (a *app) processNQuads() {
 	for nq := range a.nquadCh {
-		// TODO: Rename to forwardPosting and reversePosting
-		p1, p2 := a.createEdgePostings(nq)
+
+		fwdPosting, revPosting := a.createEdgePostings(nq)
 
 		countGroupHash := crc64.Checksum([]byte(nq.GetPredicate()), crc64.MakeTable(crc64.ISO))
 
 		key := x.DataKey(nq.GetPredicate(), a.um.uid(nq.GetSubject()))
-		a.pb.addPosting(key, p1, countGroupHash)
+		a.pb.addPosting(key, fwdPosting, countGroupHash)
 
-		if p2 != nil {
+		if revPosting != nil {
 			key = x.ReverseKey(nq.GetPredicate(), a.um.uid(nq.GetObjectId()))
 			// Reverse predicates are counted separately from normal
 			// predicates, so the hash is inverted to give a separate hash.
-			a.pb.addPosting(key, p2, ^countGroupHash)
+			a.pb.addPosting(key, revPosting, ^countGroupHash)
 		}
 
 		key = x.DataKey("_predicate_", a.um.uid(nq.GetSubject()))
