@@ -30,8 +30,5 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if err := app.run(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	app.run()
 }

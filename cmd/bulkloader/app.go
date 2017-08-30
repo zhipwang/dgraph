@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger"
@@ -39,6 +40,10 @@ type app struct {
 	pb   *postingListBuilder
 	kv   *badger.KV
 	prog *progress
+
+	wg sync.WaitGroup // decremented to zero after all RDFs have been processed
+
+	rdfCh chan string
 }
 
 func newApp(opt options) (*app, error) {
@@ -63,43 +68,63 @@ func newApp(opt options) (*app, error) {
 	prog := new(progress)
 	ss := newSchemaStore(initialSchema, kv)
 
-	go prog.reportProgress()
+	a := &app{
+		opt:   opt,
+		um:    newUIDMap(),
+		ss:    ss,
+		pb:    newPostingListBuilder(opt.tmpDir, prog, kv, ss),
+		kv:    kv,
+		prog:  prog,
+		wg:    sync.WaitGroup{},
+		rdfCh: make(chan string), // TODO: Buffered?
+	}
 
-	return &app{
-		opt:  opt,
-		um:   newUIDMap(),
-		ss:   ss,
-		pb:   newPostingListBuilder(opt.tmpDir, prog, kv, ss),
-		kv:   kv,
-		prog: prog,
-	}, nil
+	go prog.reportProgress()
+	go a.processRDFs()
+
+	return a, nil
+
 }
 
-func (a *app) run() error {
-	f, err := os.Open(a.opt.rdfFile)
-	if err != nil {
-		log.Fatalf("could not read rdf file: %v", err)
-	}
-	defer f.Close()
+func (a *app) run() {
 
-	sc, err := rdfScanner(f, a.opt.rdfFile)
-	x.Check(err)
-
-	// TODO: Handle schema that's in gz file.
-	// TODO: What is the expected file extension?
-
-	defer func() { x.Check(a.kv.Close()) }()
 	// TODO: Check to make sure the badger is empty.
 
-	defer a.pb.cleanUp()
+	f, err := os.Open(a.opt.rdfFile)
+	x.Checkf(err, "Could not read RDF file.")
+	defer f.Close()
 
-	// Load RDF
+	var sc *bufio.Scanner
+	if !strings.HasSuffix(a.opt.rdfFile, ".gz") {
+		sc = bufio.NewScanner(f)
+	} else {
+		gzr, err := gzip.NewReader(f)
+		x.Checkf(err, "Could not create gzip reader for RDF file.")
+		sc = bufio.NewScanner(gzr)
+	}
+
+	a.wg.Add(1)
 	for sc.Scan() {
-		x.Check(sc.Err())
+		a.rdfCh <- sc.Text()
+	}
+	close(a.rdfCh)
+	x.Check(sc.Err())
 
+	a.wg.Wait()
+
+	a.createLeaseEdge()
+	a.ss.write()
+	a.pb.buildPostingLists()
+
+	a.pb.cleanUp()
+	x.Check(a.kv.Close())
+}
+
+func (a *app) processRDFs() {
+	for rdfLine := range a.rdfCh {
 		atomic.AddInt64(&a.prog.rdfProg, 1)
 
-		nq, err := parseNQuad(sc.Text())
+		nq, err := parseNQuad(rdfLine)
 		if err != nil {
 			if err == rdf.ErrEmpty {
 				continue
@@ -128,14 +153,7 @@ func (a *app) run() error {
 
 		a.addIndexPostings(nq)
 	}
-
-	a.createLeaseEdge()
-
-	a.ss.write()
-
-	a.pb.buildPostingLists()
-
-	return nil
+	a.wg.Done()
 }
 
 func parseNQuad(line string) (gql.NQuad, error) {
