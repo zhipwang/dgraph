@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -67,6 +66,8 @@ func main() {
 	x.Check(err)
 	schemaStore := newSchemaStore(schemaUpdates)
 
+	var um = newUIDMap()
+
 	kv, err := defaultBadger(*badgerDir)
 	x.Check(err)
 	defer func() { x.Check(kv.Close()) }()
@@ -93,28 +94,28 @@ func main() {
 		}
 
 		// TODO: Rename to forwardPosting and reversePosting
-		p1, p2 := createEdgePostings(nq, schemaStore)
+		p1, p2 := createEdgePostings(nq, schemaStore, um)
 
 		countGroupHash := crc64.Checksum([]byte(nq.GetPredicate()), crc64.MakeTable(crc64.ISO))
 
-		key := x.DataKey(nq.GetPredicate(), uid(nq.GetSubject()))
+		key := x.DataKey(nq.GetPredicate(), um.uid(nq.GetSubject()))
 		plBuild.addPosting(key, p1, countGroupHash)
 
 		if p2 != nil {
-			key = x.ReverseKey(nq.GetPredicate(), uid(nq.GetObjectId()))
+			key = x.ReverseKey(nq.GetPredicate(), um.uid(nq.GetObjectId()))
 			// Reverse predicates are counted separately from normal
 			// predicates, so the hash is inverted to give a separate hash.
 			plBuild.addPosting(key, p2, ^countGroupHash)
 		}
 
-		key = x.DataKey("_predicate_", uid(nq.GetSubject()))
+		key = x.DataKey("_predicate_", um.uid(nq.GetSubject()))
 		pp := createPredicatePosting(nq.GetPredicate())
 		plBuild.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
 
-		addIndexPostings(nq, schemaStore, plBuild)
+		addIndexPostings(nq, schemaStore, plBuild, um)
 	}
 
-	lease(kv)
+	lease(kv, um)
 
 	schemaStore.write(kv)
 
@@ -140,17 +141,17 @@ func createPredicatePosting(predicate string) *protos.Posting {
 	}
 }
 
-func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.Posting) {
+func createEdgePostings(nq gql.NQuad, ss schemaStore, um *uidMap) (*protos.Posting, *protos.Posting) {
 
 	// Ensure that the subject and object get UIDs.
-	uid(nq.GetSubject())
+	um.uid(nq.GetSubject())
 	if nq.GetObjectValue() == nil {
-		uid(nq.GetObjectId())
+		um.uid(nq.GetObjectId())
 	}
 
 	//fmt.Printf("NQuad: %+v\n\n", nq.NQuad)
 
-	de, err := nq.ToEdgeUsing(uidMap)
+	de, err := nq.ToEdgeUsing(um.uids)
 	x.Check(err)
 
 	ss.fixEdge(de, nq.ObjectValue == nil)
@@ -177,7 +178,7 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.
 	// Reverse predicate
 	x.AssertTruef(nq.GetObjectValue() == nil, "has reverse schema iff object is UID")
 
-	rde, err := nq.ToEdgeUsing(uidMap)
+	rde, err := nq.ToEdgeUsing(um.uids)
 	x.Check(err)
 	rde.Entity, rde.ValueId = rde.ValueId, rde.Entity
 
@@ -189,7 +190,7 @@ func createEdgePostings(nq gql.NQuad, ss schemaStore) (*protos.Posting, *protos.
 	return p, rp
 }
 
-func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
+func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder, um *uidMap) {
 
 	if nq.GetObjectValue() == nil {
 		return // Cannot index UIDs
@@ -206,7 +207,7 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 		}
 
 		// Create storage value. // TODO: Reuse the edge from create edge posting.
-		de, err := nq.ToEdgeUsing(uidMap)
+		de, err := nq.ToEdgeUsing(um.uids)
 		x.Check(err)
 		storageVal := types.Val{
 			Tid:   types.TypeID(de.GetValueType()),
@@ -235,20 +236,9 @@ func addIndexPostings(nq gql.NQuad, ss schemaStore, plb *plBuilder) {
 	}
 }
 
-func lease(kv *badger.KV) {
+func lease(kv *badger.KV, um *uidMap) {
 
-	// lastUID => newLease
-	//    9999 => 10001
-	//   10000 => 10001
-	//   10001 => 10001
-	//   10002 => 20001
-	//   10003 => 20001
-	var newLease uint64
-	if lastUID <= 2 {
-		newLease = 10001
-	} else {
-		newLease = (lastUID-2)/10000*10000 + 10001
-	}
+	newLease := um.lease()
 
 	// Would be nice to be able to run this as a regular RDF, rather than as a
 	// special case.
@@ -283,35 +273,4 @@ func rdfScanner(f *os.File, filename string) (*bufio.Scanner, error) {
 		return nil, err
 	}
 	return bufio.NewScanner(gr), nil
-}
-
-var (
-	lastUID = uint64(1)
-	uidMap  = map[string]uint64{}
-)
-
-func uid(str string) uint64 {
-
-	hint, err := strconv.ParseUint(str, 10, 64)
-	if err == nil {
-		uid, ok := uidMap[str]
-		if ok {
-			if uid == hint {
-				return uid
-			} else {
-				log.Fatalf("bad node hint: %v", str)
-			}
-		} else {
-			uidMap[str] = hint
-			return hint
-		}
-	}
-
-	uid, ok := uidMap[str]
-	if ok {
-		return uid
-	}
-	lastUID++
-	uidMap[str] = lastUID
-	return lastUID
 }
