@@ -62,6 +62,7 @@ func (w *KVWriter) Wait() {
 	w.setEntries(w.batch)
 	close(w.batchCh)
 	w.doneWg.Wait()
+	x.Check(w.fd.Close())
 }
 
 func (w *KVWriter) setEntries(entries []*badger.Entry) {
