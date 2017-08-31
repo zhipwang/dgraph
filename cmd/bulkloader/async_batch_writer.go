@@ -40,20 +40,21 @@ func (w *KVWriter) Set(k, v []byte, meta byte) {
 func (w *KVWriter) Wait() {
 	atomic.AddInt64(&w.prog.outstandingWrites, 1)
 	err := w.kv.BatchSet(w.batch)
-	x.Check(err)
-	for _, e := range w.batch {
-		x.Check(e.Error)
-	}
+	checkErrs(err, w.batch)
 	atomic.AddInt64(&w.prog.outstandingWrites, -1)
 }
 
 func (w *KVWriter) setEntries(entries []*badger.Entry) {
 	atomic.AddInt64(&w.prog.outstandingWrites, 1)
 	w.kv.BatchSetAsync(entries, func(err error) {
-		x.Check(err)
-		for _, e := range entries {
-			x.Check(e.Error)
-		}
+		checkErrs(err, entries)
 		atomic.AddInt64(&w.prog.outstandingWrites, -1)
 	})
+}
+
+func checkErrs(err error, entries []*badger.Entry) {
+	x.Check(err)
+	for _, e := range entries {
+		x.Check(e.Error)
+	}
 }
