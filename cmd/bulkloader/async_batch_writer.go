@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -71,6 +72,7 @@ func (w *KVWriter) setEntries(entries []*badger.Entry) {
 }
 
 func (w *KVWriter) doWrites() {
+	threshold := int(rand.Float64()*10 + 10)
 	w.doneWg.Add(1)
 	var buf bytes.Buffer
 	for entries := range w.batchCh {
@@ -80,7 +82,7 @@ func (w *KVWriter) doWrites() {
 			buf.Write([]byte{e.UserMeta})
 			buf.WriteString("\n")
 		}
-		if buf.Len() > 16<<20 {
+		if buf.Len() > threshold<<20 {
 			x.Check2(w.fd.Write(buf.Bytes()))
 			buf.Reset()
 		}
