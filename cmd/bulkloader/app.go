@@ -80,7 +80,7 @@ func newApp(opt options) (*app, error) {
 		ss:           ss,
 		targetBadger: kv,
 		prog:         prog,
-		rdfCh:        make(chan string),
+		rdfCh:        make(chan string, 10000),
 		workers:      make([]*worker, opt.workers),
 		tmpBadger:    tmpBadger,
 		tmpBadgerDir: tmpBadgerDir,
