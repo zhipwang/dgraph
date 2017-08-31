@@ -11,7 +11,6 @@ type KVWriter struct {
 	kv    *badger.KV
 	batch []*badger.Entry
 	prog  *progress
-	sem   chan struct{}
 }
 
 func NewKVWriter(kv *badger.KV, prog *progress) *KVWriter {
@@ -19,7 +18,6 @@ func NewKVWriter(kv *badger.KV, prog *progress) *KVWriter {
 		kv:    kv,
 		batch: make([]*badger.Entry, 0, writeBatchSize),
 		prog:  prog,
-		sem:   make(chan struct{}, 1000),
 	}
 	return w
 }
@@ -45,10 +43,8 @@ func (w *KVWriter) Wait() {
 }
 
 func (w *KVWriter) setEntries(entries []*badger.Entry) {
-	w.sem <- struct{}{}
 	atomic.AddInt64(&w.prog.outstandingWrites, 1)
 	w.kv.BatchSetAsync(entries, func(err error) {
-		<-w.sem
 		checkErrs(err, entries)
 		atomic.AddInt64(&w.prog.outstandingWrites, -1)
 	})

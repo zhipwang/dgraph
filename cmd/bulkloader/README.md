@@ -15,7 +15,7 @@ Hash seems to be AA7920211A1FA9C3
 729a508a9902bc3eb0942ed34fbb94ce764421b1 P1 7m21s P2 3m16s Total 10m37s -- uses batch writes to badger
 9e11cefcd72922d2903f6d3ac12da34d743d4180 P1 7m8s  P2 3m21s Total 10m13s -- parallelise rdf parsing
 
-## Batch size experiment (using 90bee146ce68d6536e1071a453096321ab895c83)
+## Experiment - Batch size (using 90bee146ce68d6536e1071a453096321ab895c83)
 
 100   - Total: 9m56s Phase1: 7m9s Phase2: 2m46s
 1000  - Total: 9m48s Phase1: 7m1s Phase2: 2m47s
@@ -23,6 +23,13 @@ Hash seems to be AA7920211A1FA9C3
 10000 - Total: 9m52s Phase1: 6m21s Phase2: 3m30s
 
 Conclusion -- not much difference. As long as there is *some* batching it's ok.
+
+## Experiment - Limit outstanding writes
+
+1000 (imposed): Total: 9m46s Phase1: 7m2s Phase2: 2m44s
+2000 (natural): Total: 9m48s Phase1: 6m59s Phase2: 2m49s
+
+Conclusion -- doesn't help.
 
 ## TODO
 
