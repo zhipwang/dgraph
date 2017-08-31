@@ -71,3 +71,20 @@ initial_release_date: dateTime @index(year) .
 name:                 string @index(term) .
 starring:             uid @count .
 ' https://github.com/dgraph-io/tutorial/blob/master/resources/1million.rdf.gz?raw=true 100C4F8F0FFB0BF1
+
+echo "========================="
+echo " 21 million data set     "
+echo "========================="
+
+run_test '
+director.film        : uid @reverse @count .
+actor.film           : uid @count .
+genre                : uid @reverse @count .
+initial_release_date : datetime @index(year) .
+rating               : uid @reverse .
+country              : uid @reverse .
+loc                  : geo @index(geo) .
+name                 : string @index(hash, fulltext, trigram) .
+starring             : uid @count .
+_share_hash_         : string @index(exact) .
+' https://github.com/dgraph-io/benchmarks/raw/master/data/21million.rdf.gz?raw=true XXXXXXXXXXXXXXXX

@@ -154,7 +154,6 @@ func (a *app) processRDFs(rdfIn chan string, nqOut chan gql.NQuad, workerID int)
 			}
 		}
 		nqOut <- nq
-		atomic.AddInt64(&a.prog.rdfProg, 1)
 	}
 	close(nqOut)
 }
@@ -199,6 +198,8 @@ func (a *app) processNQuads() {
 		a.pb.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
 
 		a.addIndexPostings(nq)
+
+		atomic.AddInt64(&a.prog.rdfProg, 1)
 	}
 	a.wg.Done()
 }
