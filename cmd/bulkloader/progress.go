@@ -58,7 +58,6 @@ func (p *progress) report() {
 			engNotation(float64(rdfProg)),
 			engNotation(float64(rdfProg)/elapsed.Seconds()),
 			engNotation(float64(tmpKeyTotal)/elapsed.Seconds()),
-			//engNotation(float64(rdfProg-p.lastRdfProg)),
 			atomic.LoadInt64(&p.outstandingWrites),
 		)
 	} else {
