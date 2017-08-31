@@ -10,10 +10,13 @@ type progress struct {
 	rdfProg     int64
 	tmpKeyProg  int64
 	tmpKeyTotal int64
+
+	start     time.Time
+	endPhase1 time.Time
 }
 
 func (p *progress) reportProgress() {
-	start := time.Now()
+	p.start = time.Now()
 	var lastRdfProg int64
 	var lastPct float64
 	for {
@@ -25,8 +28,7 @@ func (p *progress) reportProgress() {
 
 		pct := float64(tmpKeyProg) / float64(tmpKeyTotal) * 100
 
-		elapsed := time.Since(start)
-		elapsed = elapsed / 1e9 * 1e9 // round to second
+		elapsed := round(time.Since(p.start))
 		elapsedStr := fmt.Sprintf("[%10s]", elapsed.String())
 
 		// TODO: Overwrite the same line each time so we don't scroll the screen.
@@ -41,6 +43,18 @@ func (p *progress) reportProgress() {
 		lastRdfProg = rdfProg
 		lastPct = pct
 	}
+}
+
+func (p *progress) printSummary() {
+	now := time.Now()
+	phase1 := round(p.endPhase1.Sub(p.start))
+	phase2 := round(now.Sub(p.endPhase1))
+	total := round(now.Sub(p.start))
+	fmt.Printf("Total: %v Phase1: %v Phase2: %v\n", total, phase1, phase2)
+}
+
+func round(d time.Duration) time.Duration {
+	return d / 1e9 * 1e9
 }
 
 func engNotation(x float64) string {

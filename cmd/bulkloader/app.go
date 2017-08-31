@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/bp128"
@@ -130,6 +131,7 @@ func (a *app) run() {
 	x.Check(sc.Err())
 
 	a.wg.Wait()
+	a.prog.endPhase1 = time.Now()
 
 	a.createLeaseEdge()
 	a.ss.write()
@@ -137,6 +139,8 @@ func (a *app) run() {
 
 	a.pb.cleanUp()
 	x.Check(a.kv.Close())
+
+	a.prog.printSummary()
 
 	if a.opt.verbose {
 		a.um.logState()
