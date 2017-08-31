@@ -31,6 +31,11 @@ Conclusion -- not much difference. As long as there is *some* batching it's ok.
 
 Conclusion -- doesn't help.
 
+## Different worker pattern:
+
+Before: 9m48s Phase1: 6m59s Phase2: 2m49s
+After:
+
 ## TODO
 
 - Test cases where the loader should fail. E.g. rdfs that don't match schema,

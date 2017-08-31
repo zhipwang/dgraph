@@ -204,14 +204,14 @@ func (w *worker) addIndexPostings(nq gql.NQuad, uidM map[string]uint64) {
 
 		// Store index posting.
 		for _, t := range toks {
-			w.tmpBadger.Set(packPosting(
+			w.addPosting(
 				x.IndexKey(nq.Predicate, t),
 				&protos.Posting{
 					Uid:         de.GetEntity(),
 					PostingType: protos.Posting_REF,
 				},
 				0,
-			))
+			)
 		}
 	}
 }
