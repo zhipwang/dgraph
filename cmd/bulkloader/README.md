@@ -36,6 +36,11 @@ Conclusion -- doesn't help.
 Before: Total: 9m48s Phase1: 6m59s Phase2: 2m49s
 After:  Total: 10m37s Phase1: 7m54s Phase2: 2m43s
 
+## Writing directly to file:
+
+Before: Total: 9m48s Phase1: 6m59s Phase2: 2m49s
+After:  Total: 3m41s Phase1: 3m41s Phase2: 0s
+
 ## TODO
 
 - Test cases where the loader should fail. E.g. rdfs that don't match schema,

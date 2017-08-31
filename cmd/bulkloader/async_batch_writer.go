@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sync"
@@ -70,14 +71,23 @@ func (w *KVWriter) setEntries(entries []*badger.Entry) {
 
 func (w *KVWriter) doWrites() {
 	w.doneWg.Add(1)
+	var buf bytes.Buffer
 	for entries := range w.batchCh {
 		for _, e := range entries {
-			x.Check2(w.fd.Write(e.Key))
-			x.Check2(w.fd.Write(e.Value))
-			x.Check2(w.fd.Write([]byte{e.UserMeta}))
-			x.Check2(w.fd.WriteString("\n"))
+			buf.Write(e.Key)
+			buf.Write(e.Value)
+			buf.Write([]byte{e.UserMeta})
+			buf.WriteString("\n")
 		}
-		atomic.AddInt64(&w.prog.outstandingWrites, -1)
+		if buf.Len() > 16<<20 {
+			x.Check2(w.fd.Write(buf.Bytes()))
+			buf.Reset()
+		}
+		atomic.AddInt64(&w.prog.outstandingWrites, int64(-len(entries)))
 	}
+	if buf.Len() > 0 {
+		x.Check2(w.fd.Write(buf.Bytes()))
+	}
+
 	w.doneWg.Done()
 }
