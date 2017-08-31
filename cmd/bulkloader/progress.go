@@ -53,10 +53,11 @@ func (p *progress) report() {
 
 	// TODO: Overwrite the same line each time so we don't scroll the screen.
 	if tmpKeyProg == 0 {
-		fmt.Printf("%s [Phase 1/2] [RDF count: %s] [Processing speed: %s per sec] [Outstanding writes: %d]\n",
+		fmt.Printf("%s [Phase 1/2] [RDF count: %s] [RDF per second: %s] [Outstanding writes: %d]\n",
 			elapsedStr,
 			engNotation(float64(rdfProg)),
-			engNotation(float64(rdfProg-p.lastRdfProg)),
+			engNotation(float64(rdfProg)/elapsed.Seconds()),
+			//engNotation(float64(rdfProg-p.lastRdfProg)),
 			atomic.LoadInt64(&p.outstandingWrites),
 		)
 	} else {
