@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"hash/crc64"
 	"log"
 	"math"
@@ -55,21 +54,16 @@ func newWorker(
 }
 
 func (w *worker) run() {
-	fmt.Println("[worker][run] start")
 	w.wg.Add(1)
 	for rdf := range w.rdfCh {
-		fmt.Printf("[worker][run] rdf=%q\n", rdf)
 		w.parseRDF(rdf)
 	}
-	fmt.Println("[worker][run] channel closed")
 	w.wg.Done()
 }
 
 func (w *worker) wait() {
-	fmt.Println("[worker][wait] started waiting")
 	w.wg.Wait()
 	w.tmpBadger.Wait()
-	fmt.Println("[worker][wait] finished waiting")
 }
 
 func (w *worker) parseRDF(rdfLine string) {

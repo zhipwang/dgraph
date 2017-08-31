@@ -122,7 +122,6 @@ func (a *app) run() {
 	for _, w := range a.workers {
 		w.wait()
 	}
-	fmt.Println("[app][run] finished waiting")
 
 	a.prog.endPhase1 = time.Now()
 
@@ -134,15 +133,11 @@ func (a *app) run() {
 	x.Check(os.RemoveAll(a.tmpBadgerDir))
 	x.Check(a.targetBadger.Close())
 
-	fmt.Println("[app][run] before print summary")
 	a.prog.printSummary()
-	fmt.Println("[app][run] after print summary")
 
 	if a.opt.verbose {
 		a.um.logState()
 	}
-
-	fmt.Println("[app][run] about to return")
 }
 
 func (a *app) createLeaseEdge() {
