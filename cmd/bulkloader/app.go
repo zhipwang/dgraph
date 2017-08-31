@@ -87,7 +87,7 @@ func newApp(opt options) (*app, error) {
 	}
 
 	for i := 0; i < opt.workers; i++ {
-		a.workers[i] = newWorker(i, a.rdfCh, a.um, a.ss, a.prog, a.tmpBadger)
+		a.workers[i] = newWorker(i, a.rdfCh, a.um, a.ss, a.prog, a.tmpBadger, a.opt)
 	}
 	go prog.reportProgress()
 
@@ -125,13 +125,13 @@ func (a *app) run() {
 
 	a.prog.endPhase1 = time.Now()
 
-	a.createLeaseEdge()
-	a.ss.write()
-	buildPostingLists(a.tmpBadger, a.targetBadger, a.ss, a.prog)
-
-	x.Check(a.tmpBadger.Close())
+	//a.createLeaseEdge()
+	//a.ss.write()
+	//buildPostingLists(a.tmpBadger, a.targetBadger, a.ss, a.prog)
+	//
+	//x.Check(a.tmpBadger.Close())
 	x.Check(os.RemoveAll(a.tmpBadgerDir))
-	x.Check(a.targetBadger.Close())
+	//x.Check(a.targetBadger.Close())
 
 	a.prog.printSummary()
 

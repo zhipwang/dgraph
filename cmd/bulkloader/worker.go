@@ -4,6 +4,8 @@ import (
 	"hash/crc64"
 	"log"
 	"math"
+	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -39,7 +41,9 @@ func newWorker(
 	ss *schemaStore,
 	prog *progress,
 	tmpBadger *badger.KV,
+	opt options,
 ) *worker {
+	filename := filepath.Join(opt.tmpDir, strconv.Itoa(id))
 	return &worker{
 		id:    id,
 		rdfCh: rdfCh,
@@ -47,7 +51,7 @@ func newWorker(
 		um: um,
 		ss: ss,
 
-		tmpBadger: NewKVWriter(tmpBadger, prog),
+		tmpBadger: NewKVWriter(tmpBadger, prog, filename),
 
 		prog: prog,
 	}

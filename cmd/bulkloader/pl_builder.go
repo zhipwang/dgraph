@@ -49,7 +49,7 @@ func packPosting(
 
 func buildPostingLists(tmpBadger *badger.KV, targetBadger *badger.KV, ss *schemaStore, prog *progress) {
 
-	target := NewKVWriter(targetBadger, prog)
+	target := NewKVWriter(targetBadger, prog, "")
 
 	counts := map[int][]uint64{}
 
