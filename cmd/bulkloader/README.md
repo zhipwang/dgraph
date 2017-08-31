@@ -33,8 +33,8 @@ Conclusion -- doesn't help.
 
 ## Different worker pattern:
 
-Before: 9m48s Phase1: 6m59s Phase2: 2m49s
-After:
+Before: Total: 9m48s Phase1: 6m59s Phase2: 2m49s
+After:  Total: 10m37s Phase1: 7m54s Phase2: 2m43s
 
 ## TODO
 
