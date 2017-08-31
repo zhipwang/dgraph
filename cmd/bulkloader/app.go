@@ -76,7 +76,7 @@ func newApp(opt options) (*app, error) {
 	}
 	x.Check(err)
 
-	prog := new(progress)
+	prog := newProgress()
 	ss := newSchemaStore(initialSchema, kv)
 
 	a := &app{

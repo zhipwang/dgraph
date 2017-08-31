@@ -17,7 +17,8 @@ Hash seems to be AA7920211A1FA9C3
 
 ## Batch size experiment (using 90bee146ce68d6536e1071a453096321ab895c83)
 
-1000 - 7m6s
+1000 - Total: 9m48s Phase1: 7m1s Phase2: 2m47s
+1000
 
 ## TODO
 

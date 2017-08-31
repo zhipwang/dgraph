@@ -87,4 +87,4 @@ loc                  : geo @index(geo) .
 name                 : string @index(hash, fulltext, trigram) .
 starring             : uid @count .
 _share_hash_         : string @index(exact) .
-' https://github.com/dgraph-io/benchmarks/raw/master/data/21million.rdf.gz?raw=true XXXXXXXXXXXXXXXX
+' https://github.com/dgraph-io/benchmarks/raw/master/data/21million.rdf.gz?raw=true AA7920211A1FA9C3 # TODO: I *think* this hash is okay. It gets reported consistently anyway.
