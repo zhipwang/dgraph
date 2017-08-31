@@ -66,6 +66,11 @@ func (w *worker) wait() {
 	w.tmpBadger.Wait()
 }
 
+func (w *worker) addPosting(key []byte, posting *protos.Posting, countGroupHash uint64) {
+	w.tmpBadger.Set(packPosting(key, posting, countGroupHash))
+	atomic.AddInt64(&w.prog.tmpKeyTotal, 1)
+}
+
 func (w *worker) parseRDF(rdfLine string) {
 	nq, err := parseNQuad(rdfLine)
 	if err != nil {
@@ -86,19 +91,19 @@ func (w *worker) parseRDF(rdfLine string) {
 	fwdPosting, revPosting := w.createEdgePostings(nq, uidM)
 	countGroupHash := crc64.Checksum([]byte(nq.GetPredicate()), crc64.MakeTable(crc64.ISO))
 	key := x.DataKey(nq.GetPredicate(), sUID)
-	w.tmpBadger.Set(packPosting(key, fwdPosting, countGroupHash))
+	w.addPosting(key, fwdPosting, countGroupHash)
 
 	if revPosting != nil {
 		key = x.ReverseKey(nq.GetPredicate(), oUID)
 		// Reverse predicates are counted separately from normal
 		// predicates, so the hash is inverted to give a separate hash.
-		w.tmpBadger.Set(packPosting(key, revPosting, ^countGroupHash))
+		w.addPosting(key, revPosting, ^countGroupHash)
 	}
 
 	key = x.DataKey("_predicate_", sUID)
 	pp := createPredicatePosting(nq.GetPredicate())
 
-	w.tmpBadger.Set(packPosting(key, pp, 0)) // TODO: Can the _predicate_ predicate have @index(count) ?
+	w.addPosting(key, pp, 0) // TODO: Can the _predicate_ predicate have @index(count) ?
 
 	w.addIndexPostings(nq, uidM)
 
