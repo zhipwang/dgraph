@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/x"
@@ -14,15 +15,17 @@ import (
 const batchSize = 1000 // TODO: Should be parameterised
 
 type KVWriter struct {
-	kv *badger.KV
-	ch chan *badger.Entry
-	wg sync.WaitGroup
+	kv   *badger.KV
+	ch   chan *badger.Entry
+	wg   sync.WaitGroup
+	prog *progress
 }
 
-func NewKVWriter(kv *badger.KV) *KVWriter {
+func NewKVWriter(kv *badger.KV, prog *progress) *KVWriter {
 	w := &KVWriter{
-		kv: kv,
-		ch: make(chan *badger.Entry),
+		kv:   kv,
+		ch:   make(chan *badger.Entry),
+		prog: prog,
 	}
 	go w.recvEntries()
 	return w
@@ -57,11 +60,13 @@ func (w *KVWriter) recvEntries() {
 }
 
 func (w *KVWriter) setEntries(entries []*badger.Entry) {
+	atomic.AddInt64(&w.prog.outstandingWrites, 1)
 	w.kv.BatchSetAsync(entries, func(err error) {
 		x.Check(err)
 		for _, e := range entries {
 			x.Check(e.Error)
 		}
 		w.wg.Add(-len(entries))
+		atomic.AddInt64(&w.prog.outstandingWrites, -1)
 	})
 }

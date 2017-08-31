@@ -21,10 +21,10 @@ func newPostingListBuilder(tmpDir string, prog *progress, targetKV *badger.KV, s
 	tmpKV, err := defaultBadger(badgerDir)
 	x.Check(err)
 	return &postingListBuilder{
-		NewKVWriter(tmpKV),
+		NewKVWriter(tmpKV, prog),
 		badgerDir,
 		prog,
-		NewKVWriter(targetKV),
+		NewKVWriter(targetKV, prog),
 		ss,
 	}
 }

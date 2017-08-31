@@ -11,6 +11,8 @@ type progress struct {
 	tmpKeyProg  int64
 	tmpKeyTotal int64
 
+	outstandingWrites int64
+
 	start     time.Time
 	endPhase1 time.Time
 }
@@ -33,11 +35,19 @@ func (p *progress) reportProgress() {
 
 		// TODO: Overwrite the same line each time so we don't scroll the screen.
 		if tmpKeyProg == 0 {
-			fmt.Printf("%s [Phase 1/2] RDF count: %s  Processing speed: %s per sec\n",
-				elapsedStr, engNotation(float64(rdfProg)), engNotation(float64(rdfProg-lastRdfProg)))
+			fmt.Printf("%s [Phase 1/2] [RDF count: %s] [Processing speed: %s per sec] [Outstanding writes: %d]\n",
+				elapsedStr,
+				engNotation(float64(rdfProg)),
+				engNotation(float64(rdfProg-lastRdfProg)),
+				atomic.LoadInt64(&p.outstandingWrites),
+			)
 		} else {
-			fmt.Printf("%s [Phase 2/2] Key progress: %5.2f%%  Processing Speed: %.3f%% per sec\n",
-				elapsedStr, pct, pct-lastPct)
+			fmt.Printf("%s [Phase 2/2] [Key progress: %5.2f%%] [Processing Speed: %.3f%% per sec] [Outstanding writes: %d]\n",
+				elapsedStr,
+				pct,
+				pct-lastPct,
+				atomic.LoadInt64(&p.outstandingWrites),
+			)
 		}
 
 		lastRdfProg = rdfProg
