@@ -1,11 +1,18 @@
 ## Performance Analysis
 
-Running on local machine on the 21M dataset.
+Running on local machine on the 1M dataset:
 
 0c1b5a101a5749ff76dbd055dbc8a97f4500291b 18s -- uses batch writes to badger
 16cf55a478e749bfac8b3201ad8e17e29dc4b5d8 18s -- split out line parsing and rdf parsing
 5dab12eb788396f5856953747245c56a8bdde204 18s -- split rdf parsing and rdf processing
 9e11cefcd72922d2903f6d3ac12da34d743d4180 17s -- parallelise rdf parsing
+
+Running on i3 AWS machine with 21M dataset:
+
+Hash seems to be AA7920211A1FA9C3
+
+729a508a9902bc3eb0942ed34fbb94ce764421b1 P1 7m21s P2 3m16s Total 10m37s -- uses batch writes to badger
+9e11cefcd72922d2903f6d3ac12da34d743d4180 P1 7m8s  P2 3m21s Total 10m13s -- parallelise rdf parsing
 
 ## TODO
 
