@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ type KVWriter struct {
 func NewKVWriter(kv *badger.KV, prog *progress, filename string) *KVWriter {
 
 	fd, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	fmt.Printf("Writing to %s\n", filename)
 	x.Check(err)
 
 	w := &KVWriter{
