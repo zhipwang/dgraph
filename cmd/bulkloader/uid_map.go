@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"sort"
 	"strconv"
 )
 
@@ -54,5 +56,21 @@ func (m *uidMap) lease() uint64 {
 		return 10001
 	} else {
 		return (m.lastUID-2)/10000*10000 + 10001
+	}
+}
+
+func (m *uidMap) logState() {
+	type entry struct {
+		uid uint64
+		str string
+	}
+	entries := make([]entry, 0, len(m.uids))
+	for str, uid := range m.uids {
+		entries = append(entries, entry{uid, str})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].uid < entries[j].uid })
+	fmt.Printf("UID Map: (%d entries)\n", len(entries))
+	for _, entry := range entries {
+		fmt.Printf("%d:%q\n", entry.uid, entry.str)
 	}
 }

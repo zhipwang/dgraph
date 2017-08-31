@@ -27,6 +27,7 @@ import (
 )
 
 type options struct {
+	verbose    bool
 	rdfFile    string
 	schemaFile string
 	badgerDir  string
@@ -121,6 +122,10 @@ func (a *app) run() {
 
 	a.pb.cleanUp()
 	x.Check(a.kv.Close())
+
+	if a.opt.verbose {
+		a.um.logState()
+	}
 }
 
 func (a *app) processRDFs() {

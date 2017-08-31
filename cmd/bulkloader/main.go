@@ -15,7 +15,7 @@ func main() {
 	runtime.GOMAXPROCS(128)
 
 	var opt options
-
+	flag.BoolVar(&opt.verbose, "v", false, "Verbose")
 	flag.StringVar(&opt.rdfFile, "r", "", "Location of rdf file to load")
 	flag.StringVar(&opt.schemaFile, "s", "", "Location of schema file to load")
 	flag.StringVar(&opt.badgerDir, "b", "", "Location of badger data directory")
