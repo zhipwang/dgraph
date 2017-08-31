@@ -7,8 +7,6 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-const batchSize = 1000 // TODO: Should be parameterised
-
 type KVWriter struct {
 	kv    *badger.KV
 	batch []*badger.Entry
@@ -18,7 +16,7 @@ type KVWriter struct {
 func NewKVWriter(kv *badger.KV, prog *progress) *KVWriter {
 	w := &KVWriter{
 		kv:    kv,
-		batch: make([]*badger.Entry, 0, batchSize),
+		batch: make([]*badger.Entry, 0, writeBatchSize),
 		prog:  prog,
 	}
 	return w
@@ -31,9 +29,9 @@ func (w *KVWriter) Set(k, v []byte, meta byte) {
 		UserMeta: meta,
 	}
 	w.batch = append(w.batch, e)
-	if len(w.batch) == batchSize {
+	if len(w.batch) == writeBatchSize {
 		w.setEntries(w.batch)
-		w.batch = make([]*badger.Entry, 0, batchSize)
+		w.batch = make([]*badger.Entry, 0, writeBatchSize)
 	}
 }
 

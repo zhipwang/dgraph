@@ -53,6 +53,8 @@ type app struct {
 const (
 	rdfWorkers      = 8
 	rdfWorkerBuffer = 4
+
+	writeBatchSize = 1000
 )
 
 func newApp(opt options) (*app, error) {

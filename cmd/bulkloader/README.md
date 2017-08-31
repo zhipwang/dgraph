@@ -11,8 +11,13 @@ Running on i3 AWS machine with 21M dataset:
 
 Hash seems to be AA7920211A1FA9C3
 
+                                         P1 7m22s p2 3m5s  Total 10m27s
 729a508a9902bc3eb0942ed34fbb94ce764421b1 P1 7m21s P2 3m16s Total 10m37s -- uses batch writes to badger
 9e11cefcd72922d2903f6d3ac12da34d743d4180 P1 7m8s  P2 3m21s Total 10m13s -- parallelise rdf parsing
+
+## Batch size experiment (using 90bee146ce68d6536e1071a453096321ab895c83)
+
+1000 - 7m6s
 
 ## TODO
 
