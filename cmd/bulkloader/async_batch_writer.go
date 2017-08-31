@@ -7,6 +7,11 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
+const (
+	// Seem to not matter much. Tried 100, 1000, and 10000 and got same result.
+	writeBatchSize = 1000
+)
+
 type KVWriter struct {
 	kv    *badger.KV
 	batch []*badger.Entry

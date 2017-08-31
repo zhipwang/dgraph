@@ -36,7 +36,7 @@ func (p *progress) reportProgress() {
 			p.report()
 		case <-p.shutdown:
 			p.shutdown <- struct{}{}
-			break
+			return
 		}
 	}
 }

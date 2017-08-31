@@ -75,7 +75,7 @@ function run_test {
 
 	# Run the bulk loader.
 	mkdir $blLoaderDir/p
-	bulkloader -tmp $tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
+	bulkloader -j 1 -tmp $tmp -b $blLoaderDir/p -s $schemaFile -r $rdfFile 2>&1 | sed "s/.*/$magenta&$default/"
 
 	# Wait for dgraph to finish.
 	while ps -p $dgPid 1>/dev/null; do

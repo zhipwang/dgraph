@@ -5,9 +5,11 @@ import (
 	"log"
 	"sort"
 	"strconv"
+	"sync"
 )
 
 type uidMap struct {
+	mu      sync.Mutex
 	lastUID uint64
 	uids    map[string]uint64
 }
@@ -19,7 +21,9 @@ func newUIDMap() *uidMap {
 	}
 }
 
-func (m *uidMap) uid(str string) uint64 {
+func (m *uidMap) assignUID(str string) uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	hint, err := strconv.ParseUint(str, 10, 64)
 	if err == nil {
@@ -46,6 +50,11 @@ func (m *uidMap) uid(str string) uint64 {
 }
 
 func (m *uidMap) lease() uint64 {
+
+	// TODO: This lease management is pretty crazy and complex... Just to get
+	// the badgers to match for regression testing. We'd be better off to
+	// simply it, and just ignore the lease during comparison.
+
 	// lastUID => lease
 	//    9999 => 10001
 	//   10000 => 10001
