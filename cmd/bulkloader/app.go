@@ -54,7 +54,7 @@ const (
 	rdfWorkers      = 8
 	rdfWorkerBuffer = 4
 
-	writeBatchSize = 1000
+	writeBatchSize = 1000 // Seem to not matter much. Tried 100, 1000, and 10000 and got same result.
 )
 
 func newApp(opt options) (*app, error) {
