@@ -42,11 +42,17 @@ type app struct {
 	kv   *badger.KV
 	prog *progress
 
-	wg sync.WaitGroup // decremented to zero after all RDFs have been processed
+	wg sync.WaitGroup // decremented to zero after all RDFs have been processed (i.e. phase 1 is complete).
 
-	rdfCh   chan string
-	nquadCh chan gql.NQuad
+	rdfChs   []chan string
+	nquadChs []chan gql.NQuad
 }
+
+// TODO Parameterise
+const (
+	rdfWorkers      = 8
+	rdfWorkerBuffer = 4
+)
 
 func newApp(opt options) (*app, error) {
 
@@ -71,19 +77,26 @@ func newApp(opt options) (*app, error) {
 	ss := newSchemaStore(initialSchema, kv)
 
 	a := &app{
-		opt:     opt,
-		um:      newUIDMap(),
-		ss:      ss,
-		pb:      newPostingListBuilder(opt.tmpDir, prog, kv, ss),
-		kv:      kv,
-		prog:    prog,
-		wg:      sync.WaitGroup{},
-		rdfCh:   make(chan string),    // TODO: Buffered?
-		nquadCh: make(chan gql.NQuad), // TODO: Buffer?
+		opt:  opt,
+		um:   newUIDMap(),
+		ss:   ss,
+		pb:   newPostingListBuilder(opt.tmpDir, prog, kv, ss),
+		kv:   kv,
+		prog: prog,
+
+		wg: sync.WaitGroup{},
+
+		rdfChs:   make([]chan string, rdfWorkers),
+		nquadChs: make([]chan gql.NQuad, rdfWorkers),
+	}
+
+	for i := 0; i < rdfWorkers; i++ {
+		a.rdfChs[i] = make(chan string, rdfWorkerBuffer)
+		a.nquadChs[i] = make(chan gql.NQuad, rdfWorkerBuffer)
+		go a.processRDFs(a.rdfChs[i], a.nquadChs[i], i)
 	}
 
 	go prog.reportProgress()
-	go a.processRDFs()
 	go a.processNQuads()
 
 	return a, nil
@@ -108,10 +121,12 @@ func (a *app) run() {
 	}
 
 	a.wg.Add(1)
-	for sc.Scan() {
-		a.rdfCh <- sc.Text()
+	for i := 0; sc.Scan(); i++ {
+		a.rdfChs[i%rdfWorkers] <- sc.Text()
 	}
-	close(a.rdfCh)
+	for i := 0; i < rdfWorkers; i++ {
+		close(a.rdfChs[i])
+	}
 	x.Check(sc.Err())
 
 	a.wg.Wait()
@@ -128,19 +143,20 @@ func (a *app) run() {
 	}
 }
 
-func (a *app) processRDFs() {
-	for rdfLine := range a.rdfCh {
+func (a *app) processRDFs(rdfIn chan string, nqOut chan gql.NQuad, workerID int) {
+	for rdfLine := range rdfIn {
 		nq, err := parseNQuad(rdfLine)
 		if err != nil {
 			if err == rdf.ErrEmpty {
-				continue
+				nq = gql.NQuad{} // Need to send "empty" NQuad to keep ordering correct.
+			} else {
+				x.Checkf(err, "Could not parse RDF.")
 			}
-			x.Check(err)
 		}
-		a.nquadCh <- nq
+		nqOut <- nq
 		atomic.AddInt64(&a.prog.rdfProg, 1)
 	}
-	close(a.nquadCh)
+	close(nqOut)
 }
 
 func parseNQuad(line string) (gql.NQuad, error) {
@@ -152,7 +168,17 @@ func parseNQuad(line string) (gql.NQuad, error) {
 }
 
 func (a *app) processNQuads() {
-	for nq := range a.nquadCh {
+	for i := 0; true; i++ {
+		nq, ok := <-a.nquadChs[i%rdfWorkers]
+		if !ok {
+			break
+		}
+		if nq.NQuad == nil {
+			continue // Blank or comment line.
+		}
+
+		// TODO: Do uid assignment once upfront right here. This part has to be
+		// serial in order for UID assignment to be consistent.
 
 		fwdPosting, revPosting := a.createEdgePostings(nq)
 
