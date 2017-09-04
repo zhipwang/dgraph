@@ -86,7 +86,7 @@ func (w *KVWriter) doWrites() {
 			x.Check2(w.fd.Write(buf.Bytes()))
 			buf.Reset()
 		}
-		atomic.AddInt64(&w.prog.outstandingWrites, int64(-len(entries)))
+		atomic.AddInt64(&w.prog.outstandingWrites, -1)
 	}
 	if buf.Len() > 0 {
 		x.Check2(w.fd.Write(buf.Bytes()))
