@@ -89,6 +89,7 @@ func (w *KVWriter) dumpFile() {
 		// TODO: would also need to write sizes of keys and values to read them later.
 		wr.Write(entry.k)
 		wr.Write(entry.v)
+		wr.WriteString("\n")
 	}
 	x.Check(wr.Flush())
 	atomic.AddInt64(&w.prog.outstandingWrites, -1)
