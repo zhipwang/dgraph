@@ -39,7 +39,7 @@ type KVWriter struct {
 	filename string
 }
 
-const batchSize = 100 << 20
+const batchSize = 10 << 20
 
 func NewKVWriter(kv *badger.KV, prog *progress, filename string) *KVWriter {
 
