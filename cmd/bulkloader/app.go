@@ -124,6 +124,7 @@ func (a *app) run() {
 	var wg sync.WaitGroup
 	wg.Add(len(a.workers))
 	for _, w := range a.workers {
+		w := w
 		go func() {
 			w.wait()
 			wg.Done()
