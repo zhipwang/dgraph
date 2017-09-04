@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"math/rand"
 	"os"
 	"sort"
 	"sync/atomic"
@@ -37,15 +38,16 @@ type KVWriter struct {
 	fileCount int
 
 	filename string
-}
 
-const batchSize = 10 << 20
+	batchSize int
+}
 
 func NewKVWriter(kv *badger.KV, prog *progress, filename string) *KVWriter {
 
 	w := &KVWriter{
-		prog:     prog,
-		filename: filename,
+		prog:      prog,
+		filename:  filename,
+		batchSize: (rand.Intn(10) + 10) << 20,
 	}
 	return w
 }
@@ -55,7 +57,7 @@ func (w *KVWriter) Set(k, v []byte, meta byte) {
 	w.batch = append(w.batch, entry{k, v})
 	w.sz += len(k) + len(v)
 
-	if w.sz > batchSize {
+	if w.sz > w.batchSize {
 		w.dumpFile()
 	}
 }
