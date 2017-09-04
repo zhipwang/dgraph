@@ -87,7 +87,17 @@ func (w *KVWriter) dumpFile() {
 	wr := bufio.NewWriterSize(fd, 32<<20)
 	for _, entry := range w.batch {
 		// TODO: would also need to write sizes of keys and values to read them later.
+		for i := range entry.k {
+			if entry.k[i] == '\n' {
+				entry.k[i] = ' '
+			}
+		}
 		wr.Write(entry.k)
+		for i := range entry.v {
+			if entry.v[i] == '\n' {
+				entry.v[i] = ' '
+			}
+		}
 		wr.Write(entry.v)
 		wr.WriteString("\n")
 	}
