@@ -47,7 +47,7 @@ func NewKVWriter(kv *badger.KV, prog *progress, filename string) *KVWriter {
 	w := &KVWriter{
 		prog:      prog,
 		filename:  filename,
-		batchSize: (rand.Intn(10) + 10) << 20,
+		batchSize: int(rand.Float64()*(10<<20) + (10 << 20)),
 	}
 	return w
 }
