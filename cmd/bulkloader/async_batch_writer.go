@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/dgraph/x"
@@ -68,6 +69,9 @@ func (w *KVWriter) Wait() {
 
 func (w *KVWriter) dumpFile() {
 
+	atomic.AddInt64(&w.prog.outstandingWrites, 1)
+	defer atomic.AddInt64(&w.prog.outstandingWrites, -1)
+
 	sort.Slice(w.batch, func(i, j int) bool { return bytes.Compare(w.batch[i].k, w.batch[j].k) < 0 }) // TODO Slow?
 
 	w.fileCount++
@@ -81,7 +85,7 @@ func (w *KVWriter) dumpFile() {
 		wr.Write(entry.k)
 		wr.Write(entry.v)
 	}
+	x.Check(wr.Flush())
 
 	w.sz = 0
-	x.Check(wr.Flush())
 }
