@@ -719,96 +719,10 @@ type linearizableReadRequest struct {
 	readIndexCh chan<- uint64
 }
 
-// linearizableState is used single-threaded, except for senders to `requests`.  (A single thread,
-// the Run loop, reads from `requests` and sends on `readIndexCh`.)
-type linearizableState struct {
-	requests           chan linearizableReadRequest
-	rctxCounter        x.NonceCounter
-	activeRequestRctx  []byte
-	activeRequestTimer *time.Timer
-	pendingRequests    []chan<- uint64
-	needingResponse    []chan<- uint64
-}
-
-func newLinearizableState() linearizableState {
-	// Create a new inactive timer to start with.  (We reuse the timer object just to save
-	// allocations.)
-	timer := time.NewTimer(0)
-	if !timer.Stop() {
-		<-timer.C
-	}
-	return linearizableState{
-		requests:           make(chan linearizableReadRequest),
-		rctxCounter:        x.NewNonceCounter(),
-		activeRequestTimer: timer,
-		pendingRequests:    []chan<- uint64{},
-		needingResponse:    []chan<- uint64{},
-	}
-}
-
 func (n *node) readIndex() chan uint64 {
 	ch := make(chan uint64, 1)
 	n.requestCh <- linearizableReadRequest{ch}
 	return ch
-}
-
-// Called by other threads
-func (ls *linearizableState) readIndex() chan uint64 {
-	ch := make(chan uint64, 1)
-	ls.requests <- linearizableReadRequest{ch}
-	return ch
-}
-
-// Called serially by the Run loop
-func (ls *linearizableState) slurpRequests() {
-	for {
-		select {
-		case req := <-ls.requests:
-			ls.pendingRequests = append(ls.pendingRequests, req.readIndexCh)
-		default:
-			return
-		}
-	}
-}
-
-// Called serially by the Run loop
-func (ls *linearizableState) feedRequest(req linearizableReadRequest) {
-	ls.pendingRequests = append(ls.pendingRequests, req.readIndexCh)
-}
-
-// Our ReadIndex request got a response (or timed out).  Inform our requesters and then (perhaps)
-// send another ReadIndex request for the next batch of requesters.  Called serially by the Run
-// loop.
-func cycleResponses(ls *linearizableState, n *node, indexOrNone uint64) error {
-	for _, respCh := range ls.needingResponse {
-		respCh <- indexOrNone
-	}
-	ls.needingResponse = ls.needingResponse[:0]
-	return feedRequestsAndDispatchReadIndex(ls, n)
-}
-
-// Called serially by the Run loop
-func feedRequestsAndDispatchReadIndex(ls *linearizableState, n *node) error {
-	ls.slurpRequests()
-	if len(ls.needingResponse) != 0 {
-		// Don't send another request -- we've already got an active one and it hasn't timed out.
-		return nil
-	}
-	if len(ls.pendingRequests) == 0 {
-		// Don't send a request -- there's nothing asking for one
-		return nil
-	}
-	ls.needingResponse, ls.pendingRequests = ls.pendingRequests, ls.needingResponse
-	rctxCounter := ls.rctxCounter.Generate()
-	ls.activeRequestRctx = rctxCounter[:]
-	const readIndexTimeout = 10 * time.Millisecond
-	ls.activeRequestTimer.Reset(readIndexTimeout)
-	return n.Raft().ReadIndex(n.ctx, ls.activeRequestRctx)
-}
-
-// Called serially by the Run loop
-func (ls *linearizableState) timeExpired(n *node) error {
-	return cycleResponses(ls, n, raft.None)
 }
 
 func runReadIndexLoop(
