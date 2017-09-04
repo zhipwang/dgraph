@@ -164,7 +164,7 @@ type node struct {
 	_raft      raft.Node
 
 	// Changed after init but not protected by SafeMutex
-	linState linearizableState
+	requestCh chan linearizableReadRequest
 
 	// Fields which are never changed after init.
 	cfg         *raft.Config
@@ -236,11 +236,11 @@ func newNode(gid uint32, id uint64, myAddr string) *node {
 	}
 
 	n := &node{
-		linState: newLinearizableState(),
-		ctx:      context.Background(),
-		id:       id,
-		gid:      gid,
-		store:    store,
+		requestCh: make(chan linearizableReadRequest),
+		ctx:       context.Background(),
+		id:        id,
+		gid:       gid,
+		store:     store,
 		cfg: &raft.Config{
 			ID:              id,
 			ElectionTick:    100, // 200 ms if we call Tick() every 20 ms.
@@ -746,6 +746,12 @@ func newLinearizableState() linearizableState {
 	}
 }
 
+func (n *node) readIndex() chan uint64 {
+	ch := make(chan uint64, 1)
+	n.requestCh <- linearizableReadRequest{ch}
+	return ch
+}
+
 // Called by other threads
 func (ls *linearizableState) readIndex() chan uint64 {
 	ch := make(chan uint64, 1)
@@ -805,6 +811,60 @@ func (ls *linearizableState) timeExpired(n *node) error {
 	return cycleResponses(ls, n, raft.None)
 }
 
+func runReadIndexLoop(
+	n *node, wg *sync.WaitGroup, requestCh chan linearizableReadRequest,
+	readStateCh chan raft.ReadState) {
+	defer wg.Done()
+	counter := x.NewNonceCounter()
+	requests := []linearizableReadRequest{}
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	for {
+		select {
+		case <-n.done:
+			return
+		case req := <-requestCh:
+		slurpLoop:
+			for {
+				requests = append(requests, req)
+				select {
+				case req = <-requestCh:
+				default:
+					break slurpLoop
+				}
+			}
+			activeRctx := counter.Generate()
+			const readIndexTimeout = 10 * time.Millisecond
+			timer.Reset(readIndexTimeout)
+			// TODO: handle err
+			_ = n.Raft().ReadIndex(n.ctx, activeRctx[:])
+		again:
+			select {
+			case <-n.done:
+				return
+			case rs := <-readStateCh:
+				if 0 != bytes.Compare(activeRctx[:], rs.RequestCtx) {
+					goto again
+				}
+				if !timer.Stop() {
+					<-timer.C
+				}
+				index := rs.Index
+				for _, req := range requests {
+					req.readIndexCh <- index
+				}
+			case <-timer.C:
+				for _, req := range requests {
+					req.readIndexCh <- raft.None
+				}
+			}
+			requests = requests[:0]
+		}
+	}
+}
+
 func (n *node) Run() {
 	firstRun := true
 	var leader bool
@@ -814,6 +874,13 @@ func (n *node) Run() {
 	defer ticker.Stop()
 	rcBytes, err := n.raftContext.Marshal()
 	x.Check(err)
+
+	readStateCh := make(chan raft.ReadState, 500)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()
+	go runReadIndexLoop(n, &wg, n.requestCh, readStateCh)
+
 	for {
 		select {
 		case <-ticker.C:
@@ -821,15 +888,7 @@ func (n *node) Run() {
 
 		case rd := <-n.Raft().Ready():
 			for _, rs := range rd.ReadStates {
-				if 0 != bytes.Compare(n.linState.activeRequestRctx, rs.RequestCtx) {
-					continue
-				}
-				if !n.linState.activeRequestTimer.Stop() {
-					<-n.linState.activeRequestTimer.C
-				}
-				if err := cycleResponses(&n.linState, n, rs.Index); err != nil {
-					return
-				}
+				readStateCh <- rs
 			}
 
 			if rd.SoftState != nil {
@@ -893,19 +952,6 @@ func (n *node) Run() {
 			if firstRun && n.canCampaign {
 				go n.Raft().Campaign(n.ctx)
 				firstRun = false
-			}
-
-		case req := <-n.linState.requests:
-			// Feed this request,
-			n.linState.feedRequest(req)
-			// and feed any others on the channel
-			if err := feedRequestsAndDispatchReadIndex(&n.linState, n); err != nil {
-				return
-			}
-
-		case <-n.linState.activeRequestTimer.C:
-			if err := n.linState.timeExpired(n); err != nil {
-				return
 			}
 
 		case <-n.stop:
@@ -1204,7 +1250,7 @@ func (w *grpcWorker) JoinCluster(ctx context.Context, rc *protos.RaftContext) (*
 
 func waitLinearizableRead(ctx context.Context, gid uint32) error {
 	n := groups().Node(gid)
-	replyCh := n.linState.readIndex()
+	replyCh := n.readIndex()
 	index := <-replyCh
 	if index == raft.None {
 		return x.Errorf("cannot get linearized read (time expired or no configured leader)")
