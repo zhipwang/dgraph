@@ -72,10 +72,14 @@ func (w *KVWriter) dumpFile() {
 	atomic.AddInt64(&w.prog.outstandingWrites, 1)
 	defer atomic.AddInt64(&w.prog.outstandingWrites, -1)
 
+	w.fileCount++
+	fname := fmt.Sprintf("%s_%d", w.filename, w.fileCount)
+	fmt.Printf("Writing %s\n", fname)
+	defer fmt.Printf("Finished %s\n", fname)
+
 	sort.Slice(w.batch, func(i, j int) bool { return bytes.Compare(w.batch[i].k, w.batch[j].k) < 0 }) // TODO Slow?
 
-	w.fileCount++
-	fd, err := os.OpenFile(fmt.Sprintf("%s_%d", w.filename, w.fileCount), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	fd, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	x.Check(err)
 	defer func() { x.Check(fd.Close()) }()
 
