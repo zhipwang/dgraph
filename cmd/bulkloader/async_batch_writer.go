@@ -101,6 +101,7 @@ func (w *KVWriter) dumpFile() {
 		wr.Write(entry.v)
 		wr.WriteString("\n")
 	}
+	w.batch = w.batch[:]
 	x.Check(wr.Flush())
 	atomic.AddInt64(&w.prog.outstandingWrites, -1)
 	x.Check(fd.Close())
