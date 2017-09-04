@@ -726,8 +726,8 @@ func (n *node) readIndex() chan uint64 {
 }
 
 func runReadIndexLoop(
-	n *node, wg *sync.WaitGroup, requestCh chan linearizableReadRequest,
-	readStateCh chan raft.ReadState) {
+	n *node, stop <-chan struct{}, wg *sync.WaitGroup, requestCh <-chan linearizableReadRequest,
+	readStateCh <-chan raft.ReadState) {
 	defer wg.Done()
 	counter := x.NewNonceCounter()
 	requests := []linearizableReadRequest{}
@@ -737,7 +737,7 @@ func runReadIndexLoop(
 	}
 	for {
 		select {
-		case <-n.done:
+		case <-stop:
 			return
 		case <-readStateCh:
 			// Do nothing, discard ReadState info we don't have an activeRctx for
@@ -758,7 +758,7 @@ func runReadIndexLoop(
 			_ = n.Raft().ReadIndex(n.ctx, activeRctx[:])
 		again:
 			select {
-			case <-n.done:
+			case <-stop:
 				return
 			case rs := <-readStateCh:
 				if 0 != bytes.Compare(activeRctx[:], rs.RequestCtx) {
@@ -791,11 +791,16 @@ func (n *node) Run() {
 	rcBytes, err := n.raftContext.Marshal()
 	x.Check(err)
 
-	readStateCh := make(chan raft.ReadState, 500)
+	// This chan could have capacity zero, because runReadIndexLoop never blocks without selecting
+	// on readStateCh.  It's 2 so that sending rarely blocks (so the Go runtime doesn't have to
+	// switch threads as much.)
+	readStateCh := make(chan raft.ReadState, 2)
 	var wg sync.WaitGroup
 	wg.Add(1)
+	stop := make(chan struct{})
 	defer wg.Wait()
-	go runReadIndexLoop(n, &wg, n.requestCh, readStateCh)
+	defer close(stop)
+	go runReadIndexLoop(n, stop, &wg, n.requestCh, readStateCh)
 
 	for {
 		select {
