@@ -825,6 +825,8 @@ func runReadIndexLoop(
 		select {
 		case <-n.done:
 			return
+		case <-readStateCh:
+			// Do nothing, discard ReadState info we don't have an activeRctx for
 		case req := <-requestCh:
 		slurpLoop:
 			for {
