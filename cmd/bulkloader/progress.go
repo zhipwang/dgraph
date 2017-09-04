@@ -15,6 +15,7 @@ type progress struct {
 	lastPct     float64
 
 	outstandingWrites int64
+	outstandingSorts  int64
 
 	start     time.Time
 	endPhase1 time.Time
@@ -53,12 +54,13 @@ func (p *progress) report() {
 
 	// TODO: Overwrite the same line each time so we don't scroll the screen.
 	if tmpKeyProg == 0 {
-		fmt.Printf("%s [Phase 1/2] [RDF count: %s] [RDF per second: %s] [Keys per second: %s] [Outstanding writes: %d]\n",
+		fmt.Printf("%s [Phase 1/2] [RDF count: %s] [RDF per second: %s] [Keys per second: %s] [Outstanding writes: %d] [Outstanding sorts: %d]\n",
 			elapsedStr,
 			engNotation(float64(rdfProg)),
 			engNotation(float64(rdfProg)/elapsed.Seconds()),
 			engNotation(float64(tmpKeyTotal)/elapsed.Seconds()),
 			atomic.LoadInt64(&p.outstandingWrites),
+			atomic.LoadInt64(&p.outstandingSorts),
 		)
 	} else {
 		fmt.Printf("%s [Phase 2/2] [Key progress: %5.2f%%] [Processing Speed: %.3f%% per sec] [Outstanding writes: %d]\n",
