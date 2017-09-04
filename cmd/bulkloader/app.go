@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger"
@@ -119,9 +120,16 @@ func (a *app) run() {
 	}
 	x.Check(sc.Err())
 	close(a.rdfCh)
+
+	var wg sync.WaitGroup
+	wg.Add(len(a.workers))
 	for _, w := range a.workers {
-		w.wait()
+		go func() {
+			w.wait()
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	a.prog.endPhase1 = time.Now()
 
