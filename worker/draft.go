@@ -726,9 +726,9 @@ func (n *node) readIndex() chan uint64 {
 }
 
 func runReadIndexLoop(
-	n *node, stop <-chan struct{}, wg *sync.WaitGroup, requestCh <-chan linearizableReadRequest,
+	n *node, stop <-chan struct{}, finished chan<- struct{}, requestCh <-chan linearizableReadRequest,
 	readStateCh <-chan raft.ReadState) {
-	defer wg.Done()
+	defer close(finished)
 	counter := x.NewNonceCounter()
 	requests := []linearizableReadRequest{}
 	timer := time.NewTimer(0)
@@ -795,12 +795,16 @@ func (n *node) Run() {
 	// on readStateCh.  It's 2 so that sending rarely blocks (so the Go runtime doesn't have to
 	// switch threads as much.)
 	readStateCh := make(chan raft.ReadState, 2)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	stop := make(chan struct{})
-	defer wg.Wait()
-	defer close(stop)
-	go runReadIndexLoop(n, stop, &wg, n.requestCh, readStateCh)
+
+	{
+		// We only stop runReadIndexLoop after the for loop below has finished interacting with it.
+		// That way we know sending to readStateCh will not deadlock.
+		finished := make(chan struct{})
+		stop := make(chan struct{})
+		defer func() { <-finished }()
+		defer close(stop)
+		go runReadIndexLoop(n, stop, finished, n.requestCh, readStateCh)
+	}
 
 	for {
 		select {
