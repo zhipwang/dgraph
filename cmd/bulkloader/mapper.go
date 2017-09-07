@@ -35,7 +35,7 @@ func (m *mapper) run() []string {
 		x.Checkf(m.parseRDF(rdf), "Could not parse RDF.")
 		atomic.AddInt64(&m.prog.rdfCount, 1)
 
-		if m.postingsSz > 256<<20 {
+		if m.postingsSz > 64<<20 {
 			m.processBatch()
 		}
 	}
