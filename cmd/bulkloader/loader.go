@@ -29,12 +29,11 @@ type options struct {
 }
 
 type state struct {
-	opt        options
-	prog       *progress
-	um         *uidMap
-	ss         *schemaStore
-	rdfCh      chan string
-	postingsCh chan *protos.FlatPosting
+	opt   options
+	prog  *progress
+	um    *uidMap
+	ss    *schemaStore
+	rdfCh chan string
 }
 
 type loader struct {
@@ -50,20 +49,26 @@ func newLoader(opt options) *loader {
 	initialSchema, err := schema.Parse(string(schemaBuf))
 	x.Checkf(err, "Could not parse schema.")
 
+	tmpPostingsDir, err := ioutil.TempDir(opt.tmpDir, "bulkloader_tmp_posting_")
+	x.Check(err)
+
 	st := &state{
-		opt:        opt,
-		prog:       newProgress(),
-		um:         newUIDMap(),
-		ss:         newSchemaStore(initialSchema),
-		rdfCh:      make(chan string, 1000),
-		postingsCh: make(chan *protos.FlatPosting, 1000),
+		opt:   opt,
+		prog:  newProgress(),
+		um:    newUIDMap(),
+		ss:    newSchemaStore(initialSchema),
+		rdfCh: make(chan string, 1000),
 	}
 	ld := &loader{
 		state:   st,
 		mappers: make([]*mapper, opt.numGoroutines),
 	}
 	for i := 0; i < opt.numGoroutines; i++ {
-		ld.mappers[i] = &mapper{state: st}
+		ld.mappers[i] = &mapper{
+			state:    st,
+			mapperId: i,
+			dir:      tmpPostingsDir,
+		}
 	}
 	return ld
 }
@@ -71,22 +76,15 @@ func newLoader(opt options) *loader {
 func (ld *loader) mapStage() {
 	go ld.prog.report()
 
-	var postingWriterWg sync.WaitGroup
-	postingWriterWg.Add(1)
-
-	tmpPostingsDir, err := ioutil.TempDir(ld.opt.tmpDir, "bulkloader_tmp_posting_")
-	x.Check(err)
-
-	go func() {
-		ld.mapOutput = writeMapOutput(tmpPostingsDir, ld.postingsCh, ld.prog)
-		postingWriterWg.Done()
-	}()
-
 	var mapperWg sync.WaitGroup
 	mapperWg.Add(len(ld.mappers))
+	var mu sync.Mutex
 	for _, m := range ld.mappers {
 		go func(m *mapper) {
-			m.run()
+			mapOutput := m.run()
+			mu.Lock()
+			ld.mapOutput = append(ld.mapOutput, mapOutput...)
+			mu.Unlock()
 			mapperWg.Done()
 		}(m)
 	}
@@ -115,8 +113,6 @@ func (ld *loader) mapStage() {
 
 	close(ld.rdfCh)
 	mapperWg.Wait()
-	close(ld.postingsCh)
-	postingWriterWg.Wait()
 }
 
 func (ld *loader) reduceStage() {

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
+	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/dgraph-io/dgraph/gql"
@@ -17,13 +20,48 @@ import (
 
 type mapper struct {
 	*state
+
+	postings   []*protos.FlatPosting
+	postingsSz int
+	wg         sync.WaitGroup
+	filenames  []string
+	fileNum    int
+	mapperId   int
+	dir        string
 }
 
-func (m *mapper) run() {
+func (m *mapper) run() []string {
 	for rdf := range m.rdfCh {
 		x.Checkf(m.parseRDF(rdf), "Could not parse RDF.")
 		atomic.AddInt64(&m.prog.rdfCount, 1)
+
+		if m.postingsSz > 256<<20 {
+			m.processBatch()
+		}
 	}
+	if len(m.postings) > 0 {
+		m.processBatch()
+	}
+	m.wg.Wait()
+	return m.filenames
+}
+
+func (m *mapper) processBatch() {
+	filename := filepath.Join(
+		m.dir,
+		fmt.Sprintf("%06d.bin", m.fileNum*m.opt.numGoroutines+m.mapperId),
+	)
+	m.filenames = append(m.filenames, filename)
+
+	ps := m.postings
+	m.postings = nil
+	m.postingsSz = 0
+
+	m.wg.Add(1)
+	go func() {
+		sortAndWrite(filename, ps, m.prog)
+		m.wg.Done()
+	}()
 }
 
 func (m *mapper) addPosting(key []byte, posting *protos.Posting) {
@@ -37,7 +75,9 @@ func (m *mapper) addPosting(key []byte, posting *protos.Posting) {
 	} else {
 		p.Posting = &protos.FlatPosting_FullPosting{FullPosting: posting}
 	}
-	m.postingsCh <- p
+
+	m.postings = append(m.postings, p)
+	m.postingsSz += p.Size()
 }
 
 func (m *mapper) parseRDF(rdfLine string) error {
