@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dgraph-io/badger"
@@ -231,20 +230,21 @@ func (ld *loader) reduceStage() {
 	}()
 
 	// Reduce stage.
-	var ra int64
+	//var ra int64
 	pending := make(chan struct{}, ld.opt.numGoroutines)
 	for batch := range reduceCh {
 		pending <- struct{}{}
-		fmt.Println("Starting reduce:", atomic.AddInt64(&ra, 1))
+		//fmt.Println("Starting reduce:", atomic.AddInt64(&ra, 1))
 		go func(batch []*protos.MapEntry) {
 			reduce(batch, ld.kv, ld.prog)
 			<-pending
-			fmt.Println("Finished reduce:", atomic.AddInt64(&ra, -1))
+			//fmt.Println("Finished reduce:", atomic.AddInt64(&ra, -1))
 		}(batch)
 	}
 	for i := 0; i < ld.opt.numGoroutines; i++ {
 		pending <- struct{}{}
 	}
+	fmt.Println("ReduceCh closed")
 }
 
 func transpose(in [][]chan *protos.MapEntry) [][]chan *protos.MapEntry {

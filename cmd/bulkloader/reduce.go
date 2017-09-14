@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"container/heap"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -82,6 +83,7 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		}
 
 		if len(batch) >= batchSize && bytes.Compare(prevKey, me.Key) != 0 {
+			fmt.Println("SEND batchCh")
 			batchCh <- batch
 			batch = make([]*protos.MapEntry, 0, batchAlloc)
 		}
@@ -90,6 +92,7 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		batch = append(batch, me)
 	}
 	if len(batch) > 0 {
+		fmt.Println("SEND batchCh")
 		batchCh <- batch
 	}
 }
