@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -57,6 +58,8 @@ func readMapOutput(filename string, mapEntryCh chan<- *protos.MapEntry) {
 
 func shufflePostings(batchCh chan<- []*protos.MapEntry,
 	mapEntryChs []chan *protos.MapEntry, prog *progress, ci *countIndexer) {
+
+	runtime.LockOSThread()
 
 	var ph postingHeap
 	for _, ch := range mapEntryChs {
