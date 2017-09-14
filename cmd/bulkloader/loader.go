@@ -221,17 +221,20 @@ func (ld *loader) reduceStage() {
 	go shufflePostings(reduceCh, shuffleInputChs, ld.prog, ci)
 
 	// Reduce stage.
+	var badgerWg sync.WaitGroup
 	pending := make(chan struct{}, ld.opt.numGoroutines)
 	for batch := range reduceCh {
 		pending <- struct{}{}
+		badgerWg.Add(1)
 		go func(batch []*protos.MapEntry) {
-			reduce(batch, ld.kv, ld.prog)
+			reduce(batch, ld.kv, ld.prog, &badgerWg)
 			<-pending
 		}(batch)
 	}
 	for i := 0; i < ld.opt.numGoroutines; i++ {
 		pending <- struct{}{}
 	}
+	badgerWg.Wait()
 	ci.wait()
 }
 
