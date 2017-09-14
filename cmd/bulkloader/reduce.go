@@ -28,6 +28,12 @@ var mePool = sync.Pool{
 }
 
 func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
+
+	fmt.Printf("Filename: %s\n", filename)
+	for _, ch := range mapEntryChs {
+		fmt.Printf(" ch: %v\n", ch)
+	}
+
 	fd, err := os.Open(filename)
 	x.Check(err)
 	defer fd.Close()
