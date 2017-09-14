@@ -64,10 +64,12 @@ func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
 var shufWaiting int64
 
 func init() {
-	for {
-		time.Sleep(time.Second)
-		fmt.Println("SW:", atomic.LoadInt64(&shufWaiting))
-	}
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			fmt.Println("SW:", atomic.LoadInt64(&shufWaiting))
+		}
+	}()
 }
 
 func shufflePostings(batchCh chan<- []*protos.MapEntry,
