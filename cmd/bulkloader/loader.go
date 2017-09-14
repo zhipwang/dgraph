@@ -30,6 +30,7 @@ type options struct {
 	numGoroutines   int
 	mapBufSize      int64
 	skipExpandEdges bool
+	numShufflers    int
 }
 
 type state struct {
@@ -193,10 +194,15 @@ func (ld *loader) reduceStage() {
 	})
 	x.Checkf(err, "While walking the map output.")
 
-	shuffleInputChs := make([]chan *protos.MapEntry, len(mapOutput))
+	mapToShuffleChs := make([][]chan *protos.MapEntry, len(mapOutput))
+	for i := 0; i < len(mapOutput); i++ {
+		mapToShuffleChs[i] = make([]chan *protos.MapEntry, ld.opt.numShufflers)
+		for j := 0; j < ld.opt.numShufflers; j++ {
+			mapToShuffleChs[i][j] = make(chan *protos.MapEntry, 1000)
+		}
+	}
 	for i, mappedFile := range mapOutput {
-		shuffleInputChs[i] = make(chan *protos.MapEntry, 1000)
-		go readMapOutput(mappedFile, shuffleInputChs[i])
+		go readMapOutput(mappedFile, mapToShuffleChs[i])
 	}
 
 	opt := badger.DefaultOptions
@@ -208,11 +214,20 @@ func (ld *loader) reduceStage() {
 	ld.kv, err = badger.NewKV(&opt)
 	x.Check(err)
 
-	// Shuffle concurrently with reduce.
-	ci := &countIndexer{state: ld.state}
 	// Small buffer size since each element has a lot of data.
+	var shuffleWg sync.WaitGroup
+	shuffleWg.Add(ld.opt.numShufflers)
 	reduceCh := make(chan []*protos.MapEntry, 3)
-	go shufflePostings(reduceCh, shuffleInputChs, ld.prog, ci)
+	for _, shuffleInputChs := range transpose(mapToShuffleChs) {
+		go func(shuffleInputChs []chan *protos.MapEntry) {
+			shufflePostings(reduceCh, shuffleInputChs, ld.prog)
+			shuffleWg.Done()
+		}(shuffleInputChs)
+	}
+	go func() {
+		shuffleWg.Wait()
+		close(reduceCh)
+	}()
 
 	// Reduce stage.
 	pending := make(chan struct{}, ld.opt.numGoroutines)
@@ -226,7 +241,20 @@ func (ld *loader) reduceStage() {
 	for i := 0; i < ld.opt.numGoroutines; i++ {
 		pending <- struct{}{}
 	}
-	ci.wait()
+}
+
+func transpose(in [][]chan *protos.MapEntry) [][]chan *protos.MapEntry {
+	m, n := len(in), len(in[0])
+	out := make([][]chan *protos.MapEntry, n)
+	for i := range out {
+		out[i] = make([]chan *protos.MapEntry, m)
+	}
+	for i := range in {
+		for j := range in[i] {
+			out[j][i] = in[i][j]
+		}
+	}
+	return out
 }
 
 func (ld *loader) writeSchema() {

@@ -15,6 +15,7 @@ import (
 	"github.com/dgraph-io/dgraph/bp128"
 	"github.com/dgraph-io/dgraph/protos"
 	"github.com/dgraph-io/dgraph/x"
+	farm "github.com/dgryski/go-farm"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -24,7 +25,7 @@ var mePool = sync.Pool{
 	},
 }
 
-func readMapOutput(filename string, mapEntryCh chan<- *protos.MapEntry) {
+func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
 	fd, err := os.Open(filename)
 	x.Check(err)
 	defer fd.Close()
@@ -48,15 +49,18 @@ func readMapOutput(filename string, mapEntryCh chan<- *protos.MapEntry) {
 		}
 		x.Check2(io.ReadFull(r, unmarshalBuf[:sz]))
 
-		mapEntry := mePool.Get().(*protos.MapEntry)
-		x.Check(proto.Unmarshal(unmarshalBuf[:sz], mapEntry))
-		mapEntryCh <- mapEntry
+		me := mePool.Get().(*protos.MapEntry)
+		x.Check(proto.Unmarshal(unmarshalBuf[:sz], me))
+		fp := farm.Fingerprint64(me.Key)
+		mapEntryChs[fp%uint64(len(mapEntryChs))] <- me
 	}
-	close(mapEntryCh)
+	for _, ch := range mapEntryChs {
+		close(ch)
+	}
 }
 
 func shufflePostings(batchCh chan<- []*protos.MapEntry,
-	mapEntryChs []chan *protos.MapEntry, prog *progress, ci *countIndexer) {
+	mapEntryChs []chan *protos.MapEntry, prog *progress) {
 
 	var ph postingHeap
 	for _, ch := range mapEntryChs {
@@ -67,7 +71,6 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 	const batchAlloc = batchSize * 11 / 10
 	batch := make([]*protos.MapEntry, 0, batchAlloc)
 	var prevKey []byte
-	var plistLen int
 	for len(ph.nodes) > 0 {
 		me := ph.nodes[0].mapEntry
 		var ok bool
@@ -78,12 +81,6 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 			heap.Pop(&ph)
 		}
 
-		keyChanged := bytes.Compare(prevKey, me.Key) != 0
-		if keyChanged && plistLen > 0 {
-			ci.addUid(prevKey, plistLen)
-			plistLen = 0
-		}
-
 		if len(batch) >= batchSize && bytes.Compare(prevKey, me.Key) != 0 {
 			batchCh <- batch
 			batch = make([]*protos.MapEntry, 0, batchAlloc)
@@ -91,15 +88,10 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		prevKey = me.Key
 
 		batch = append(batch, me)
-		plistLen++
 	}
 	if len(batch) > 0 {
 		batchCh <- batch
 	}
-	if plistLen > 0 {
-		ci.addUid(prevKey, plistLen)
-	}
-	close(batchCh)
 }
 
 type heapNode struct {
