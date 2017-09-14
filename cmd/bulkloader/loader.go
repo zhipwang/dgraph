@@ -211,7 +211,7 @@ func (ld *loader) reduceStage() {
 	// Shuffle concurrently with reduce.
 	ci := &countIndexer{state: ld.state}
 	// Small buffer size since each element has a lot of data.
-	reduceCh := make(chan []*protos.MapEntry, 100)
+	reduceCh := make(chan []*protos.MapEntry, 1000)
 	go func() {
 		for {
 			time.Sleep(time.Second)
