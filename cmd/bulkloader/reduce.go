@@ -27,12 +27,16 @@ var mePool = sync.Pool{
 	},
 }
 
+var printLock sync.Mutex
+
 func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
 
+	printLock.Lock()
 	fmt.Printf("Filename: %s\n", filename)
 	for _, ch := range mapEntryChs {
 		fmt.Printf(" ch: %v\n", ch)
 	}
+	printLock.Unlock()
 
 	fd, err := os.Open(filename)
 	x.Check(err)
