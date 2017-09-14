@@ -80,8 +80,7 @@ func init() {
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			fmt.Println("SW:", atomic.LoadInt64(&shufWaiting))
-			fmt.Println("RW:", atomic.LoadInt64(&readWaiting))
+			fmt.Println("SW:", atomic.LoadInt64(&shufWaiting), "RW:", atomic.LoadInt64(&readWaiting))
 		}
 	}()
 }
@@ -118,7 +117,6 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		}
 
 		if len(batch) >= batchSize && bytes.Compare(prevKey, me.Key) != 0 {
-			fmt.Println("SEND batchCh, len:", len(batchCh))
 			batchCh <- batch
 			batch = make([]*protos.MapEntry, 0, batchAlloc)
 		}
@@ -127,7 +125,6 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		batch = append(batch, me)
 	}
 	if len(batch) > 0 {
-		fmt.Println("SEND batchCh (final), len:", len(batchCh))
 		batchCh <- batch
 	}
 }
