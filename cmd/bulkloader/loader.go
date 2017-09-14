@@ -199,7 +199,7 @@ func (ld *loader) reduceStage() {
 	for i := 0; i < len(mapOutput); i++ {
 		mapToShuffleChs[i] = make([]chan *protos.MapEntry, ld.opt.numShufflers)
 		for j := 0; j < ld.opt.numShufflers; j++ {
-			mapToShuffleChs[i][j] = make(chan *protos.MapEntry, 1000)
+			mapToShuffleChs[i][j] = make(chan *protos.MapEntry, 10)
 		}
 	}
 	for i, mappedFile := range mapOutput {
