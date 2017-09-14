@@ -230,12 +230,16 @@ func (ld *loader) reduceStage() {
 	}()
 
 	// Reduce stage.
+	var rdc int
 	pending := make(chan struct{}, ld.opt.numGoroutines)
 	for batch := range reduceCh {
 		pending <- struct{}{}
+		fmt.Println("Starting reduce:", rdc)
+		rdc++
 		go func(batch []*protos.MapEntry) {
 			reduce(batch, ld.kv, ld.prog)
 			<-pending
+			fmt.Println("Finished reduce")
 		}(batch)
 	}
 	for i := 0; i < ld.opt.numGoroutines; i++ {
