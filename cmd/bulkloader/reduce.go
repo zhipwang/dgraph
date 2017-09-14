@@ -82,10 +82,10 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 		}
 
 		//keyChanged := bytes.Compare(prevKey, me.Key) != 0
-		if keyChanged && plistLen > 0 {
-			//ci.addUid(prevKey, plistLen)
-			plistLen = 0
-		}
+		//if keyChanged && plistLen > 0 {
+		////ci.addUid(prevKey, plistLen)
+		//plistLen = 0
+		//}
 
 		if len(batch) >= batchSize && bytes.Compare(prevKey, me.Key) != 0 {
 			batchCh <- batch
