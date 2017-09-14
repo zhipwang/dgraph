@@ -212,17 +212,17 @@ func (ld *loader) reduceStage() {
 	ci := &countIndexer{state: ld.state}
 	// Small buffer size since each element has a lot of data.
 	reduceCh := make(chan []*protos.MapEntry, 1000)
+	pending := make(chan struct{}, ld.opt.numGoroutines)
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			fmt.Println("len(reduceCh):", len(reduceCh))
+			fmt.Println("len(reduceCh):", len(reduceCh), "len(pending):", len(pending))
 		}
 	}()
 	go shufflePostings(reduceCh, shuffleInputChs, ld.prog, ci)
 
 	// Reduce stage.
 	var badgerWg sync.WaitGroup
-	pending := make(chan struct{}, ld.opt.numGoroutines)
 	for batch := range reduceCh {
 		pending <- struct{}{}
 		badgerWg.Add(1)
