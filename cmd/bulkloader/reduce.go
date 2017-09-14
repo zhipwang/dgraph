@@ -85,6 +85,13 @@ func init() {
 func shufflePostings(batchCh chan<- []*protos.MapEntry,
 	mapEntryChs []chan *protos.MapEntry, prog *progress) {
 
+	printLock.Lock()
+	fmt.Printf("SHUFFLE\n")
+	for _, ch := range mapEntryChs {
+		fmt.Printf(" ch: %v\n", ch)
+	}
+	printLock.Unlock()
+
 	var ph postingHeap
 	for _, ch := range mapEntryChs {
 		heap.Push(&ph, heapNode{mapEntry: <-ch, ch: ch})
