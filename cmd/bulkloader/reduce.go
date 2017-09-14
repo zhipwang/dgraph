@@ -60,6 +60,8 @@ func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
 	}
 }
 
+var shufWaiting int64
+
 func shufflePostings(batchCh chan<- []*protos.MapEntry,
 	mapEntryChs []chan *protos.MapEntry, prog *progress) {
 
@@ -75,7 +77,9 @@ func shufflePostings(batchCh chan<- []*protos.MapEntry,
 	for len(ph.nodes) > 0 {
 		me := ph.nodes[0].mapEntry
 		var ok bool
+		fmt.Println("Shufwaiting +1:", atomic.AddInt64(&shufWaiting, 1))
 		ph.nodes[0].mapEntry, ok = <-ph.nodes[0].ch
+		fmt.Println("Shufwaiting -1:", atomic.AddInt64(&shufWaiting, -1))
 		if ok {
 			heap.Fix(&ph, 0)
 		} else {
