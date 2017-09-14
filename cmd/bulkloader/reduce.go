@@ -64,9 +64,9 @@ func readMapOutput(filename string, mapEntryChs []chan *protos.MapEntry) {
 		me := mePool.Get().(*protos.MapEntry)
 		x.Check(proto.Unmarshal(unmarshalBuf[:sz], me))
 		fp := farm.Fingerprint64(me.Key)
-		atomic.AddInt64(&shufWaiting, 1)
+		atomic.AddInt64(&readWaiting, 1)
 		mapEntryChs[fp%uint64(len(mapEntryChs))] <- me
-		atomic.AddInt64(&shufWaiting, -1)
+		atomic.AddInt64(&readWaiting, -1)
 	}
 	for _, ch := range mapEntryChs {
 		close(ch)
