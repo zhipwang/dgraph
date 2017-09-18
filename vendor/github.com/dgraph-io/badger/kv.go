@@ -702,9 +702,11 @@ func (s *KV) sendToWriteCh(entries []*Entry) []*request {
 	var bad []*Entry
 	for _, entry := range entries {
 		if len(entry.Key) > maxKeySize || len(entry.Value) > maxValueSize {
-			entry.Error = ErrExceedsMaxKeyValueSize
-			bad = append(bad, entry)
-			continue
+			//entry.Error = ErrExceedsMaxKeyValueSize
+			//bad = append(bad, entry)
+			//continue
+			log.Printf("WARNING: Key or value exceeded max size: KeySize=%d ValueSize=%d\n",
+				len(entry.Key), len(entry.Value))
 		}
 		if b == nil {
 			b = requestPool.Get().(*request)
