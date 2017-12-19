@@ -22,12 +22,12 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
+	"strconv"
 	"strings"
 	"unicode"
 
 	"github.com/dgraph-io/dgraph/lex"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/api"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/types/facets"
 	"github.com/dgraph-io/dgraph/x"
@@ -56,7 +56,8 @@ func sane(s string) bool {
 }
 
 // Parse parses a mutation string and returns the NQuad representation for it.
-func Parse(line string) (rnq protos.NQuad, rerr error) {
+func Parse(line string) (api.NQuad, error) {
+	var rnq api.NQuad
 	l := lex.Lexer{
 		Input: line,
 	}
@@ -64,6 +65,7 @@ func Parse(line string) (rnq protos.NQuad, rerr error) {
 
 	it := l.NewIterator()
 	var oval string
+	var seenOval bool
 	var vend bool
 	isCommentLine := false
 	// We read items from the l.Items channel to which the lexer sends items.
@@ -82,11 +84,6 @@ L:
 			if item = it.Item(); item.Typ != itemVarName {
 				return rnq, x.Errorf("Expected variable name, found: %s", item.Val)
 			}
-			if len(rnq.Subject) > 0 || len(rnq.SubjectVar) > 0 {
-				rnq.ObjectVar = item.Val
-			} else {
-				rnq.SubjectVar = item.Val
-			}
 
 			it.Next() // parse ')'
 
@@ -97,36 +94,25 @@ L:
 			rnq.ObjectId = strings.Trim(item.Val, " ")
 
 		case itemStar:
-			if rnq.Subject == "" && rnq.SubjectVar == "" {
+			if rnq.Subject == "" {
 				rnq.Subject = x.Star
 			} else if rnq.Predicate == "" {
 				rnq.Predicate = x.Star
 			} else {
-				rnq.ObjectValue = &protos.Value{&protos.Value_DefaultVal{x.Star}}
+				rnq.ObjectValue = &api.Value{&api.Value_DefaultVal{x.Star}}
 			}
 		case itemLiteral:
-			oval = item.Val
-			if oval == "" {
-				oval = "_nil_"
+			var err error
+			oval, err = strconv.Unquote(item.Val)
+			if err != nil {
+				return rnq, x.Wrapf(err, "while unquoting")
 			}
+			seenOval = true
 
 		case itemLanguage:
 			rnq.Lang = item.Val
 
-			// if lang tag is specified then type is set to string
-			// grammar allows either ^^ iriref or lang tag
-			if len(oval) > 0 {
-				rnq.ObjectValue = &protos.Value{&protos.Value_DefaultVal{oval}}
-				// If no type is specified, we default to string.
-				rnq.ObjectType = int32(types.StringID)
-				oval = ""
-			}
 		case itemObjectType:
-			if len(oval) == 0 {
-				log.Fatalf(
-					"itemObject should be emitted before itemObjectType. Input: [%s]",
-					line)
-			}
 			if rnq.Predicate == x.Star || rnq.Subject == x.Star {
 				return rnq, x.Errorf("If predicate/subject is *, value should be * as well")
 			}
@@ -141,10 +127,9 @@ L:
 			if !ok {
 				return rnq, x.Errorf("Unrecognized rdf type %s", val)
 			}
-			if oval == "_nil_" && t != types.StringID {
+			if oval == "" && t != types.StringID {
 				return rnq, x.Errorf("Invalid ObjectValue")
 			}
-			rnq.ObjectType = int32(t)
 			src := types.ValueForType(types.StringID)
 			src.Value = []byte(oval)
 			p, err := types.Convert(src, t)
@@ -155,7 +140,6 @@ L:
 			if rnq.ObjectValue, err = types.ObjectValue(t, p.Value); err != nil {
 				return rnq, err
 			}
-			oval = ""
 
 		case lex.ItemError:
 			return rnq, x.Errorf(item.Val)
@@ -195,19 +179,19 @@ L:
 	if isCommentLine {
 		return rnq, ErrEmpty
 	}
-	if len(oval) > 0 {
-		rnq.ObjectValue = &protos.Value{&protos.Value_DefaultVal{oval}}
-		// If no type is specified, we default to string.
-		rnq.ObjectType = int32(types.DefaultID)
+	// We only want to set default value if we have seen ObjectValue within "" and if we didn't
+	// already set it.
+	if seenOval && rnq.ObjectValue == nil {
+		rnq.ObjectValue = &api.Value{&api.Value_DefaultVal{oval}}
 	}
-	if (len(rnq.Subject) == 0 && len(rnq.SubjectVar) == 0) || len(rnq.Predicate) == 0 {
+	if len(rnq.Subject) == 0 || len(rnq.Predicate) == 0 {
 		return rnq, x.Errorf("Empty required fields in NQuad. Input: [%s]", line)
 	}
-	if len(rnq.ObjectId) == 0 && rnq.ObjectValue == nil && len(rnq.ObjectVar) == 0 {
+	if len(rnq.ObjectId) == 0 && rnq.ObjectValue == nil {
 		return rnq, x.Errorf("No Object in NQuad. Input: [%s]", line)
 	}
-	if !sane(rnq.Subject) || !sane(rnq.SubjectVar) || !sane(rnq.Predicate) ||
-		!sane(rnq.ObjectId) || !sane(rnq.Label) || !sane(rnq.ObjectVar) {
+	if !sane(rnq.Subject) || !sane(rnq.Predicate) ||
+		!sane(rnq.ObjectId) || !sane(rnq.Label) {
 		return rnq, x.Errorf("NQuad failed sanity check:%+v", rnq)
 	}
 
@@ -215,8 +199,8 @@ L:
 }
 
 // ConvertToNQuads parses multi line mutation string to a list of NQuads.
-func ConvertToNQuads(mutation string) ([]*protos.NQuad, error) {
-	var nquads []*protos.NQuad
+func ConvertToNQuads(mutation string) ([]*api.NQuad, error) {
+	var nquads []*api.NQuad
 	r := strings.NewReader(mutation)
 	reader := bufio.NewReader(r)
 
@@ -234,13 +218,12 @@ func ConvertToNQuads(mutation string) ([]*protos.NQuad, error) {
 		nq, err := Parse(ln)
 		if len(nq.Predicate) > 0 && nq.Predicate[0] == '_' &&
 			nq.Predicate[len(nq.Predicate)-1] == '_' {
-			return nil, x.Errorf("Predicates starting and ending with _ are reserved internally.")
+			return nil, x.Errorf("Predicates starting and ending with _ are reserved intern.y.")
 		}
 		if err == ErrEmpty { // special case: comment/empty line
 			continue
 		} else if err != nil {
-			// x.TraceError(ctx, x.Wrapf(err, "Error while parsing RDF"))
-			return nquads, err
+			return nquads, x.Wrapf(err, "While parsing RDF: %s", strBuf.String())
 		}
 		nquads = append(nquads, &nq)
 	}
@@ -250,7 +233,7 @@ func ConvertToNQuads(mutation string) ([]*protos.NQuad, error) {
 	return nquads, nil
 }
 
-func parseFacets(it *lex.ItemIterator, rnq *protos.NQuad) error {
+func parseFacets(it *lex.ItemIterator, rnq *api.NQuad) error {
 	if !it.Next() {
 		return x.Errorf("Unexpected end of facets.")
 	}
@@ -334,7 +317,6 @@ var typeMap = map[string]types.TypeID{
 	"xs:float":                                         types.FloatID,
 	"xs:base64Binary":                                  types.BinaryID,
 	"geo:geojson":                                      types.GeoID,
-	"pwd:password":                                     types.PasswordID,
 	"http://www.w3.org/2001/XMLSchema#string":          types.StringID,
 	"http://www.w3.org/2001/XMLSchema#dateTime":        types.DateTimeID,
 	"http://www.w3.org/2001/XMLSchema#date":            types.DateTimeID,

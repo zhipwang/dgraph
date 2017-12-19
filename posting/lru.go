@@ -23,6 +23,8 @@ import (
 	"container/list"
 	"context"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/dgraph-io/dgraph/x"
 )
@@ -39,6 +41,7 @@ type listCache struct {
 	evicts  uint64
 	ll      *list.List
 	cache   map[string]*list.Element
+	done    int32
 }
 
 type CacheStats struct {
@@ -55,28 +58,31 @@ type entry struct {
 
 // New creates a new Cache.
 func newListCache(maxSize uint64) *listCache {
-	return &listCache{
+	lc := &listCache{
 		ctx:     context.Background(),
 		MaxSize: maxSize,
 		ll:      list.New(),
 		cache:   make(map[string]*list.Element),
 	}
+	go lc.removeOldestLoop()
+	return lc
 }
 
-func (c *listCache) UpdateMaxSize() {
+func (c *listCache) UpdateMaxSize(size uint64) uint64 {
 	c.Lock()
 	defer c.Unlock()
-	if c.curSize < (50 << 20) {
-		c.MaxSize = 50 << 20
-		x.Println("LRU cache max size is being set to 50 MB")
-		x.LcacheCapacity.Set(50 << 20)
-		return
+	if size == 0 {
+		size = c.curSize
 	}
-	x.LcacheCapacity.Set(int64(c.curSize))
-	c.MaxSize = c.curSize
+	if size < (50 << 20) {
+		size = 50 << 20
+		x.Println("LRU cache max size is being set to 50 MB")
+	}
+	c.MaxSize = size
+	x.LcacheCapacity.Set(int64(c.MaxSize))
+	return c.MaxSize
 }
 
-// TODO: fingerprint can collide
 // Add adds a value to the cache.
 func (c *listCache) PutIfMissing(key string, pl *List) (res *List) {
 	c.Lock()
@@ -99,30 +105,53 @@ func (c *listCache) PutIfMissing(key string, pl *List) (res *List) {
 	c.curSize += e.size
 	ele := c.ll.PushFront(e)
 	c.cache[key] = ele
-	c.removeOldest()
 
 	return e.pl
 }
 
+func (c *listCache) removeOldestLoop() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		c.removeOldest()
+		if atomic.LoadInt32(&c.done) > 0 {
+			return
+		}
+	}
+}
+
 func (c *listCache) removeOldest() {
-	for c.curSize > c.MaxSize {
-		ele := c.ll.Back()
+	c.Lock()
+	defer c.Unlock()
+	ele := c.ll.Back()
+	for c.curSize > c.MaxSize && atomic.LoadInt32(&c.done) == 0 {
 		if ele == nil {
-			c.curSize = 0
+			if c.curSize < 0 {
+				c.curSize = 0
+			}
 			break
 		}
-		c.ll.Remove(ele)
-		c.evicts++
-
 		e := ele.Value.(*entry)
-		c.curSize -= e.size
 
-		e.pl.SetForDeletion()
+		if !e.pl.SetForDeletion() {
+			ele = ele.Prev()
+			continue
+		}
 		// If length of mutation layer is zero, then we won't call pstore.SetAsync and the
 		// key wont be deleted from cache. So lets delete it now if SyncIfDirty returns false.
-		if committed, _ := e.pl.SyncIfDirty(true); !committed {
+		if committed, err := e.pl.SyncIfDirty(true); err != nil {
+			ele = ele.Prev()
+			continue
+		} else if !committed {
 			delete(c.cache, e.key)
 		}
+
+		// ele gets Reset once it's passed to Remove, so store the prev.
+		prev := ele.Prev()
+		c.ll.Remove(ele)
+		c.evicts++
+		c.curSize -= e.size
+		ele = prev
 	}
 }
 
@@ -174,7 +203,19 @@ func (c *listCache) Reset() {
 	c.curSize = 0
 }
 
-func (c *listCache) clear(remove func(key []byte) bool) error {
+func (c *listCache) iterate(cont func(l *List) bool) {
+	c.Lock()
+	defer c.Unlock()
+	for _, e := range c.cache {
+		kv := e.Value.(*entry)
+		if !cont(kv.pl) {
+			return
+		}
+	}
+}
+
+// Doesn't sync to disk, call this function only when you are deleting the pls.
+func (c *listCache) clear(remove func(key []byte) bool) {
 	c.Lock()
 	defer c.Unlock()
 	for k, e := range c.cache {
@@ -184,12 +225,8 @@ func (c *listCache) clear(remove func(key []byte) bool) error {
 		}
 
 		c.ll.Remove(e)
-		kv.pl.SetForDeletion()
-		if committed, _ := kv.pl.SyncIfDirty(true); !committed {
-			delete(c.cache, k)
-		}
+		delete(c.cache, k)
 	}
-	return nil
 }
 
 // delete removes a key from cache

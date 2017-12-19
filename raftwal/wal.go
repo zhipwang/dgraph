@@ -29,13 +29,17 @@ import (
 )
 
 type Wal struct {
-	wals *badger.KV
+	wals *badger.ManagedDB
 	id   uint64
 }
 
-func Init(walStore *badger.KV, id uint64) *Wal {
-	return &Wal{wals: walStore, id: id}
+func Init(walStore *badger.ManagedDB, id uint64) *Wal {
+	w := &Wal{wals: walStore, id: id}
+	x.Check(w.StoreRaftId(id))
+	return w
 }
+
+var idKey = []byte("raftid")
 
 func (w *Wal) snapshotKey(gid uint32) []byte {
 	b := make([]byte, 14)
@@ -69,8 +73,38 @@ func (w *Wal) prefix(gid uint32) []byte {
 	return b
 }
 
+func (w *Wal) StoreRaftId(id uint64) error {
+	txn := w.wals.NewTransactionAt(1, true)
+	defer txn.Discard()
+	var b [8]byte
+	binary.BigEndian.PutUint64(b[:], id)
+	if err := txn.Set(idKey, b[:]); err != nil {
+		return err
+	}
+	return txn.CommitAt(1, nil)
+}
+
+func RaftId(wals *badger.ManagedDB) (uint64, error) {
+	txn := wals.NewTransactionAt(1, false)
+	defer txn.Discard()
+	item, err := txn.Get(idKey)
+	if err == badger.ErrKeyNotFound {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	val, err := item.Value()
+	if err != nil {
+		return 0, err
+	}
+	id := binary.BigEndian.Uint64(val)
+	return id, nil
+}
+
 func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
-	wb := make([]*badger.Entry, 0, 100)
+	txn := w.wals.NewTransactionAt(1, true)
+	defer txn.Discard()
 	if raft.IsEmptySnap(s) {
 		return nil
 	}
@@ -78,17 +112,17 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 	if err != nil {
 		return x.Wrapf(err, "wal.Store: While marshal snapshot")
 	}
-	if err := w.wals.Set(w.snapshotKey(gid), data, 0x00); err != nil {
+	if err := txn.Set(w.snapshotKey(gid), data); err != nil {
 		return err
 	}
-	x.Printf("Writing snapshot to WAL: %+v\n", s)
+	x.Printf("Writing snapshot to WAL, metadata: %+v, len(data): %d\n", s.Metadata, len(s.Data))
 
 	// Delete all entries before this snapshot to save disk space.
 	start := w.entryKey(gid, 0, 0)
 	last := w.entryKey(gid, s.Metadata.Term, s.Metadata.Index)
 	opt := badger.DefaultIteratorOptions
 	opt.PrefetchValues = false
-	itr := w.wals.NewIterator(opt)
+	itr := txn.NewIterator(opt)
 	defer itr.Close()
 
 	for itr.Seek(start); itr.Valid(); itr.Next() {
@@ -98,25 +132,31 @@ func (w *Wal) StoreSnapshot(gid uint32, s raftpb.Snapshot) error {
 		}
 		newk := make([]byte, len(key))
 		copy(newk, key)
-		wb = badger.EntriesDelete(wb, newk)
+		if err := txn.Delete(newk); err == badger.ErrTxnTooBig {
+			if err := txn.CommitAt(1, nil); err != nil {
+				return err
+			}
+			txn = w.wals.NewTransactionAt(1, true)
+			if err := txn.Delete(newk); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
 	}
 
 	// Failure to delete entries is not a fatal error, so should be
 	// ok to ignore
-	if err := w.wals.BatchSet(wb); err != nil {
-		x.Printf("Error while deleting entries %v\n", err)
-	}
-	for _, wbe := range wb {
-		if err := wbe.Error; err != nil {
-			x.Printf("Error while deleting entries %v\n", err)
-		}
+	if err := txn.CommitAt(1, nil); err != nil {
+		x.Printf("Error while storing snapshot %v\n", err)
+		return err
 	}
 	return nil
 }
 
 // Store stores the hardstate and entries for a given RAFT group.
 func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
-	wb := make([]*badger.Entry, 0, 100)
+	txn := w.wals.NewTransactionAt(1, true)
 
 	var t, i uint64
 	for _, e := range es {
@@ -126,7 +166,9 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 			return x.Wrapf(err, "wal.Store: While marshal entry")
 		}
 		k := w.entryKey(gid, e.Term, e.Index)
-		wb = badger.EntriesSet(wb, k, data)
+		if err := txn.Set(k, data); err != nil {
+			return err
+		}
 	}
 
 	if !raft.IsEmptyHardState(h) {
@@ -134,7 +176,9 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 		if err != nil {
 			return x.Wrapf(err, "wal.Store: While marshal hardstate")
 		}
-		wb = badger.EntriesSet(wb, w.hardStateKey(gid), data)
+		if err := txn.Set(w.hardStateKey(gid), data); err != nil {
+			return err
+		}
 	}
 
 	// If we get no entries, then the default value of t and i would be zero. That would
@@ -142,69 +186,93 @@ func (w *Wal) Store(gid uint32, h raftpb.HardState, es []raftpb.Entry) error {
 	if t > 0 || i > 0 {
 		// When writing an Entry with Index i, any previously-persisted entries
 		// with Index >= i must be discarded.
+		// Ideally we should be deleting entries from previous term with index >= i,
+		// but to avoid complexity we remove them during reading from wal.
 		start := w.entryKey(gid, t, i+1)
 		prefix := w.prefix(gid)
 		opt := badger.DefaultIteratorOptions
 		opt.PrefetchValues = false
-		itr := w.wals.NewIterator(opt)
+		itr := txn.NewIterator(opt)
 		defer itr.Close()
 
 		for itr.Seek(start); itr.ValidForPrefix(prefix); itr.Next() {
 			key := itr.Item().Key()
 			newk := make([]byte, len(key))
 			copy(newk, key)
-			wb = badger.EntriesDelete(wb, newk)
+			if err := txn.Delete(newk); err != nil {
+				return err
+			}
 		}
 	}
-	if err := w.wals.BatchSet(wb); err != nil {
+	if err := txn.CommitAt(1, nil); err != nil {
 		return err
-	}
-	for _, wbe := range wb {
-		if err := wbe.Error; err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
 func (w *Wal) Snapshot(gid uint32) (snap raftpb.Snapshot, rerr error) {
-	var item badger.KVItem
-	if err := w.wals.Get(w.snapshotKey(gid), &item); err != nil {
+	txn := w.wals.NewTransactionAt(1, false)
+	defer txn.Discard()
+	item, err := txn.Get(w.snapshotKey(gid))
+	if err == badger.ErrKeyNotFound {
+		return
+	}
+	if err != nil {
 		return snap, x.Wrapf(err, "while fetching snapshot from wal")
 	}
-	err := item.Value(func(val []byte) error {
-		return x.Wrapf(snap.Unmarshal(val), "While unmarshal snapshot")
-	})
-	return snap, err
+	val, err := item.Value()
+	if err != nil {
+		return
+	}
+	rerr = x.Wrapf(snap.Unmarshal(val), "While unmarshal snapshot")
+	return
 }
 
 func (w *Wal) HardState(gid uint32) (hd raftpb.HardState, rerr error) {
-	var item badger.KVItem
-	if err := w.wals.Get(w.hardStateKey(gid), &item); err != nil {
+	txn := w.wals.NewTransactionAt(1, false)
+	defer txn.Discard()
+	item, err := txn.Get(w.hardStateKey(gid))
+	if err == badger.ErrKeyNotFound {
+		return
+	}
+	if err != nil {
 		return hd, x.Wrapf(err, "while fetching hardstate from wal")
 	}
-	err := item.Value(func(val []byte) error {
-		return x.Wrapf(hd.Unmarshal(val), "While unmarshal hardstate")
-	})
-	return hd, err
+	val, err := item.Value()
+	if err != nil {
+		return
+	}
+	rerr = x.Wrapf(hd.Unmarshal(val), "While unmarshal snapshot")
+	return
 }
 
 func (w *Wal) Entries(gid uint32, fromTerm, fromIndex uint64) (es []raftpb.Entry, rerr error) {
 	start := w.entryKey(gid, fromTerm, fromIndex)
 	prefix := w.prefix(gid)
-	itr := w.wals.NewIterator(badger.DefaultIteratorOptions)
+	txn := w.wals.NewTransactionAt(1, false)
+	defer txn.Discard()
+	itr := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer itr.Close()
 
+	var firstIndex uint64
 	for itr.Seek(start); itr.ValidForPrefix(prefix); itr.Next() {
 		item := itr.Item()
 		var e raftpb.Entry
-		err := item.Value(func(val []byte) error {
-			return x.Wrapf(e.Unmarshal(val), "While unmarshal raftpb.Entry")
-		})
+		val, err := item.Value()
 		if err != nil {
 			return es, err
 		}
-		es = append(es, e)
+		if err = e.Unmarshal(val); err != nil {
+			return es, err
+		}
+		if e.Index < fromIndex {
+			continue
+		}
+		if firstIndex == 0 {
+			firstIndex = e.Index
+		}
+		// When you see entry with Index i, ignore all entries with index >= i
+		es = append(es[:e.Index-firstIndex], e)
 	}
 	return
 }

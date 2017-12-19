@@ -22,26 +22,27 @@ import (
 	"golang.org/x/net/trace"
 
 	"github.com/dgraph-io/dgraph/conn"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/api"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
 )
 
 var (
-	emptySchemaResult protos.SchemaResult
+	emptySchemaResult intern.SchemaResult
 )
 
 type resultErr struct {
-	result *protos.SchemaResult
+	result *intern.SchemaResult
 	err    error
 }
 
 // getSchema iterates over all predicates and populates the asked fields, if list of
 // predicates is not specified, then all the predicates belonging to the group
 // are returned
-func getSchema(ctx context.Context, s *protos.SchemaRequest) (*protos.SchemaResult, error) {
-	var result protos.SchemaResult
+func getSchema(ctx context.Context, s *intern.SchemaRequest) (*intern.SchemaResult, error) {
+	var result intern.SchemaResult
 	var predicates []string
 	var fields []string
 	if len(s.Predicates) > 0 {
@@ -56,8 +57,10 @@ func getSchema(ctx context.Context, s *protos.SchemaRequest) (*protos.SchemaResu
 	}
 
 	for _, attr := range predicates {
+		// This can happen after a predicate is moved. We don't delete predicate from schema state
+		// immediately. So lets ignore this predicate.
 		if !groups().ServesTablet(attr) {
-			return &emptySchemaResult, errUnservedTablet
+			continue
 		}
 		if schemaNode := populateSchema(attr, fields); schemaNode != nil {
 			result.Schema = append(result.Schema, schemaNode)
@@ -67,8 +70,8 @@ func getSchema(ctx context.Context, s *protos.SchemaRequest) (*protos.SchemaResu
 }
 
 // populateSchema returns the information of asked fields for given attribute
-func populateSchema(attr string, fields []string) *protos.SchemaNode {
-	var schemaNode protos.SchemaNode
+func populateSchema(attr string, fields []string) *api.SchemaNode {
+	var schemaNode api.SchemaNode
 	var typ types.TypeID
 	var err error
 	if typ, err = schema.State().TypeOf(attr); err != nil {
@@ -101,12 +104,12 @@ func populateSchema(attr string, fields []string) *protos.SchemaNode {
 
 // addToSchemaMap groups the predicates by group id, if list of predicates is
 // empty then it adds all known groups
-func addToSchemaMap(schemaMap map[uint32]*protos.SchemaRequest, schema *protos.SchemaRequest) {
+func addToSchemaMap(schemaMap map[uint32]*intern.SchemaRequest, schema *intern.SchemaRequest) {
 	for _, attr := range schema.Predicates {
 		gid := groups().BelongsTo(attr)
 		s := schemaMap[gid]
 		if s == nil {
-			s = &protos.SchemaRequest{GroupId: gid}
+			s = &intern.SchemaRequest{GroupId: gid}
 			s.Fields = schema.Fields
 			schemaMap[gid] = s
 		}
@@ -124,7 +127,7 @@ func addToSchemaMap(schemaMap map[uint32]*protos.SchemaRequest, schema *protos.S
 		}
 		s := schemaMap[gid]
 		if s == nil {
-			s = &protos.SchemaRequest{GroupId: gid}
+			s = &intern.SchemaRequest{GroupId: gid}
 			s.Fields = schema.Fields
 			schemaMap[gid] = s
 		}
@@ -134,7 +137,7 @@ func addToSchemaMap(schemaMap map[uint32]*protos.SchemaRequest, schema *protos.S
 // If the current node serves the group serve the schema or forward
 // to relevant node
 // TODO: Janardhan - if read fails try other servers serving same group
-func getSchemaOverNetwork(ctx context.Context, gid uint32, s *protos.SchemaRequest, ch chan resultErr) {
+func getSchemaOverNetwork(ctx context.Context, gid uint32, s *intern.SchemaRequest, ch chan resultErr) {
 	if groups().ServesGroup(gid) {
 		schema, e := getSchema(ctx, s)
 		ch <- resultErr{result: schema, err: e}
@@ -147,25 +150,27 @@ func getSchemaOverNetwork(ctx context.Context, gid uint32, s *protos.SchemaReque
 		return
 	}
 	conn := pl.Get()
-	c := protos.NewWorkerClient(conn)
+	c := intern.NewWorkerClient(conn)
 	schema, e := c.Schema(ctx, s)
 	ch <- resultErr{result: schema, err: e}
 }
 
 // GetSchemaOverNetwork checks which group should be serving the schema
 // according to fingerprint of the predicate and sends it to that instance.
-func GetSchemaOverNetwork(ctx context.Context, schema *protos.SchemaRequest) ([]*protos.SchemaNode, error) {
+func GetSchemaOverNetwork(ctx context.Context, schema *intern.SchemaRequest) ([]*api.SchemaNode, error) {
 	if err := x.HealthCheck(); err != nil {
 		if tr, ok := trace.FromContext(ctx); ok {
 			tr.LazyPrintf("Request rejected %v", err)
 		}
 		return nil, err
 	}
-	schemaMap := make(map[uint32]*protos.SchemaRequest)
+
+	// Map of groupd id => Predicates for that group.
+	schemaMap := make(map[uint32]*intern.SchemaRequest)
 	addToSchemaMap(schemaMap, schema)
 
 	results := make(chan resultErr, len(schemaMap))
-	var schemaNodes []*protos.SchemaNode
+	var schemaNodes []*api.SchemaNode
 
 	for gid, s := range schemaMap {
 		if gid == 0 {
@@ -193,7 +198,7 @@ func GetSchemaOverNetwork(ctx context.Context, schema *protos.SchemaRequest) ([]
 }
 
 // Schema is used to get schema information over the network on other instances.
-func (w *grpcWorker) Schema(ctx context.Context, s *protos.SchemaRequest) (*protos.SchemaResult, error) {
+func (w *grpcWorker) Schema(ctx context.Context, s *intern.SchemaRequest) (*intern.SchemaResult, error) {
 	if ctx.Err() != nil {
 		return &emptySchemaResult, ctx.Err()
 	}

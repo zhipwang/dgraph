@@ -18,802 +18,1043 @@ package client_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
-	"strings"
+	"os/exec"
+	"testing"
 	"time"
 
 	"github.com/dgraph-io/dgraph/client"
+	"github.com/dgraph-io/dgraph/protos/api"
 	"github.com/dgraph-io/dgraph/x"
-	"github.com/gogo/protobuf/proto"
-	"github.com/twpayne/go-geom/encoding/wkb"
 	"google.golang.org/grpc"
 )
 
-func Node(val string, c *client.Dgraph) string {
-	if uid, err := strconv.ParseUint(val, 0, 64); err == nil {
-		return c.NodeUid(uid).String()
+func TestMain(m *testing.M) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	zw, err := ioutil.TempDir("", "")
+	x.Check(err)
+
+	cmd := exec.Command("go", "install", "github.com/dgraph-io/dgraph/dgraph")
+	cmd.Env = os.Environ()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Fatalf("Could not run %q: %s", cmd.Args, string(out))
 	}
-	if strings.HasPrefix(val, "_:") {
-		n, err := c.NodeBlank(val[2:])
-		if err != nil {
-			log.Fatalf("Error while converting to node: %v", err)
+	zero := exec.Command(os.ExpandEnv("$GOPATH/bin/dgraph"),
+		"zero",
+		"-w", zw,
+		"-o", "-2000",
+	)
+	zero.Stdout = os.Stdout
+	zero.Stderr = os.Stdout
+	x.Check(zero.Start())
+
+	p, err := ioutil.TempDir("", "")
+	x.Check(err)
+	w, err := ioutil.TempDir("", "")
+	x.Check(err)
+
+	server := exec.Command(os.ExpandEnv("$GOPATH/bin/dgraph"),
+		"server",
+		"-w", w,
+		"-p", p,
+		"--zero", "127.0.0.1:5080",
+		"--memory_mb", "2048",
+	)
+	server.Stdout = os.Stdout
+	server.Stderr = os.Stdout
+	x.Check(server.Start())
+	// Wait for servers to start and connect.
+	time.Sleep(5 * time.Second)
+	s := m.Run()
+
+	x.Check(zero.Process.Kill())
+	x.Check(server.Process.Kill())
+	x.Check(os.RemoveAll(zw))
+	x.Check(os.RemoveAll(w))
+	x.Check(os.RemoveAll(p))
+	os.Exit(s)
+}
+
+func ExampleDgraph_Alter_dropAll() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	op := api.Operation{
+		DropAll: true,
+	}
+	ctx := context.Background()
+	if err := dg.Alter(ctx, &op); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(err)
+
+	// Output: <nil>
+}
+
+func ExampleTxn_Query_variables() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	type Person struct {
+		Uid  string `json:"uid,omitempty"`
+		Name string `json:"name,omitempty"`
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		name: string @index(exact) .
+	`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	p := Person{
+		Name: "Alice",
+	}
+
+	mu := &api.Mutation{
+		CommitNow: true,
+	}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	variables := make(map[string]string)
+	variables["$a"] = "Alice"
+	q := `query Alice($a: string){
+		me(func: eq(name, $a)) {
+			name
 		}
-		return n.String()
-	}
-	n, err := c.NodeXid(val, false)
+	}`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
 	if err != nil {
-		log.Fatalf("Error while converting to node: %v", err)
+		log.Fatal(err)
 	}
-	return n.String()
+
+	type Root struct {
+		Me []Person `json:"me"`
+	}
+
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(resp.Json))
+	// Output: {"me":[{"name":"Alice"}]}
 }
 
-func ExampleReq_Set() {
+func ExampleTxn_Mutate() {
+	type School struct {
+		Name string `json:"name,omitempty"`
+	}
+
+	type loc struct {
+		Type   string    `json:"type,omitempty"`
+		Coords []float64 `json:"coordinates,omitempty"`
+	}
+
+	// If omitempty is not set, then edges with empty values (0 for int/float, "" for string, false
+	// for bool) would be created for values not specified explicitly.
+
+	type Person struct {
+		Uid      string   `json:"uid,omitempty"`
+		Name     string   `json:"name,omitempty"`
+		Age      int      `json:"age,omitempty"`
+		Married  bool     `json:"married,omitempty"`
+		Raw      []byte   `json:"raw_bytes,omitempty"`
+		Friends  []Person `json:"friend,omitempty"`
+		Location loc      `json:"loc,omitempty"`
+		School   []School `json:"school,omitempty"`
+	}
+
 	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
 	defer conn.Close()
 
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
 
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
+	// While setting an object if a struct has a Uid then its properties in the graph are updated
+	// else a new node is created.
+	// In the example below new nodes for Alice, Bob and Charlie and school are created (since they
+	// dont have a Uid).
+	p := Person{
+		Name:    "Alice",
+		Age:     26,
+		Married: true,
+		Location: loc{
+			Type:   "Point",
+			Coords: []float64{1.1, 2},
+		},
+		Raw: []byte("raw_bytes"),
+		Friends: []Person{{
+			Name: "Bob",
+			Age:  24,
+		}, {
+			Name: "Charlie",
+			Age:  29,
+		}},
+		School: []School{{
+			Name: "Crown Public School",
+		}},
+	}
 
-	// Create new request
-	req := client.Req{}
+	op := &api.Operation{}
+	op.Schema = `
+		age: int .
+		married: bool .
+	`
 
-	// Create a node for person1 (the blank node label "person1" exists
-	// client-side so the mutation can correctly link nodes.  It is not
-	// persisted in the server)
-	person1, err := dgraphClient.NodeBlank("person1")
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Add edges for name and salary to person1
-	e := person1.Edge("name")
-	e.SetValueString("Steven Spielberg")
-	err = req.Set(e)
-	x.Check(err)
-
-	// If the old variable was written over or out of scope we can lookup person1 again,
-	// the string->node mapping is remembered by the client for this session.
-	p, err := dgraphClient.NodeBlank("person1")
-	e = p.Edge("salary")
-	e.SetValueFloat(13333.6161)
-	err = req.Set(e)
-	x.Check(err)
-
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
+	mu := &api.Mutation{
+		CommitNow: true,
 	}
-
-	// proto.MarshalTextString(resp) can be used to print the raw response as text.  Client
-	// programs usually use Umarshal to unpack query responses to a struct (or the protocol
-	// buffer can be accessed with resp.N)
-	fmt.Printf("%+v\n", proto.MarshalTextString(resp))
-
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleReq_Delete() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	// Create new request
-	req := client.Req{}
-
-	// Create a node for person1 (the blank node label "person1" exists
-	// client-side so the mutation can correctly link nodes.  It is not
-	// persisted in the server)
-	person1, err := dgraphClient.NodeBlank("person1")
-	if err != nil {
-		log.Fatal(err)
-	}
-	person2, err := dgraphClient.NodeBlank("person2")
+	pb, err := json.Marshal(p)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	e := person1.Edge("name")
-	e.SetValueString("Steven Spallding")
-	err = req.Set(e)
-	x.Check(err)
-
-	e = person2.Edge("name")
-	e.SetValueString("Steven Stevenson")
-	err = req.Set(e)
-	x.Check(err)
-
-	e = person1.ConnectTo("friend", person2)
-
-	// Add person1, person2 and friend edge to store
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-	fmt.Printf("%+v\n", proto.MarshalTextString(resp))
-
-	// Now remove the friend edge
-
-	// If the old variable was written over or out of scope we can lookup person1 again,
-	// the string->node mapping is remembered by the client for this session.
-	p1, err := dgraphClient.NodeBlank("person1")
-	p2, err := dgraphClient.NodeBlank("person2")
-
-	e = p1.ConnectTo("friend", p2)
-	req = client.Req{}
-	req.Delete(e)
-
-	// Run the mutation to delete the edge
-	resp, err = dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-	fmt.Printf("%+v\n", proto.MarshalTextString(resp))
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleDgraph_BatchSet() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	bmOpts := client.BatchMutationOptions{
-		Size:          1000,
-		Pending:       100,
-		PrintCounters: false,
-	}
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, bmOpts, clientDir)
-
-	// Create a node for person1 (the blank node label "person1" exists
-	// client-side so the mutation can correctly link nodes.  It is not
-	// persisted in the server)
-	person1, err := dgraphClient.NodeBlank("person1")
+	mu.SetJson = pb
+	assigned, err := dg.NewTxn().Mutate(ctx, mu)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Add edges for name and salary to the batch mutation
-	e := person1.Edge("name")
-	e.SetValueString("Steven Spielberg")
-	dgraphClient.BatchSet(e)
-	e = person1.Edge("salary")
-	e.SetValueFloat(13333.6161)
-	dgraphClient.BatchSet(e)
-
-	dgraphClient.BatchFlush() // Must be called to flush buffers after all mutations are added.
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleEdge_AddFacet() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	// Create a node for person1 add an edge for name.
-	person1, err := dgraphClient.NodeXid("person1", false)
-	if err != nil {
-		log.Fatal(err)
-	}
-	e := person1.Edge("name")
-	e.SetValueString("Steven Stevenson")
-
-	// Add facets since and alias to the edge.
-	e.AddFacet("since", "2006-01-02T15:04:05")
-	e.AddFacet("alias", `"Steve"`)
-
-	err = req.Set(e)
-	x.Check(err)
-
-	person2, err := dgraphClient.NodeXid("person2", false)
-	if err != nil {
-		log.Fatal(err)
-	}
-	e = person2.Edge("name")
-	e.SetValueString("William Jones")
-	err = req.Set(e)
-	x.Check(err)
-
-	e = person1.ConnectTo("friend", person2)
-
-	// Facet on a node-node edge.
-	e.AddFacet("close", "true")
-	err = req.Set(e)
-	x.Check(err)
-
-	req.SetQuery(`mutation { schema { name: string @index(exact) . } }`)
-
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	req = client.Req{}
-	req.SetQuery(`{
-		query(func: eq(name,"Steven Stevenson")) {
-			name @facets
-			friend @facets {
+	// Assigned uids for nodes which were created would be returned in the resp.AssignedUids map.
+	puid := assigned.Uids["blank-0"]
+	const q = `query Me($id: string){
+		me(func: uid($id)) {
+			name
+			age
+			loc
+			raw_bytes
+			married
+			friend @filter(eq(name, "Bob")) {
+				name
+				age
+			}
+			school {
 				name
 			}
 		}
-	}`)
+	}`
 
-	resp, err = dgraphClient.Run(context.Background(), &req)
+	variables := make(map[string]string)
+	variables["$id"] = puid
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
 	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
+		log.Fatal(err)
 	}
 
-	// Types representing information in the graph.
-	type nameFacets struct {
-		Since time.Time `dgraph:"since"`
-		Alias string    `dgraph:"alias"`
+	type Root struct {
+		Me []Person `json:"me"`
 	}
 
-	type friendFacets struct {
-		Close bool `dgraph:"close"`
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// R.Me would be same as the person that we set above.
+	// fmt.Printf("Me: %+v\n", r.Me)
+
+	fmt.Println(string(resp.Json))
+	// Output: {"me":[{"name":"Alice","age":26,"loc":{"type":"Point","coordinates":[1.1,2]},"raw_bytes":"cmF3X2J5dGVz","married":true,"friend":[{"name":"Bob","age":24}],"school":[{"name":"Crown Public School"}]}]}
+
+}
+
+func ExampleTxn_Mutate_bytes() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	type Person struct {
+		Uid   string `json:"uid,omitempty"`
+		Name  string `json:"name,omitempty"`
+		Bytes []byte `json:"bytes,omitempty"`
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		name: string @index(exact) .
+	`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	p := Person{
+		Name:  "Alice-new",
+		Bytes: []byte("raw_bytes"),
+	}
+
+	mu := &api.Mutation{
+		CommitNow: true,
+	}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	q := `{
+	q(func: eq(name, "Alice-new")) {
+		name
+		bytes
+	}
+}`
+
+	resp, err := dg.NewTxn().Query(ctx, q)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Root struct {
+		Me []Person `json:"q"`
+	}
+
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Me: %+v\n", r.Me)
+
+	// Output: Me: [{Uid: Name:Alice-new Bytes:[114 97 119 95 98 121 116 101 115]}]
+}
+
+func ExampleTxn_Query_unmarshal() {
+	type School struct {
+		Name string `json:"name,omitempty"`
 	}
 
 	type Person struct {
-		Name         string       `dgraph:"name"`
-		NameFacets   nameFacets   `dgraph:"name@facets"`
-		Friends      []Person     `dgraph:"friend"`
-		FriendFacets friendFacets `dgraph:"@facets"`
+		Uid     string   `json:"uid,omitempty"`
+		Name    string   `json:"name,omitempty"`
+		Age     int      `json:"age,omitempty"`
+		Married bool     `json:"married,omitempty"`
+		Raw     []byte   `json:"raw_bytes,omitempty"`
+		Friends []Person `json:"friend,omitempty"`
+		School  []School `json:"school,omitempty"`
 	}
 
-	// Helper type to unmarshal query
-	type Res struct {
-		Root Person `dgraph:"query"`
-	}
-
-	var pq Res
-	err = client.Unmarshal(resp.N, &pq)
-	if err != nil {
-		log.Fatal("Couldn't unmarshal response : ", err)
-	}
-
-	fmt.Println("Found : ", pq.Root.Name)
-	fmt.Println("Who likes to be called : ", pq.Root.NameFacets.Alias, " since ", pq.Root.NameFacets.Since)
-	fmt.Println("Friends : ")
-	for i := range pq.Root.Friends {
-		fmt.Print("\t", pq.Root.Friends[i].Name)
-		if pq.Root.Friends[i].FriendFacets.Close {
-			fmt.Println(" who is a close friend.")
-		} else {
-			fmt.Println(" who is not a close friend.")
-		}
-	}
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleReq_SetQuery() {
 	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
 	defer conn.Close()
 
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
 
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
+	// While setting an object if a struct has a Uid then its properties in the graph are updated
+	// else a new node is created.
+	// In the example below new nodes for Alice and Charlie and school are created (since they dont
+	// have a Uid).  Alice is also connected via the friend edge to an existing node with Uid
+	// 1000(Bob).  We also set Name and Age values for this node with Uid 1000.
 
-	req := client.Req{}
-	alice, err := dgraphClient.NodeXid("alice", false)
+	p := Person{
+		Name:    "Alice",
+		Age:     26,
+		Married: true,
+		Raw:     []byte("raw_bytes"),
+		Friends: []Person{{
+			Uid:  "1000",
+			Name: "Bob",
+			Age:  24,
+		}, {
+			Name: "Charlie",
+			Age:  29,
+		}},
+		School: []School{{
+			Name: "Crown Public School",
+		}},
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		age: int .
+		married: bool .
+	`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
 	if err != nil {
 		log.Fatal(err)
 	}
-	e := alice.Edge("name")
-	e.SetValueString("Alice")
-	err = req.Set(e)
-	x.Check(err)
 
-	e = alice.Edge("falls.in")
-	e.SetValueString("Rabbit hole")
-	err = req.Set(e)
-	x.Check(err)
-
-	req.SetQuery(`mutation { schema { name: string @index(exact) . } }`)
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	req = client.Req{}
-
-	req.SetQuery(`{
-		me(func: eq(name, "Alice")) {
-			name
-			falls.in
-		}
-	}`)
-	resp, err = dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	type Alice struct {
-		Name         string `dgraph:"name"`
-		WhatHappened string `dgraph:"falls.in"`
-	}
-
-	type Res struct {
-		Root Alice `dgraph:"me"`
-	}
-
-	var r Res
-	err = client.Unmarshal(resp.N, &r)
-	x.Check(err)
-	fmt.Printf("Alice: %+v\n\n", r.Root)
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleReq_SetQueryWithVariables() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	alice, err := dgraphClient.NodeXid("alice", false)
+	txn := dg.NewTxn()
+	mu := &api.Mutation{}
+	pb, err := json.Marshal(p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	e := alice.Edge("name")
-	e.SetValueString("Alice")
-	err = req.Set(e)
-	x.Check(err)
 
-	e = alice.Edge("falls.in")
-	e.SetValueString("Rabbit hole")
-	err = req.Set(e)
-	x.Check(err)
-
-	req.SetQuery(`mutation { schema { name: string @index(exact) . } }`)
-	resp, err := dgraphClient.Run(context.Background(), &req)
+	mu.SetJson = pb
+	mu.CommitNow = true
+	assigned, err := txn.Mutate(ctx, mu)
 	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
+		log.Fatal(err)
 	}
 
-	req = client.Req{}
+	// Assigned uids for nodes which were created would be returned in the resp.AssignedUids map.
+	puid := assigned.Uids["blank-0"]
 	variables := make(map[string]string)
-	variables["$a"] = "Alice"
-	req.SetQueryWithVariables(`{
-		me(func: eq(name, $a)) {
+	variables["$id"] = puid
+	const q = `query Me($id: string){
+		me(func: uid($id)) {
 			name
-			falls.in
+			age
+			loc
+			raw_bytes
+			married
+			friend @filter(eq(name, "Bob")) {
+				name
+				age
+			}
+			school {
+				name
+			}
 		}
-	}`, variables)
+	}`
 
-	resp, err = dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	type Alice struct {
-		Name         string `dgraph:"name"`
-		WhatHappened string `dgraph:"falls.in"`
-	}
-
-	type Res struct {
-		Root Alice `dgraph:"me"`
-	}
-
-	var r Res
-	err = client.Unmarshal(resp.N, &r)
-	x.Check(err)
-	fmt.Printf("Alice: %+v\n\n", r.Root)
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleDgraph_NodeUidVar() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	// Add some data
-	alice, err := dgraphClient.NodeXid("alice", false)
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
 	if err != nil {
 		log.Fatal(err)
 	}
-	e := alice.Edge("name")
-	e.SetValueString("Alice")
-	err = req.Set(e)
-	x.Check(err)
 
-	req.SetQuery(`mutation { schema { name: string @index(exact) . } }`)
-
-	resp, err := dgraphClient.Run(context.Background(), &req)
-
-	// New request
-	req = client.Req{}
-
-	// Now issue a query and mutation using client interface
-
-	req.SetQuery(`{
-    a as var(func: eq(name, "Alice"))
-    me(func: uid(a)) {
-        name
-    }
-}`)
-
-	// Get a node for the variable a in the query above.
-	n, _ := dgraphClient.NodeUidVar("a")
-	e = n.Edge("falls.in")
-	e.SetValueString("Rabbit hole")
-	err = req.Set(e)
-	x.Check(err)
-
-	resp, err = dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
+	type Root struct {
+		Me []Person `json:"me"`
 	}
-	fmt.Printf("%+v\n", proto.MarshalTextString(resp))
 
-	// This is equivalent to the single query and mutation
-	//
-	// {
-	//		a as var(func: eq(name, "Alice"))
-	//		me(func: uid(a)) {
-	//			name
-	//		}
-	// }
-	// mutation { set {
-	//		var(a) <falls.in> "Rabbit hole" .
-	// }}
-	//
-	// It's often easier to construct such things with client functions that
-	// by manipulating raw strings.
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleEdge_SetValueBytes() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	alice, err := dgraphClient.NodeBlank("alice")
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
 	if err != nil {
 		log.Fatal(err)
 	}
-	e := alice.Edge("name")
-	e.SetValueString("Alice")
-	err = req.Set(e)
-	x.Check(err)
 
-	e = alice.Edge("somestoredbytes")
-	err = e.SetValueBytes([]byte(`\xbd\xb2\x3d\xbc\x20\xe2\x8c\x98`))
-	x.Check(err)
-	err = req.Set(e)
-	x.Check(err)
+	fmt.Println(string(resp.Json))
+	// Output: {"me":[{"name":"Alice","age":26,"raw_bytes":"cmF3X2J5dGVz","married":true,"friend":[{"name":"Bob","age":24}],"school":[{"name":"Crown Public School"}]}]}
+}
 
-	req.SetQuery(`mutation {
-	schema {
+func ExampleTxn_Mutate_facets() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	// Doing a dropAll isn't required by the user. We do it here so that we can verify that the
+	// example runs as expected.
+	op := api.Operation{
+		DropAll: true,
+	}
+	ctx := context.Background()
+	if err := dg.Alter(ctx, &op); err != nil {
+		log.Fatal(err)
+	}
+
+	op = api.Operation{}
+	op.Schema = `
 		name: string @index(exact) .
-	}
-}
-{
-	q(func: eq(name, "Alice")) {
-		name
-		somestoredbytes
-	}
-}`)
+	`
 
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	type Alice struct {
-		Name      string `dgraph:"name"`
-		ByteValue []byte `dgraph:"somestoredbytes"`
-	}
-
-	type Res struct {
-		Root Alice `dgraph:"q"`
-	}
-
-	var r Res
-	err = client.Unmarshal(resp.N, &r)
-	x.Check(err)
-	fmt.Printf("Alice: %+v\n\n", r.Root)
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleUnmarshal() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	// A mutation as a string, see ExampleReq_NodeUidVar, ExampleReq_SetQuery,
-	// etc for examples of mutations using client functions.
-	req.SetQuery(`
-mutation {
-	schema {
-		name: string @index .
-	}
-	set {
-		_:person1 <name> "Alex" .
-		_:person2 <name> "Beatie" .
-		_:person3 <name> "Chris" .
-
-		_:person1 <friend> _:person2 .
-		_:person1 <friend> _:person3 .
-	}
-}
-{
-	friends(func: eq(name, "Alex")) {
-		name
-		friend {
-			name
-		}
-	}
-}`)
-
-	// Run the request in the Dgraph server.  The mutations are added, then
-	// the query is exectuted.
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	// Unmarshal the response into a custom struct
-
-	// A type representing information in the graph.
-	type person struct {
-		Name    string   `dgraph:"name"`
-		Friends []person `dgraph:"friend"`
-	}
-
-	// A helper type matching the query root.
-	type friends struct {
-		Root person `dgraph:"friends"`
-	}
-
-	var f friends
-	err = client.Unmarshal(resp.N, &f)
-	if err != nil {
-		log.Fatal("Couldn't unmarshal response : ", err)
-	}
-
-	fmt.Println("Name : ", f.Root.Name)
-	fmt.Print("Friends : ")
-	for _, p := range f.Root.Friends {
-		fmt.Print(p.Name, " ")
-	}
-	fmt.Println()
-
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleUnmarshal_facetsUpdate() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	req.SetQuery(`
-mutation {
-	schema {
-		name: string @index .
-	}
-	set {
-		_:person1 <name> "Alex" .
-		_:person2 <name> "Beatie" .
-		_:person3 <name> "Chris" .
-		_:person4 <name> "David" .
-
-		_:person1 <friend> _:person2 (close=true).
-		_:person1 <friend> _:person3 (close=false).
-		_:person1 <friend> _:person4 (close=true).
-	}
-}
-{
-	friends(func: eq(name, "Alex")) {
-		_uid_
-		name
-		friend @facets {
-			_uid_
-			name
-		}
-	}
-}`)
-
-	// Run the request in the Dgraph server.  The mutations are added, then
-	// the query is exectuted.
-	resp, err := dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	// Unmarshal the response into a custom struct
-
-	type friendFacets struct {
-		Close bool `dgraph:"close"`
-	}
-
-	// A type representing information in the graph.
-	type person struct {
-		ID           uint64        `dgraph:"_uid_"` // record the UID for our update
-		Name         string        `dgraph:"name"`
-		Friends      []*person     `dgraph:"friend"` // Unmarshal with pointers to structs
-		FriendFacets *friendFacets `dgraph:"@facets"`
-	}
-
-	// A helper type matching the query root.
-	type friends struct {
-		Root person `dgraph:"friends"`
-	}
-
-	var f friends
-	err = client.Unmarshal(resp.N, &f)
-	if err != nil {
-		log.Fatal("Couldn't unmarshal response : ", err)
-	}
-
-	req = client.Req{}
-
-	// Now update the graph.
-	// for the close friends, add the reverse edge and note in a facet when we did this.
-	for _, p := range f.Root.Friends {
-		if p.FriendFacets.Close {
-			n := dgraphClient.NodeUid(p.ID)
-			e := n.ConnectTo("friend", dgraphClient.NodeUid(f.Root.ID))
-			e.AddFacet("since", time.Now().Format(time.RFC3339))
-			req.Set(e)
-		}
-	}
-
-	resp, err = dgraphClient.Run(context.Background(), &req)
-	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
-	}
-
-	err = dgraphClient.Close()
-	x.Check(err)
-}
-
-func ExampleEdge_SetValueGeoJson() {
-	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
-	x.Checkf(err, "While trying to dial gRPC")
-	defer conn.Close()
-
-	clientDir, err := ioutil.TempDir("", "client_")
-	x.Check(err)
-	defer os.RemoveAll(clientDir)
-
-	dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions, clientDir)
-
-	req := client.Req{}
-
-	alice, err := dgraphClient.NodeBlank("alice")
+	err = dg.Alter(ctx, &op)
 	if err != nil {
 		log.Fatal(err)
 	}
-	e := alice.Edge("name")
-	e.SetValueString("Alice")
-	err = req.Set(e)
-	x.Check(err)
 
-	e = alice.Edge("loc")
-	err = e.SetValueGeoJson(`{"Type":"Point", "Coordinates":[1.1,2.0]}`)
-	x.Check(err)
-	err = req.Set(e)
-	x.Check(err)
-
-	e = alice.Edge("city")
-	err = e.SetValueGeoJson(`{"Type":"Polygon", "Coordinates":[[[0.0,0.0], [2.0,0.0], [2.0, 2.0], [0.0, 2.0], [0.0, 0.0]]]}`)
-	x.Check(err)
-	err = req.Set(e)
-	x.Check(err)
-
-	req.SetQuery(`mutation {
-	schema {
-		name: string @index(exact) .
+	// This example shows example for SetObject using facets.
+	type School struct {
+		Name  string    `json:"name,omitempty"`
+		Since time.Time `json:"school|since,omitempty"`
 	}
-}
-{
-	q(func: eq(name, "Alice")) {
-		name
-		loc
-		city
-	}
-}`)
 
-	resp, err := dgraphClient.Run(context.Background(), &req)
+	type Person struct {
+		Name       string   `json:"name,omitempty"`
+		NameOrigin string   `json:"name|origin,omitempty"`
+		Friends    []Person `json:"friend,omitempty"`
+
+		// These are facets on the friend edge.
+		Since  time.Time `json:"friend|since,omitempty"`
+		Family string    `json:"friend|family,omitempty"`
+		Age    float64   `json:"friend|age,omitempty"`
+		Close  bool      `json:"friend|close,omitempty"`
+
+		School []School `json:"school,omitempty"`
+	}
+
+	ti := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+	p := Person{
+		Name:       "Alice",
+		NameOrigin: "Indonesia",
+		Friends: []Person{
+			Person{
+				Name:   "Bob",
+				Since:  ti,
+				Family: "yes",
+				Age:    13,
+				Close:  true,
+			},
+			Person{
+				Name:   "Charlie",
+				Family: "maybe",
+				Age:    16,
+			},
+		},
+		School: []School{School{
+			Name:  "Wellington School",
+			Since: ti,
+		}},
+	}
+
+	mu := &api.Mutation{}
+	pb, err := json.Marshal(p)
 	if err != nil {
-		log.Fatalf("Error in getting response from server, %s", err)
+		log.Fatal(err)
 	}
 
-	type Alice struct {
-		Name string `dgraph:"name"`
-		Loc  []byte `dgraph:"loc"`
-		City []byte `dgraph:"city"`
+	mu.SetJson = pb
+	mu.CommitNow = true
+	assigned, err := dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	type Res struct {
-		Root Alice `dgraph:"q"`
+	auid := assigned.Uids["blank-0"]
+	variables := make(map[string]string)
+	variables["$id"] = auid
+
+	const q = `query Me($id: string){
+        me(func: uid($id)) {
+            name @facets
+			friend @filter(eq(name, "Bob")) @facets {
+                name
+            }
+            school @facets {
+                name
+            }
+
+        }
+    }`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	var r Res
-	err = client.Unmarshal(resp.N, &r)
-	x.Check(err)
-	fmt.Printf("Alice: %+v\n\n", r.Root)
-	loc, err := wkb.Unmarshal(r.Root.Loc)
-	x.Check(err)
-	city, err := wkb.Unmarshal(r.Root.City)
-	x.Check(err)
+	type Root struct {
+		Me []Person `json:"me"`
+	}
 
-	fmt.Printf("Loc: %+v\n\n", loc)
-	fmt.Printf("City: %+v\n\n", city)
-	err = dgraphClient.Close()
-	x.Check(err)
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Me: %+v\n", r.Me)
+	// Output: Me: [{Name:Alice NameOrigin:Indonesia Friends:[{Name:Bob NameOrigin: Friends:[] Since:2009-11-10 23:00:00 +0000 UTC Family:yes Age:13 Close:true School:[]}] Since:0001-01-01 00:00:00 +0000 UTC Family: Age:0 Close:false School:[{Name:Wellington School Since:2009-11-10 23:00:00 +0000 UTC}]}]
+}
+
+func ExampleTxn_Mutate_list() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+	// This example shows example for SetObject for predicates with list type.
+	type Person struct {
+		Uid         string   `json:"uid"`
+		Address     []string `json:"address"`
+		PhoneNumber []int64  `json:"phone_number"`
+	}
+
+	p := Person{
+		Address:     []string{"Redfern", "Riley Street"},
+		PhoneNumber: []int64{9876, 123},
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		address: [string] .
+		phone_number: [int] .
+	`
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu := &api.Mutation{}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	mu.CommitNow = true
+	assigned, err := dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	variables := map[string]string{"$id": assigned.Uids["blank-0"]}
+	const q = `
+	query Me($id: string){
+		me(func: uid($id)) {
+			address
+			phone_number
+		}
+	}
+	`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Root struct {
+		Me []Person `json:"me"`
+	}
+
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(resp.Json))
+	// Output: {"me":[{"address":["Riley Street","Redfern"],"phone_number":[9876,123]}]}
+
+}
+
+func ExampleDeleteEdges() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	op := &api.Operation{}
+	op.Schema = `
+			age: int .
+			married: bool .
+		`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type School struct {
+		Uid  string `json:"uid"`
+		Name string `json:"name@en,omitempty"`
+	}
+
+	type Person struct {
+		Uid      string    `json:"uid,omitempty"`
+		Name     string    `json:"name,omitempty"`
+		Age      int       `json:"age,omitempty"`
+		Married  bool      `json:"married,omitempty"`
+		Friends  []Person  `json:"friends,omitempty"`
+		Location string    `json:"loc,omitempty"`
+		Schools  []*School `json:"schools,omitempty"`
+	}
+
+	// Lets add some data first.
+	p := Person{
+		Name:     "Alice",
+		Age:      26,
+		Married:  true,
+		Location: "Riley Street",
+		Friends: []Person{{
+			Name: "Bob",
+			Age:  24,
+		}, {
+			Name: "Charlie",
+			Age:  29,
+		}},
+		Schools: []*School{&School{
+			Name: "Crown Public School",
+		}},
+	}
+
+	mu := &api.Mutation{}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	mu.CommitNow = true
+	mu.IgnoreIndexConflict = true
+	assigned, err := dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	uid := assigned.Uids["blank-0"]
+	variables := make(map[string]string)
+	variables["$id"] = uid
+	const q = `query Me($id: string){
+		me(func: uid($id)) {
+			name
+			age
+			loc
+			married
+			friends {
+				name
+				age
+			}
+			schools {
+				name@en
+			}
+		}
+	}`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Now lets delete the friend and location edge from Alice
+	mu = &api.Mutation{}
+	client.DeleteEdges(mu, uid, "friends", "loc")
+
+	mu.CommitNow = true
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err = dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Root struct {
+		Me []Person `json:"me"`
+	}
+
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	fmt.Println(string(resp.Json))
+	// Output: {"me":[{"name":"Alice","age":26,"married":true,"schools":[{"name@en":"Crown Public School"}]}]}
+}
+
+func ExampleTxn_Mutate_deleteNode() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	// In this test we check S * * deletion.
+	type Person struct {
+		Uid     string    `json:"uid,omitempty"`
+		Name    string    `json:"name,omitempty"`
+		Age     int       `json:"age,omitempty"`
+		Married bool      `json:"married,omitempty"`
+		Friends []*Person `json:"friend,omitempty"`
+	}
+
+	p := Person{
+		Uid:     "1000",
+		Name:    "Alice",
+		Age:     26,
+		Married: true,
+		Friends: []*Person{&Person{
+			Uid:  "1001",
+			Name: "Bob",
+			Age:  24,
+		}, &Person{
+			Uid:  "1002",
+			Name: "Charlie",
+			Age:  29,
+		}},
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		age: int .
+		married: bool .
+	`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu := &api.Mutation{
+		CommitNow: true,
+	}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	variables := make(map[string]string)
+	variables["$id"] = "1000"
+	const q = `query Me($id: string){
+		me(func: uid($id)) {
+			name
+			age
+			married
+			friend {
+				uid
+				name
+				age
+			}
+		}
+
+		me2(func: uid(1001)) {
+			uid
+			name
+			age
+		}
+
+		me3(func: uid(1002)) {
+			uid
+			name
+			age
+		}
+	}`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Root struct {
+		Me  []Person `json:"me"`
+		Me2 []Person `json:"me2"`
+		Me3 []Person `json:"me3"`
+	}
+
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+
+	// Now lets try to delete Alice. This won't delete Bob and Charlie but just remove the
+	// connection between Alice and them.
+	p2 := Person{
+		Uid: "1000",
+	}
+
+	mu = &api.Mutation{
+		CommitNow: true,
+	}
+	pb, err = json.Marshal(p2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.DeleteJson = pb
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err = dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Resp after deleting node: %+v\n", string(resp.Json))
+	// Output: Resp after deleting node: {"me":[],"me2":[{"uid":"0x3e9","name":"Bob","age":24}],"me3":[{"uid":"0x3ea","name":"Charlie","age":29}]}
+}
+
+func ExampleTxn_Mutate_deletePredicate() {
+	conn, err := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("While trying to dial gRPC")
+	}
+	defer conn.Close()
+
+	dc := api.NewDgraphClient(conn)
+	dg := client.NewDgraphClient(dc)
+
+	type Person struct {
+		Uid     string   `json:"uid,omitempty"`
+		Name    string   `json:"name,omitempty"`
+		Age     int      `json:"age,omitempty"`
+		Married bool     `json:"married,omitempty"`
+		Friends []Person `json:"friend,omitempty"`
+	}
+
+	p := Person{
+		Uid:     "1000",
+		Name:    "Alice",
+		Age:     26,
+		Married: true,
+		Friends: []Person{Person{
+			Uid:  "1001",
+			Name: "Bob",
+			Age:  24,
+		}, Person{
+			Uid:  "1002",
+			Name: "Charlie",
+			Age:  29,
+		}},
+	}
+
+	op := &api.Operation{}
+	op.Schema = `
+		age: int .
+		married: bool .
+	`
+
+	ctx := context.Background()
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu := &api.Mutation{
+		CommitNow: true,
+	}
+	pb, err := json.Marshal(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mu.SetJson = pb
+	_, err = dg.NewTxn().Mutate(ctx, mu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	variables := make(map[string]string)
+	variables["$id"] = "1000"
+	const q = `query Me($id: string){
+		me(func: uid($id)) {
+			uid
+			name
+			age
+			married
+			friend {
+				uid
+				name
+				age
+			}
+		}
+	}`
+
+	resp, err := dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Root struct {
+		Me []Person `json:"me"`
+	}
+	var r Root
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	op = &api.Operation{
+		DropAttr: "friend",
+	}
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	op.DropAttr = "married"
+	err = dg.Alter(ctx, op)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Also lets run the query again to verify that predicate data was deleted.
+	resp, err = dg.NewTxn().QueryWithVars(ctx, q, variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r = Root{}
+	err = json.Unmarshal(resp.Json, &r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Alice should have no friends and only two attributes now.
+	fmt.Printf("Response after deletion: %+v\n", r)
+	// Output: Response after deletion: {Me:[{Uid:0x3e8 Name:Alice Age:26 Married:false Friends:[]}]}
 }

@@ -34,7 +34,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/types/facets"
@@ -42,16 +42,16 @@ import (
 	"golang.org/x/net/trace"
 )
 
-const numExportRoutines = 10
+const numExportRoutines = 100
 
 type kv struct {
 	prefix string
-	list   *protos.PostingList
+	key    []byte
 }
 
 type skv struct {
 	attr   string
-	schema *protos.SchemaUpdate
+	schema *intern.SchemaUpdate
 }
 
 // Map from our types to RDF type. Useful when writing storage types
@@ -64,18 +64,15 @@ var rdfTypeMap = map[types.TypeID]string{
 	types.FloatID:    "xs:float",
 	types.BoolID:     "xs:boolean",
 	types.GeoID:      "geo:geojson",
-	types.PasswordID: "pwd:password",
 	types.BinaryID:   "xs:base64Binary",
+	types.PasswordID: "xs:string",
 }
 
-func toRDF(buf *bytes.Buffer, item kv) {
-	pl := item.list
-	var pitr posting.PIterator
-	pitr.Init(pl, 0)
-	for ; pitr.Valid(); pitr.Next() {
-		p := pitr.Posting()
+func toRDF(buf *bytes.Buffer, item kv, readTs uint64) {
+	l := posting.GetNoStore(item.key)
+	err := l.Iterate(readTs, 0, func(p *intern.Posting) bool {
 		buf.WriteString(item.prefix)
-		if !bytes.Equal(p.Value, nil) {
+		if p.PostingType != intern.Posting_REF {
 			// Value posting
 			// Convert to appropriate type
 			vID := types.TypeID(p.ValType)
@@ -83,12 +80,10 @@ func toRDF(buf *bytes.Buffer, item kv) {
 			src.Value = p.Value
 			str, err := types.Convert(src, types.StringID)
 			x.Check(err)
-			buf.WriteByte('"')
-			buf.WriteString(str.Value.(string))
-			buf.WriteByte('"')
-			if p.PostingType == protos.Posting_VALUE_LANG {
+			buf.WriteString(strconv.Quote(str.Value.(string)))
+			if p.PostingType == intern.Posting_VALUE_LANG {
 				buf.WriteByte('@')
-				buf.WriteString(string(p.Metadata))
+				buf.WriteString(string(p.LangTag))
 			} else if vID != types.DefaultID {
 				rdfType, ok := rdfTypeMap[vID]
 				x.AssertTruef(ok, "Didn't find RDF type for dgraph type: %+v", vID.Name())
@@ -97,9 +92,8 @@ func toRDF(buf *bytes.Buffer, item kv) {
 				buf.WriteByte('>')
 			}
 		} else {
-			buf.WriteString("<_:uid")
+			buf.WriteString("_:uid")
 			buf.WriteString(strconv.FormatUint(p.Uid, 16))
-			buf.WriteByte('>')
 		}
 		// Label
 		if len(p.Label) > 0 {
@@ -120,9 +114,7 @@ func toRDF(buf *bytes.Buffer, item kv) {
 				fVal := &types.Val{Tid: types.StringID}
 				x.Check(types.Marshal(facets.ValFor(f), fVal))
 				if facets.TypeIDFor(f) == types.StringID {
-					buf.WriteByte('"')
-					buf.WriteString(fVal.Value.(string))
-					buf.WriteByte('"')
+					buf.WriteString(strconv.Quote(fVal.Value.(string)))
 				} else {
 					buf.WriteString(fVal.Value.(string))
 				}
@@ -131,6 +123,12 @@ func toRDF(buf *bytes.Buffer, item kv) {
 		}
 		// End dot.
 		buf.WriteString(" .\n")
+		return true
+	})
+	if err != nil {
+		// TODO: Throw error back to the user.
+		// Ensure that we are not missing errCheck at other places.
+		x.Printf("Error while exporting :%v\n", err)
 	}
 }
 
@@ -151,9 +149,9 @@ func toSchema(buf *bytes.Buffer, s *skv) {
 	if isList {
 		buf.WriteRune(']')
 	}
-	if s.schema.Directive == protos.SchemaUpdate_REVERSE {
+	if s.schema.Directive == intern.SchemaUpdate_REVERSE {
 		buf.WriteString(" @reverse")
-	} else if s.schema.Directive == protos.SchemaUpdate_INDEX && len(s.schema.Tokenizer) > 0 {
+	} else if s.schema.Directive == intern.SchemaUpdate_INDEX && len(s.schema.Tokenizer) > 0 {
 		buf.WriteString(" @index(")
 		buf.WriteString(strings.Join(s.schema.Tokenizer, ","))
 		buf.WriteByte(')')
@@ -193,9 +191,7 @@ func writeToFile(fpath string, ch chan []byte) error {
 }
 
 // Export creates a export of data by exporting it as an RDF gzip.
-// TODO: Make it so that export checks if the tablet is served by us,
-// before exporting it.
-func export(bdir string) error {
+func export(bdir string, readTs uint64) error {
 	// Use a goroutine to write to file.
 	err := os.MkdirAll(bdir, 0700)
 	if err != nil {
@@ -204,7 +200,7 @@ func export(bdir string) error {
 	gid := groups().groupId()
 	fpath := path.Join(bdir, fmt.Sprintf("dgraph-%d-%s.rdf.gz", gid,
 		time.Now().Format("2006-01-02-15-04")))
-	fspath := path.Join(bdir, fmt.Sprintf("dgraph-schema-%d-%s.rdf.gz", gid,
+	fspath := path.Join(bdir, fmt.Sprintf("dgraph-%d-%s.schema.gz", gid,
 		time.Now().Format("2006-01-02-15-04")))
 	x.Printf("Exporting to: %v, schema at %v\n", fpath, fspath)
 	chb := make(chan []byte, 1000)
@@ -226,7 +222,7 @@ func export(bdir string) error {
 			buf := new(bytes.Buffer)
 			buf.Grow(50000)
 			for item := range chkv {
-				toRDF(buf, item)
+				toRDF(buf, item, readTs)
 				if buf.Len() >= 40000 {
 					tmp := make([]byte, buf.Len())
 					copy(tmp, buf.Bytes())
@@ -267,7 +263,11 @@ func export(bdir string) error {
 	}()
 
 	// Iterate over key-value store
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransactionAt(readTs, false)
+	defer txn.Discard()
+	iterOpts := badger.DefaultIteratorOptions
+	iterOpts.PrefetchValues = false
+	it := txn.NewIterator(iterOpts)
 	defer it.Close()
 	prefix := new(bytes.Buffer)
 	prefix.Grow(100)
@@ -276,27 +276,40 @@ func export(bdir string) error {
 		item := it.Item()
 		key := item.Key()
 		pk := x.Parse(key)
+		if pk == nil {
+			it.Next()
+			continue
+		}
 
 		if pk.IsIndex() || pk.IsReverse() || pk.IsCount() {
 			// Seek to the end of index, reverse and count keys.
 			it.Seek(pk.SkipRangeOfSameType())
 			continue
 		}
-		if pk.Attr == "_uid_" || pk.Attr == "_predicate_" ||
-			pk.Attr == "_lease_" {
+
+		// Skip if we don't serve the tablet.
+		if !groups().ServesTablet(pk.Attr) {
+			if pk.IsData() {
+				it.Seek(pk.SkipPredicate())
+			} else if pk.IsSchema() {
+				it.Seek(pk.SkipSchema())
+			}
+			continue
+		}
+
+		if pk.Attr == "_predicate_" || pk.Attr == "_dummy_" {
 			// Skip the UID mappings.
 			it.Seek(pk.SkipPredicate())
 			continue
 		}
+
 		if pk.IsSchema() {
-			s := &protos.SchemaUpdate{}
-			err := item.Value(func(val []byte) error {
-				x.Check(s.Unmarshal(val))
-				return nil
-			})
+			s := &intern.SchemaUpdate{}
+			val, err := item.Value()
 			if err != nil {
 				return err
 			}
+			x.Check(s.Unmarshal(val))
 			chs <- &skv{
 				attr:   pk.Attr,
 				schema: s,
@@ -312,17 +325,11 @@ func export(bdir string) error {
 		prefix.WriteString("> <")
 		prefix.WriteString(pred)
 		prefix.WriteString("> ")
-		pl := &protos.PostingList{}
-		err := item.Value(func(val []byte) error {
-			posting.UnmarshalOrCopy(val, item.UserMeta(), pl)
-			return nil
-		})
-		if err != nil {
-			return err
-		}
+		nkey := make([]byte, len(key))
+		copy(nkey, key)
 		chkv <- kv{
 			prefix: prefix.String(),
-			list:   pl,
+			key:    nkey,
 		}
 		prefix.Reset()
 		it.Next()
@@ -341,84 +348,80 @@ func export(bdir string) error {
 
 // TODO: How do we want to handle export for group, do we pause mutations, sync all and then export ?
 // TODO: Should we move export logic to dgraphzero?
-func handleExportForGroup(ctx context.Context, reqId uint64, gid uint32) *protos.ExportPayload {
+func handleExportForGroupOverNetwork(ctx context.Context, in *intern.ExportPayload) *intern.ExportPayload {
 	n := groups().Node
-	if gid == groups().groupId() && n != nil && n.AmLeader() {
-		lastIndex, _ := n.Store.LastIndex()
-		n.syncAllMarks(n.ctx, lastIndex)
-		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Leader of group: %d. Running export.", gid)
-		}
-		if err := export(Config.ExportPath); err != nil {
-			if tr, ok := trace.FromContext(ctx); ok {
-				tr.LazyPrintf(err.Error())
-			}
-			return &protos.ExportPayload{
-				ReqId:  reqId,
-				Status: protos.ExportPayload_FAILED,
-			}
-		}
-		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Export done for group: %d.", gid)
-		}
-		return &protos.ExportPayload{
-			ReqId:   reqId,
-			Status:  protos.ExportPayload_SUCCESS,
-			GroupId: gid,
-		}
+	if in.GroupId == groups().groupId() && n != nil && n.AmLeader() {
+		return handleExportForGroup(ctx, in)
 	}
 
-	pl := groups().Leader(gid)
+	pl := groups().Leader(in.GroupId)
 	if pl == nil {
 		// Unable to find any connection to any of these servers. This should be exceedingly rare.
 		// But probably not worthy of crashing the server. We can just skip the export.
 		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Unable to find a server to export group: %d", gid)
+			tr.LazyPrintf("Unable to find a server to export group: %d", in.GroupId)
 		}
-		return &protos.ExportPayload{
-			ReqId:   reqId,
-			Status:  protos.ExportPayload_FAILED,
-			GroupId: gid,
-		}
+		in.Status = intern.ExportPayload_FAILED
+		return in
 	}
 
-	c := protos.NewWorkerClient(pl.Get())
-	nr := &protos.ExportPayload{
-		ReqId:   reqId,
-		GroupId: gid,
-	}
-	nrep, err := c.Export(ctx, nr)
+	c := intern.NewWorkerClient(pl.Get())
+	nrep, err := c.Export(ctx, in)
 	if err != nil {
 		if tr, ok := trace.FromContext(ctx); ok {
 			tr.LazyPrintf(err.Error())
 		}
-		return &protos.ExportPayload{
-			ReqId:   reqId,
-			Status:  protos.ExportPayload_FAILED,
-			GroupId: gid,
-		}
+		in.Status = intern.ExportPayload_FAILED
+		return in
 	}
 	return nrep
+}
+
+func handleExportForGroup(ctx context.Context, in *intern.ExportPayload) *intern.ExportPayload {
+	n := groups().Node
+	if in.GroupId != groups().groupId() || !n.AmLeader() {
+		if tr, ok := trace.FromContext(ctx); ok {
+			tr.LazyPrintf("I am not leader of group %d.", in.GroupId)
+		}
+		in.Status = intern.ExportPayload_FAILED
+		return in
+	}
+	n.applyAllMarks(n.ctx)
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Leader of group: %d. Running export.", in.GroupId)
+	}
+	if err := export(Config.ExportPath, in.ReadTs); err != nil {
+		if tr, ok := trace.FromContext(ctx); ok {
+			tr.LazyPrintf(err.Error())
+		}
+		in.Status = intern.ExportPayload_FAILED
+		return in
+	}
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Export done for group: %d.", in.GroupId)
+	}
+	in.Status = intern.ExportPayload_SUCCESS
+	return in
 }
 
 // Export request is used to trigger exports for the request list of groups.
 // If a server receives request to export a group that it doesn't handle, it would
 // automatically relay that request to the server that it thinks should handle the request.
-func (w *grpcWorker) Export(ctx context.Context, req *protos.ExportPayload) (*protos.ExportPayload, error) {
-	reply := &protos.ExportPayload{ReqId: req.ReqId}
-	reply.Status = protos.ExportPayload_FAILED // Set by default.
+func (w *grpcWorker) Export(ctx context.Context, req *intern.ExportPayload) (*intern.ExportPayload, error) {
+	reply := &intern.ExportPayload{ReqId: req.ReqId, GroupId: req.GroupId}
+	reply.Status = intern.ExportPayload_FAILED // Set by default.
 
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
 	}
 	if !w.addIfNotPresent(req.ReqId) {
-		reply.Status = protos.ExportPayload_DUPLICATE
+		reply.Status = intern.ExportPayload_DUPLICATE
 		return reply, nil
 	}
 
-	chb := make(chan *protos.ExportPayload, 1)
+	chb := make(chan *intern.ExportPayload, 1)
 	go func() {
-		chb <- handleExportForGroup(ctx, req.ReqId, req.GroupId)
+		chb <- handleExportForGroup(ctx, req)
 	}()
 
 	select {
@@ -437,27 +440,32 @@ func ExportOverNetwork(ctx context.Context) error {
 		}
 		return err
 	}
+	// Get ReadTs from zero and wait for stream to catch up.
+	ts, err := Timestamps(ctx, &intern.Num{Val: 1})
+	if err != nil {
+		return err
+	}
+	readTs := ts.StartId
+	posting.Oracle().WaitForTs(ctx, readTs)
+
 	// Let's first collect all groups.
 	gids := groups().KnownGroups()
 
-	for i, gid := range gids {
-		if gid == 0 {
-			gids[i] = gids[len(gids)-1]
-			gids = gids[:len(gids)-1]
-		}
-	}
-
-	ch := make(chan *protos.ExportPayload, len(gids))
+	ch := make(chan *intern.ExportPayload, len(gids))
 	for _, gid := range gids {
 		go func(group uint32) {
-			reqId := uint64(rand.Int63())
-			ch <- handleExportForGroup(ctx, reqId, group)
+			req := &intern.ExportPayload{
+				ReqId:   uint64(rand.Int63()),
+				GroupId: group,
+				ReadTs:  readTs,
+			}
+			ch <- handleExportForGroupOverNetwork(ctx, req)
 		}(gid)
 	}
 
 	for i := 0; i < len(gids); i++ {
 		bp := <-ch
-		if bp.Status != protos.ExportPayload_SUCCESS {
+		if bp.Status != intern.ExportPayload_SUCCESS {
 			if tr, ok := trace.FromContext(ctx); ok {
 				tr.LazyPrintf("Export status: %v for group id: %d", bp.Status, bp.GroupId)
 			}

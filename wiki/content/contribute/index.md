@@ -3,7 +3,7 @@ title = "Contribute to Dgraph"
 +++
 # Getting Started
 - Read the [Getting Started Guide](https://docs.dgraph.io/get-started/)
-- [Do the tour](https://tour.dgraph.io)
+- [Take the Dgraph tour](https://tour.dgraph.io)
 
 ## Setting Up the Development Environment
 
@@ -14,7 +14,11 @@ title = "Contribute to Dgraph"
 
 ### Setup Dgraph from source repo
 
-    $ go get -t -v github.com/dgraph-io/dgraph/...
+    $ mkdir -p $GOPATH/src/github.com/dgraph-io/
+    $ cd $GOPATH/src/github.com/dgraph-io
+    $ git clone git@github.com:dgraph-io/dgraph.git
+    $ cd dgraph
+    $ ./contrib/scripts/install.sh
 
 This will put the source code in a Git repo under `$GOPATH/src/github.com/dgraph-io/dgraph` and compile the binaries to `$GOPATH/bin`.
 

@@ -18,6 +18,7 @@
 package posting
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
 	"io/ioutil"
@@ -28,13 +29,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/trace"
 
 	"github.com/dgraph-io/badger"
 
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -50,19 +52,19 @@ const (
 // syncMarks stores the watermark for synced RAFT proposals. Each RAFT proposal consists
 // of many individual mutations, which could be applied to many different posting lists.
 // Thus, each PL when being mutated would send an undone Mark, and each list would
-// accumulate all such pending marks. When the PL is synced to RocksDB, it would
+// accumulate all such pending marks. When the PL is synced to BadgerDB, it would
 // mark all the pending ones as done.
 // This ideally belongs to RAFT node struct (where committed watermark is being tracked),
 // but because the logic of mutations is
 // present here and to avoid a circular dependency, we've placed it here.
 // Note that there's one watermark for each RAFT node/group.
 // This watermark would be used for taking snapshots, to ensure that all the data and
-// index mutations have been syned to RocksDB, before a snapshot is taken, and previous
+// index mutations have been syned to BadgerDB, before a snapshot is taken, and previous
 // RAFT entries discarded.
 func init() {
 	x.AddInit(func() {
 		h := md5.New()
-		pl := protos.PostingList{
+		pl := intern.PostingList{
 			Checksum: h.Sum(nil),
 		}
 		var err error
@@ -70,60 +72,6 @@ func init() {
 		x.Check(err)
 	})
 	elog = trace.NewEventLog("Memory", "")
-}
-
-func gentleCommit(dirtyMap map[string]time.Time, pending chan struct{},
-	commitFraction float64) {
-	select {
-	case pending <- struct{}{}:
-	default:
-		elog.Printf("Skipping gentleCommit")
-		return
-	}
-
-	// NOTE: No need to acquire read lock for stopTheWorld. This portion is being run
-	// serially alongside aggressive commit.
-	n := int(float64(len(dirtyMap)) * commitFraction)
-	if n < 1000 {
-		// Have a min value of n, so we can merge small number of dirty PLs fast.
-		n = 1000
-	}
-	keysBuffer := make([]string, 0, n)
-
-	// Convert map to list.
-	var loops int
-	for key, ts := range dirtyMap {
-		loops++
-		if loops > 3*n {
-			break
-		}
-		if time.Since(ts) < 5*time.Second {
-			continue
-		}
-
-		delete(dirtyMap, key)
-		keysBuffer = append(keysBuffer, key)
-		if len(keysBuffer) >= n {
-			// We don't want to process the entire dirtyMap in one go.
-			break
-		}
-	}
-
-	go func(keys []string) {
-		defer func() { <-pending }()
-		if len(keys) == 0 {
-			return
-		}
-		for _, key := range keys {
-			l := lcache.Get(key)
-			if l == nil {
-				continue
-			}
-			// Not removing the postings list from the map, to avoid a race condition,
-			// where another caller re-creates the posting list before a commit happens.
-			commitOne(l)
-		}
-	}(keysBuffer)
 }
 
 func getMemUsage() int {
@@ -172,43 +120,25 @@ func getMemUsage() int {
 	return rss * os.Getpagesize()
 }
 
-// periodicMerging periodically merges the dirty posting lists. It also checks our memory
-// usage. If it exceeds a certain threshold, it would stop the world, and aggressively
-// merge and evict all posting lists from memory.
-func periodicCommit() {
-	ticker := time.NewTicker(time.Second)
-	dirtyMap := make(map[string]time.Time, 1000)
-	// pending is used to ensure that we only have up to 15 goroutines doing gentle commits.
-	pending := make(chan struct{}, 15)
-	dsize := 0 // needed for better reporting.
+func periodicUpdateStats() {
+	ticker := time.NewTicker(10 * time.Second)
 	setLruMemory := true
+	var maxSize uint64
+	var lastUse float64
 	for {
 		select {
-		case key := <-dirtyChan:
-			dirtyMap[string(key)] = time.Now()
 
 		case <-ticker.C:
-			if len(dirtyMap) != dsize {
-				dsize = len(dirtyMap)
-				x.DirtyMapSize.Set(int64(dsize))
-			}
 
 			var ms runtime.MemStats
 			runtime.ReadMemStats(&ms)
 			megs := (ms.HeapInuse + ms.StackInuse) / (1 << 20)
 			inUse := float64(megs)
 
-			fraction := math.Min(1.0, Config.CommitFraction*math.Exp(float64(dsize)/1000000.0))
-			gentleCommit(dirtyMap, pending, fraction)
-
 			stats := lcache.Stats()
 			x.EvictedPls.Set(int64(stats.NumEvicts))
 			x.LcacheSize.Set(int64(stats.Size))
 			x.LcacheLen.Set(int64(stats.Length))
-
-			// Flush out the dirtyChan after acquiring lock. This allow posting lists which
-			// are currently being processed to not get stuck on dirtyChan, which won't be
-			// processed until aggressive evict finishes.
 
 			// Okay, we exceed the max memory threshold.
 			// Stop the world, and deal with this first.
@@ -216,9 +146,32 @@ func periodicCommit() {
 			Config.Mu.Lock()
 			mem := Config.AllottedMemory
 			Config.Mu.Unlock()
-			if setLruMemory && inUse > 0.75*mem {
-				lcache.UpdateMaxSize()
-				setLruMemory = false
+			if setLruMemory {
+				if inUse > 0.75*mem {
+					maxSize = lcache.UpdateMaxSize(0)
+					setLruMemory = false
+					lastUse = inUse
+				}
+				break
+			}
+
+			// If memory has not changed by 100MB.
+			if math.Abs(inUse-lastUse) < 100 {
+				break
+			}
+
+			delta := maxSize / 10
+			if delta > 50<<20 {
+				delta = 50 << 20 // Change lru cache size by max 50mb.
+			}
+			if inUse > 0.85*mem { // Decrease max Size by 10%
+				maxSize -= delta
+				maxSize = lcache.UpdateMaxSize(maxSize)
+				lastUse = inUse
+			} else if inUse < 0.65*mem { // Increase max Size by 10%
+				maxSize += delta
+				maxSize = lcache.UpdateMaxSize(maxSize)
+				lastUse = inUse
 			}
 		}
 	}
@@ -241,28 +194,65 @@ func updateMemoryMetrics() {
 }
 
 var (
-	pstore    *badger.KV
-	dirtyChan chan []byte // All dirty posting list keys are pushed here.
-	marks     *x.WaterMark
-	lcache    *listCache
+	pstore *badger.ManagedDB
+	lcache *listCache
+	btree  *BTree
 )
 
-func SyncMarks() *x.WaterMark {
-	return marks
-}
-
 // Init initializes the posting lists package, the in memory and dirty list hash.
-func Init(ps *badger.KV) {
-	marks = &x.WaterMark{Name: "Synced watermark"}
-	marks.Init()
-
+func Init(ps *badger.ManagedDB) {
 	pstore = ps
 	lcache = newListCache(math.MaxUint64)
+	btree = newBTree(2)
 	x.LcacheCapacity.Set(math.MaxInt64)
-	dirtyChan = make(chan []byte, 10000)
 
-	go periodicCommit()
+	go periodicUpdateStats()
 	go updateMemoryMetrics()
+	go periodicPurgeOldVersions()
+}
+
+func StopLRUEviction() {
+	atomic.StoreInt32(&lcache.done, 1)
+}
+
+func periodicPurgeOldVersions() {
+	// Runs every 1 minute
+	purge := func() {
+		opt := badger.DefaultIteratorOptions
+		opt.PrefetchValues = false
+		opt.AllVersions = true
+
+		txn := pstore.NewTransactionAt(math.MaxUint64, false)
+		defer txn.Discard()
+		itr := txn.NewIterator(opt)
+		defer itr.Close()
+
+		var prevKey []byte
+		// Iterate  over all versions of key, from latest to oldest
+		// For each key find the latest complete pl and purge all versions
+		// below that
+		for itr.Rewind(); itr.Valid(); itr.Next() {
+			item := itr.Item()
+			key := item.Key()
+			if bytes.Equal(key, prevKey) {
+				continue
+			}
+			if item.UserMeta()&BitCompletePosting == 0 {
+				continue
+			}
+			// Found complete pl, purge all versions below this TS
+			pstore.PurgeVersionsBelow(key, item.Version())
+			if cap(prevKey) < len(key) {
+				prevKey = make([]byte, len(key))
+			}
+			prevKey = prevKey[:len(key)]
+			copy(prevKey, key)
+		}
+	}
+	for {
+		time.Sleep(time.Minute)
+		purge()
+	}
 }
 
 // Get stores the List corresponding to key, if it's not there already.
@@ -285,45 +275,20 @@ func Get(key []byte) (rlist *List) {
 
 	// Any initialization for l must be done before PutIfMissing. Once it's added
 	// to the map, any other goroutine can retrieve it.
-	l := getNew(key, pstore)
-	l.water = marks
+	l, _ := getNew(key, pstore)
 	// We are always going to return lp to caller, whether it is l or not
 	lp = lcache.PutIfMissing(string(key), l)
 	if lp != l {
 		x.CacheRace.Add(1)
+	} else if atomic.LoadInt32(&l.onDisk) == 0 {
+		btree.Insert(l.key)
 	}
 	return lp
 }
 
-// getOrMutate is similar to GetLru the only difference being that for index and count keys it also
-// does a SetIfAbsentAsync. This function should be called by functions in the mutation path only.
-func getOrMutate(key []byte) (rlist *List) {
-	lp := lcache.Get(string(key))
-	if lp != nil {
-		x.CacheHit.Add(1)
-		return lp
-	}
-	x.CacheMiss.Add(1)
-
-	// Any initialization for l must be done before PutIfMissing. Once it's added
-	// to the map, any other goroutine can retrieve it.
-	l := getNew(key, pstore)
-	l.water = marks
-	// We are always going to return lp to caller, whether it is l or not
-	lp = lcache.PutIfMissing(string(key), l)
-
-	if lp != l {
-		x.CacheRace.Add(1)
-	} else {
-		pk := x.Parse(key)
-		x.AssertTrue(pk.IsIndex() || pk.IsCount())
-		// This is a best effort set, hence we don't check error from callback.
-		if err := pstore.SetIfAbsentAsync(key, nil, 0x00, func(err error) {}); err != nil &&
-			err != badger.ErrKeyExists {
-			x.Fatalf("Got error while doing SetIfAbsent: %+v\n", err)
-		}
-	}
-	return lp
+// GetLru checks the lru map and returns it if it exits
+func GetLru(key []byte) *List {
+	return lcache.Get(string(key))
 }
 
 // GetNoStore takes a key. It checks if the in-memory map has an updated value and returns it if it exists
@@ -333,51 +298,44 @@ func GetNoStore(key []byte) (rlist *List) {
 	if lp != nil {
 		return lp
 	}
-	lp = getNew(key, pstore) // This retrieves a new *List and sets refcount to 1.
+	lp, _ = getNew(key, pstore) // This retrieves a new *List and sets refcount to 1.
 	return lp
 }
 
-func commitOne(l *List) {
-	if l == nil {
-		return
-	}
-	if _, err := l.SyncIfDirty(false); err != nil {
-		x.Printf("Error while committing dirty list: %v\n", err)
-	}
+// This doesn't sync, so call this only when you don't care about dirty posting lists in // memory(for example before populating snapshot) or after calling syncAllMarks
+func EvictLRU() {
+	lcache.Reset()
 }
 
-func CommitLists(numRoutines int, gid uint32) {
-	if gid == 0 {
-		return
-	}
-
-	// We iterate over lhmap, deleting keys and pushing values (List) into this
+func CommitLists(commit func(key []byte) bool) {
+	// We iterate over lru and pushing values (List) into this
 	// channel. Then goroutines right below will commit these lists to data store.
 	workChan := make(chan *List, 10000)
 
 	var wg sync.WaitGroup
-	for i := 0; i < numRoutines; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for l := range workChan {
-				commitOne(l)
+				l.SyncIfDirty(false)
 			}
 		}()
 	}
 
-	lcache.Each(func(k []byte, l *List) {
-		if l == nil { // To be safe. Check might be unnecessary.
-			return
+	lcache.iterate(func(l *List) bool {
+		if commit(l.key) {
+			workChan <- l
 		}
-		workChan <- l
+		return true
 	})
 	close(workChan)
 	wg.Wait()
-}
 
-// This doesn't sync, so call this only when you don't care about dirty posting lists in
-// memory(for example before populating snapshot) or after calling syncAllMarks
-func EvictLRU() {
-	lcache.Reset()
+	// Consider using sync in syncIfDirty instead of async.
+	// Hacky solution for now, ensures that everything is flushed to disk before we return.
+	txn := pstore.NewTransactionAt(1, true)
+	defer txn.Discard()
+	txn.Set(x.DataKey("_dummy_", 0), nil)
+	txn.CommitAt(1, nil)
 }

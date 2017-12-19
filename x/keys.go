@@ -18,6 +18,7 @@ package x
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 )
 
@@ -25,7 +26,6 @@ const (
 	// TODO(pawan) - Make this 2 bytes long. Right now ParsedKey has byteType and
 	// bytePrefix. Change it so that it just has one field which has all the information.
 	ByteData     = byte(0x00)
-	byteSchema   = byte(0x01)
 	ByteIndex    = byte(0x02)
 	ByteReverse  = byte(0x04)
 	ByteCount    = byte(0x08)
@@ -33,6 +33,7 @@ const (
 	// same prefix for data, index and reverse keys so that relative order of data doesn't change
 	// keys of same attributes are located together
 	defaultPrefix = byte(0x00)
+	byteSchema    = byte(0x01)
 )
 
 func writeAttr(buf []byte, attr string) []byte {
@@ -49,13 +50,11 @@ func writeAttr(buf []byte, attr string) []byte {
 // schema keys are stored separately with unique prefix,
 // since we need to iterate over all schema keys
 func SchemaKey(attr string) []byte {
-	buf := make([]byte, 2+len(attr)+2)
+	buf := make([]byte, 1+2+len(attr))
 	buf[0] = byteSchema
 	rest := buf[1:]
 
-	rest = writeAttr(rest, attr)
-	rest[0] = byteSchema
-
+	writeAttr(rest, attr)
 	return buf
 }
 
@@ -142,7 +141,7 @@ func (p ParsedKey) IsIndex() bool {
 }
 
 func (p ParsedKey) IsSchema() bool {
-	return p.byteType == byteSchema
+	return p.bytePrefix == byteSchema
 }
 
 func (p ParsedKey) IsType(typ byte) bool {
@@ -181,9 +180,9 @@ func (p ParsedKey) SkipRangeOfSameType() []byte {
 }
 
 func (p ParsedKey) SkipSchema() []byte {
-	buf := make([]byte, 1)
+	var buf [1]byte
 	buf[0] = byteSchema + 1
-	return buf
+	return buf[:]
 }
 
 // DataPrefix returns the prefix for data keys.
@@ -236,15 +235,15 @@ func (p ParsedKey) CountPrefix(reverse bool) []byte {
 
 // SchemaPrefix returns the prefix for Schema keys.
 func SchemaPrefix() []byte {
-	buf := make([]byte, 1)
+	var buf [1]byte
 	buf[0] = byteSchema
-	return buf
+	return buf[:]
 }
 
 // PredicatePrefix returns the prefix for all keys belonging
 // to this predicate except schema key.
 func PredicatePrefix(predicate string) []byte {
-	buf := make([]byte, 2+len(predicate))
+	buf := make([]byte, 1+2+len(predicate))
 	buf[0] = defaultPrefix
 	k := writeAttr(buf[1:], predicate)
 	AssertTrue(len(k) == 0)
@@ -261,20 +260,34 @@ func Parse(key []byte) *ParsedKey {
 	p.Attr = string(k[:sz])
 	k = k[sz:]
 
+	switch p.bytePrefix {
+	case byteSchema:
+		return p
+	default:
+	}
+
 	p.byteType = k[0]
 	k = k[1:]
 
 	switch p.byteType {
-	case ByteData:
-		fallthrough
-	case ByteReverse:
+	case ByteData, ByteReverse:
+		if len(k) < 8 {
+			if Config.DebugMode {
+				fmt.Printf("Error: Uid length < 8 for key: %q, parsed key: %+v\n", key, p)
+			}
+			return nil
+		}
 		p.Uid = binary.BigEndian.Uint64(k)
 	case ByteIndex:
 		p.Term = string(k)
 	case ByteCount, ByteCountRev:
+		if len(k) < 4 {
+			if Config.DebugMode {
+				fmt.Printf("Error: Count length < 4 for key: %q, parsed key: %+v\n", key, p)
+			}
+			return nil
+		}
 		p.Count = binary.BigEndian.Uint32(k)
-	case byteSchema:
-		break
 	default:
 		// Some other data type.
 		return nil

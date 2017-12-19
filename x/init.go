@@ -17,12 +17,8 @@
 package x
 
 import (
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
-
-	yaml "gopkg.in/yaml.v2"
 )
 
 var (
@@ -51,9 +47,8 @@ func AddInit(f func()) {
 }
 
 // Init initializes flags and run all functions in initFunc.
-func Init() {
-	// Lets print the details of the current build on startup.
-	printBuildDetails()
+func Init(debug bool) {
+	Config.DebugMode = debug
 
 	// Next, run all the init functions that have been added.
 	for _, f := range initFunc {
@@ -61,47 +56,27 @@ func Init() {
 	}
 }
 
-// loadConfigFromYAML reads configurations from specified YAML file.
-func LoadConfigFromYAML(file string) {
-	bs, err := ioutil.ReadFile(file)
-	Checkf(err, "Cannot open specified config file: %v", file)
-
-	m := make(map[string]string)
-	Checkf(yaml.Unmarshal(bs, &m), "Error while parsing config file: %v", Config.ConfigFile)
-
-	for k, v := range m {
-		Printf("Picked flag from config: [%q = %v]\n", k, v)
-		err := flag.Set(k, v)
-		Checkf(err, "While setting flag from config.")
-	}
-}
-
-func printBuildDetails() {
-	if dgraphVersion == "" {
-		return
-	}
-
-	fmt.Printf(fmt.Sprintf(`
+func BuildDetails() string {
+	return fmt.Sprintf(`
 Dgraph version   : %v
 Commit SHA-1     : %v
 Commit timestamp : %v
-Branch           : %v`,
-		dgraphVersion, lastCommitSHA, lastCommitTime, gitBranch) + "\n\n")
+Branch           : %v
+
+For Dgraph official documentation, visit https://docs.dgraph.io.
+For discussions about Dgraph     , visit https://discuss.dgraph.io.
+To say hi to the community       , visit https://dgraph.slack.com.
+
+Licensed under AGPLv3. Copyright 2017 Dgraph Labs, Inc.
+
+`,
+		dgraphVersion, lastCommitSHA, lastCommitTime, gitBranch)
 }
 
 // PrintVersionOnly prints version and other helpful information if --version.
 func PrintVersionOnly() {
-	if Config.Version {
-		printBuildDetails()
-		fmt.Println("Copyright 2017 Dgraph Labs, Inc.")
-		fmt.Println(`
-Licensed under AGPLv3.
-For Dgraph official documentation, visit https://docs.dgraph.io.
-For discussions about Dgraph     , visit https://discuss.dgraph.io.
-To say hi to the community       , visit https://dgraph.slack.com.
-`)
-		os.Exit(0)
-	}
+	fmt.Println(BuildDetails())
+	os.Exit(0)
 }
 
 func Version() string {

@@ -19,15 +19,13 @@ package gql
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/dgraph-io/dgraph/lex"
-	"github.com/dgraph-io/dgraph/protos"
-	"github.com/dgraph-io/dgraph/rdf"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/x"
 )
 
@@ -37,7 +35,7 @@ const (
 )
 
 // GraphQuery stores the parsed Query in a tree format. This gets converted to
-// internally used query.SubGraph before processing the query.
+// intern.y used query.SubGraph before processing the query.
 type GraphQuery struct {
 	UID        []uint64
 	Attr       string
@@ -53,16 +51,18 @@ type GraphQuery struct {
 
 	Args map[string]string
 	// Query can have multiple sort parameters.
-	Order        []*protos.Order
+	Order        []*intern.Order
 	Children     []*GraphQuery
 	Filter       *FilterTree
 	MathExp      *MathTree
 	Normalize    bool
+	Recurse      bool
+	RecurseArgs  RecurseArgs
 	Cascade      bool
 	IgnoreReflex bool
-	Facets       *Facets
+	Facets       *intern.FacetParams
 	FacetsFilter *FilterTree
-	GroupbyAttrs []AttrLang
+	GroupbyAttrs []GroupByAttr
 	FacetVar     map[string]string
 	FacetOrder   string
 	FacetDesc    bool
@@ -71,18 +71,25 @@ type GraphQuery struct {
 	// If gq.fragment is nonempty, then it is a fragment reference / spread.
 	fragment string
 
-	// Indicates whether count of uids is requested as a child node. If
-	// there is a child with count() attr, then this is not empty for the parent.
-	// If there is an alias, this has the alias value, else its value is count.
-	UidCount string
+	// Indicates whether count of uids is requested as a child node. If there
+	// is an alias, then UidCountAlias will be set (otherwise it will be the
+	// empty string).
+	UidCount      bool
+	UidCountAlias string
+
 	// True for blocks that don't have a starting function and hence no starting nodes. They are
 	// used to aggregate and get variables defined in another block.
 	IsEmpty bool
-	Upsert  bool // Whether we should add the edge in case it doesn't exist.
 }
 
-type AttrLang struct {
+type RecurseArgs struct {
+	Depth     uint64
+	AllowLoop bool
+}
+
+type GroupByAttr struct {
 	Attr  string
+	Alias string
 	Langs []string
 }
 
@@ -141,19 +148,14 @@ type Arg struct {
 
 // Function holds the information about gql functions.
 type Function struct {
-	Attr     string
-	Lang     string // language of the attribute value
-	Name     string // Specifies the name of the function.
-	Args     []Arg  // Contains the arguments of the function.
-	UID      []uint64
-	NeedsVar []VarContext // If the function requires some variable
-	IsCount  bool         // gt(count(friends),0)
-}
-
-// Facet holds the information about gql Facets (edge key-value pairs).
-type Facets struct {
-	AllKeys bool
-	Keys    []string // should be in sorted order.
+	Attr       string
+	Lang       string // language of the attribute value
+	Name       string // Specifies the name of the function.
+	Args       []Arg  // Contains the arguments of the function.
+	UID        []uint64
+	NeedsVar   []VarContext // If the function requires some variable
+	IsCount    bool         // gt(count(friends),0)
+	IsValueVar bool         // eq(val(s), 5)
 }
 
 // filterOpPrecedence is a map from filterOp (a string) to its precedence.
@@ -269,28 +271,8 @@ type queryAlt struct {
 	Query     string `json:"query"`
 }
 
-/*
-The query could be of the following forms :
-
-# Normal query.
-	`query test($a: int) { me(_xid_: alice-in-wonderland) {author(first:$a){name}}}`
-
-# With stringified variables map.
- `{
-   "query": "query test($a: int){ me(_xid_: alice-in-wonderland) {author(first:$a){name}}}",
-	 "variables": "{'$a':'2'}"
-	 }`
-
-# With a non-stringified variables map.
-  `{
-   "query": "query test($a: int){ me(_xid_: alice-in-wonderland) {author(first:$a){name}}}",
-	 "variables": {'$a':'2'}
-	 }`
-*/
-
 func convertToVarMap(variables map[string]string) (vm varMap) {
 	vm = make(map[string]varInfo)
-	// Go client passes in variables separately.
 	for k, v := range variables {
 		vm[k] = varInfo{
 			Value: v,
@@ -301,51 +283,7 @@ func convertToVarMap(variables map[string]string) (vm varMap) {
 
 type Request struct {
 	Str       string
-	Mutation  *protos.Mutation
 	Variables map[string]string
-	// We need this so that we don't try to do JSON.Unmarshal for request coming
-	// from Go client, as we directly get the variables in a map.
-	Http bool
-}
-
-func parseQueryWithGqlVars(r Request) (string, varMap, error) {
-	var q query
-	vm := make(varMap)
-	mp := make(map[string]string)
-
-	// Go client can send variable map separately.
-	if len(r.Variables) != 0 {
-		vm = convertToVarMap(r.Variables)
-	}
-
-	// If its a language driver like Go, no more parsing needed.
-	if !r.Http {
-		return r.Str, vm, nil
-	}
-
-	if err := json.Unmarshal([]byte(r.Str), &q); err != nil {
-		// Check if the json object is stringified.
-		var q1 queryAlt
-		if err := json.Unmarshal([]byte(r.Str), &q1); err != nil {
-			return r.Str, vm, nil // It does not obey GraphiQL format but valid.
-		}
-		// Convert the stringified variables to map if it is not nil.
-		if q1.Variables != "" {
-			if err = json.Unmarshal([]byte(q1.Variables), &mp); err != nil {
-				return "", nil, err
-			}
-		}
-	} else {
-		mp = q.Variables
-	}
-
-	for k, v := range mp {
-		vm[k] = varInfo{
-			Value: v,
-		}
-	}
-
-	return q.Query, vm, nil
 }
 
 func checkValueType(vm varMap) error {
@@ -398,7 +336,7 @@ func checkValueType(vm varMap) error {
 func substituteVar(f string, res *string, vmap varMap) error {
 	if len(f) > 0 && f[0] == '$' {
 		va, ok := vmap[f]
-		if !ok {
+		if !ok || va.Type == "" {
 			return x.Errorf("Variable not defined %v", f)
 		}
 		*res = va.Value
@@ -485,20 +423,16 @@ type Vars struct {
 // Result struct contains the Query list, its corresponding variable use list
 // and the mutation block.
 type Result struct {
-	Query        []*GraphQuery
-	QueryVars    []*Vars
-	Mutation     *Mutation
-	MutationVars []string
-	Schema       *protos.SchemaRequest
+	Query     []*GraphQuery
+	QueryVars []*Vars
+	Schema    *intern.SchemaRequest
 }
 
 // Parse initializes and runs the lexer. It also constructs the GraphQuery subgraph
 // from the lexed items.
 func Parse(r Request) (res Result, rerr error) {
-	query, vmap, err := parseQueryWithGqlVars(r)
-	if err != nil {
-		return res, err
-	}
+	query := r.Str
+	vmap := convertToVarMap(r.Variables)
 
 	lexer := lex.Lexer{Input: query}
 	lexer.Run(lexTopLevel)
@@ -511,15 +445,12 @@ func Parse(r Request) (res Result, rerr error) {
 		switch item.Typ {
 		case lex.ItemError:
 			return res, x.Errorf(item.Val)
+
 		case itemOpType:
 			if item.Val == "mutation" {
-				if res.Mutation != nil {
-					return res, x.Errorf("Only one mutation block allowed.")
-				}
-				if res.Mutation, rerr = getMutation(it); rerr != nil {
-					return res, rerr
-				}
-			} else if item.Val == "schema" {
+				return res, x.Errorf("Mutation block no longer allowed.")
+			}
+			if item.Val == "schema" {
 				if res.Schema != nil {
 					return res, x.Errorf("Only one schema block allowed ")
 				}
@@ -559,22 +490,6 @@ func Parse(r Request) (res Result, rerr error) {
 		}
 	}
 
-	// Clients can pass mutations separately apart from passing it as part of request.
-	if r.Mutation != nil {
-		if res.Mutation == nil {
-			res.Mutation = &Mutation{}
-		}
-		res.Mutation.Set = append(res.Mutation.Set, r.Mutation.Set...)
-		res.Mutation.Del = append(res.Mutation.Del, r.Mutation.Del...)
-	}
-
-	if res.Mutation != nil {
-		res.MutationVars = res.Mutation.NeededVars()
-		if len(res.MutationVars) > 0 && len(res.Query) == 0 {
-			return res, x.Errorf("mutation uses undefined vars: %v", res.MutationVars)
-		}
-	}
-
 	if len(res.Query) != 0 {
 		res.QueryVars = make([]*Vars, 0, len(res.Query))
 		for i := 0; i < len(res.Query); i++ {
@@ -595,12 +510,6 @@ func Parse(r Request) (res Result, rerr error) {
 		}
 
 		allVars := res.QueryVars
-		if len(res.MutationVars) > 0 {
-			varNames := x.RemoveDuplicates(res.MutationVars)
-
-			allVars = append(allVars, &Vars{Needs: varNames})
-		}
-
 		if err := checkDependency(allVars); err != nil {
 			return res, err
 		}
@@ -711,8 +620,7 @@ func (f *FilterTree) hasVars() bool {
 // getVariablesAndQuery checks if the query has a variable list and stores it in
 // vmap. For variable list to be present, the query should have a name which is
 // also checked for. It also calls getQuery to create the GraphQuery object tree.
-func getVariablesAndQuery(it *lex.ItemIterator, vmap varMap) (gq *GraphQuery,
-	rerr error) {
+func getVariablesAndQuery(it *lex.ItemIterator, vmap varMap) (gq *GraphQuery, rerr error) {
 	var name string
 L2:
 	for it.Next() {
@@ -746,6 +654,59 @@ L2:
 	}
 
 	return gq, nil
+}
+
+func parseRecurseArgs(it *lex.ItemIterator, gq *GraphQuery) error {
+	if ok := trySkipItemTyp(it, itemLeftRound); !ok {
+		// We don't have a (, we can return.
+		return nil
+	}
+
+	var key, val string
+	var item lex.Item
+	var ok bool
+	for it.Next() {
+		item = it.Item()
+		if item.Typ != itemName {
+			return fmt.Errorf("Expected key inside @recurse().")
+		}
+		key = strings.ToLower(item.Val)
+
+		if ok := trySkipItemTyp(it, itemColon); !ok {
+			return fmt.Errorf("Expected colon(:) after %s")
+		}
+
+		if item, ok = tryParseItemType(it, itemName); !ok {
+			return fmt.Errorf("Expected value inside @recurse() for key: %s.", key)
+		}
+		val = item.Val
+
+		switch key {
+		case "depth":
+			depth, err := strconv.ParseUint(val, 0, 64)
+			if err != nil {
+				return err
+			}
+			gq.RecurseArgs.Depth = depth
+		case "loop":
+			allowLoop, err := strconv.ParseBool(val)
+			if err != nil {
+				return err
+			}
+			gq.RecurseArgs.AllowLoop = allowLoop
+		default:
+			return fmt.Errorf("Unexpected key: [%s] inside @recurse block", key)
+		}
+
+		if _, ok := tryParseItemType(it, itemRightRound); ok {
+			return nil
+		}
+
+		if _, ok := tryParseItemType(it, itemComma); !ok {
+			return fmt.Errorf("Expected comma after value: %s inside recurse block.", val)
+		}
+	}
+	return nil
 }
 
 // getQuery creates a GraphQuery object tree by calling getRoot
@@ -794,14 +755,11 @@ L:
 				parseGroupby(it, gq)
 			case "ignorereflex":
 				gq.IgnoreReflex = true
-			case "upsert":
-				if gq.Func == nil || gq.Func.Name != "eq" {
-					return nil, x.Errorf("Upsert query can only be done with eq function.")
+			case "recurse":
+				gq.Recurse = true
+				if err := parseRecurseArgs(it, gq); err != nil {
+					return nil, err
 				}
-				if len(gq.Func.Args) != 1 {
-					return nil, x.Errorf("Upsert query can only have one argument.")
-				}
-				gq.Upsert = true
 			default:
 				return nil, x.Errorf("Unknown directive [%s]", item.Val)
 			}
@@ -855,30 +813,6 @@ func getFragment(it *lex.ItemIterator) (*fragmentNode, error) {
 	return fn, nil
 }
 
-// getMutation function parses and stores the set and delete
-// operation in Mutation.
-func getMutation(it *lex.ItemIterator) (*Mutation, error) {
-	var mu *Mutation
-	for it.Next() {
-		item := it.Item()
-		if item.Typ == itemText {
-			continue
-		}
-		if item.Typ == itemLeftCurl {
-			mu = new(Mutation)
-		}
-		if item.Typ == itemRightCurl {
-			return mu, nil
-		}
-		if item.Typ == itemMutationOp {
-			if err := parseMutationOp(it, item.Val, mu); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return nil, x.Errorf("Invalid mutation.")
-}
-
 // parses till rightSquare is found (parses [a, b]) excluding leftSquare
 // This function can be reused for query later
 func parseListItemNames(it *lex.ItemIterator) ([]string, error) {
@@ -907,7 +841,7 @@ func parseListItemNames(it *lex.ItemIterator) ([]string, error) {
 }
 
 // parses till rightround is found
-func parseSchemaPredicates(it *lex.ItemIterator, s *protos.SchemaRequest) error {
+func parseSchemaPredicates(it *lex.ItemIterator, s *intern.SchemaRequest) error {
 	// pred should be followed by colon
 	it.Next()
 	item := it.Item()
@@ -943,7 +877,7 @@ func parseSchemaPredicates(it *lex.ItemIterator, s *protos.SchemaRequest) error 
 }
 
 // parses till rightcurl is found
-func parseSchemaFields(it *lex.ItemIterator, s *protos.SchemaRequest) error {
+func parseSchemaFields(it *lex.ItemIterator, s *intern.SchemaRequest) error {
 	for it.Next() {
 		item := it.Item()
 		switch item.Typ {
@@ -958,8 +892,8 @@ func parseSchemaFields(it *lex.ItemIterator, s *protos.SchemaRequest) error {
 	return x.Errorf("Invalid schema block.")
 }
 
-func getSchema(it *lex.ItemIterator) (*protos.SchemaRequest, error) {
-	var s protos.SchemaRequest
+func getSchema(it *lex.ItemIterator) (*intern.SchemaRequest, error) {
+	var s intern.SchemaRequest
 	leftRoundSeen := false
 	for it.Next() {
 		item := it.Item()
@@ -982,67 +916,6 @@ func getSchema(it *lex.ItemIterator) (*protos.SchemaRequest, error) {
 		}
 	}
 	return nil, x.Errorf("Invalid schema block.")
-}
-
-// parseMutationOp parses and stores set or delete operation string in Mutation.
-///  TODO: move to rdf
-func parseMutationOp(it *lex.ItemIterator, op string, mu *Mutation) error {
-	var err error
-	if mu == nil {
-		return x.Errorf("Mutation is nil.")
-	}
-	var nquads []*protos.NQuad
-
-	parse := false
-	for it.Next() {
-		item := it.Item()
-		if item.Typ == itemText {
-			continue
-		}
-		if item.Typ == itemLeftCurl {
-			if parse {
-				return x.Errorf("Too many left curls in set mutation.")
-			}
-			parse = true
-		}
-		if item.Typ == itemMutationContent {
-			if !parse {
-				return x.Errorf("Mutation syntax invalid.")
-			}
-			if op == "set" {
-				if len(item.Val) > 0 {
-					if nquads, err = rdf.ConvertToNQuads(item.Val); err != nil {
-						return x.Wrap(err)
-					}
-				}
-				if mu.Set != nil {
-					return x.Errorf("Multiple 'set' blocks not allowed.")
-				}
-				mu.Set = nquads
-			} else if op == "delete" {
-				if len(item.Val) > 0 {
-					if nquads, err = rdf.ConvertToNQuads(item.Val); err != nil {
-						return x.Wrap(err)
-					}
-				}
-				if mu.Del != nil {
-					return x.Errorf("Multiple 'delete' blocks not allowed.")
-				}
-				mu.Del = nquads
-			} else if op == "schema" {
-				if mu.Schema != "" {
-					return x.Errorf("Multiple 'schema' blocks not allowed.")
-				}
-				mu.Schema = item.Val
-			} else {
-				return x.Errorf("Invalid mutation operation.")
-			}
-		}
-		if item.Typ == itemRightCurl {
-			return nil
-		}
-	}
-	return x.Errorf("Invalid mutation formatting.")
 }
 
 // parseGqlVariables parses the the graphQL variable declaration.
@@ -1081,7 +954,7 @@ func parseGqlVariables(it *lex.ItemIterator, vmap varMap) error {
 		it.Next()
 		item = it.Item()
 		if item.Typ != itemColon {
-			return x.Errorf("Expecting a collon. Got: %v", item)
+			return x.Errorf("Expecting a colon. Got: %v", item)
 		}
 
 		// Get variable type.
@@ -1131,8 +1004,12 @@ func parseGqlVariables(it *lex.ItemIterator, vmap varMap) error {
 			// If value is empty replace, otherwise ignore the default value
 			// as the intialised value will override the default value.
 			if vmap[varName].Value == "" {
+				uq, err := unquoteIfQuoted(it.Val)
+				if err != nil {
+					return err
+				}
 				vmap[varName] = varInfo{
-					Value: strings.Trim(it.Val, "\""),
+					Value: uq,
 					Type:  varType,
 				}
 			}
@@ -1145,6 +1022,17 @@ func parseGqlVariables(it *lex.ItemIterator, vmap varMap) error {
 		expectArg = false
 	}
 	return nil
+}
+
+// unquoteIfQuoted checks if str is quoted (starts and ends with quotes). If
+// so, it tries to unquote str possibly returning an error. Otherwise, the
+// original value is returned.
+func unquoteIfQuoted(str string) (string, error) {
+	if len(str) < 2 || str[0] != quote || str[len(str)-1] != quote {
+		return str, nil
+	}
+	uq, err := strconv.Unquote(str)
+	return uq, x.Wrapf(err, "could not unquote %q:", str)
 }
 
 // parseArguments parses the arguments part of the GraphQL query root.
@@ -1413,14 +1301,15 @@ func validFuncName(name string) bool {
 	}
 
 	switch name {
-	case "regexp", "anyofterms", "allofterms", "alloftext", "anyoftext", "has", "uid", "uid_in":
+	case "regexp", "anyofterms", "allofterms", "alloftext", "anyoftext",
+		"has", "uid", "uid_in", "anyof", "allof":
 		return true
 	}
 	return false
 }
 
 func parseFunction(it *lex.ItemIterator, gq *GraphQuery) (*Function, error) {
-	var g *Function
+	var function *Function
 	var expectArg, seenFuncArg, expectLang, isDollar bool
 L:
 	for it.Next() {
@@ -1431,16 +1320,20 @@ L:
 		}
 
 		val := collectName(it, item.Val)
-		g = &Function{
+		function = &Function{
 			Name: strings.ToLower(val),
 		}
 		if _, ok := tryParseItemType(it, itemLeftRound); !ok {
-			return nil, x.Errorf("Expected ( after func name [%s]", g.Name)
+			return nil, x.Errorf("Expected ( after func name [%s]", function.Name)
 		}
 
+		attrItemsAgo := -1
 		expectArg = true
 		for it.Next() {
 			itemInFunc := it.Item()
+			if attrItemsAgo >= 0 {
+				attrItemsAgo++
+			}
 			var val string
 			if itemInFunc.Typ == itemRightRound {
 				break L
@@ -1460,47 +1353,42 @@ L:
 				}
 				it.Prev()
 				it.Prev()
-				f, err := parseFunction(it, gq)
+				nestedFunc, err := parseFunction(it, gq)
 				if err != nil {
 					return nil, err
 				}
 				seenFuncArg = true
-				if f.Name == value {
-					if len(f.NeedsVar) > 1 {
+				if nestedFunc.Name == value {
+					if len(nestedFunc.NeedsVar) > 1 {
 						return nil, x.Errorf("Multiple variables not allowed in a function")
 					}
-					// Function name would be set as attribute because of way parser is written
-					if g.Attr == "val" {
-						g.Attr = value
+					// Variable is used in place of attribute, eq(val(a), 5)
+					if len(function.Attr) == 0 {
+						function.Attr = nestedFunc.NeedsVar[0].Name
+						function.IsValueVar = true
 					} else {
-						// TODO: Refactor later, this is hacky way,Function name would be set as arg
-						// because of the way parser works
-						g.Args = g.Args[:len(g.Args)-1]
+						// eq(name, val(a))
+						function.Args = append(function.Args, Arg{Value: nestedFunc.NeedsVar[0].Name, IsValueVar: true})
 					}
-					g.Args = append(g.Args, Arg{Value: f.NeedsVar[0].Name, IsValueVar: true})
-					g.NeedsVar = append(g.NeedsVar, f.NeedsVar...)
-					g.NeedsVar[0].Typ = VALUE_VAR
+					function.NeedsVar = append(function.NeedsVar, nestedFunc.NeedsVar...)
+					function.NeedsVar[0].Typ = VALUE_VAR
 				} else {
-					if f.Name != "count" {
+					if nestedFunc.Name != "count" {
 						return nil,
-							x.Errorf("Only val/count allowed as function within another. Got: %s", f.Name)
+							x.Errorf("Only val/count allowed as function within another. Got: %s", nestedFunc.Name)
 					}
-					g.Attr = f.Attr
-					g.IsCount = true
+					function.Attr = nestedFunc.Attr
+					function.IsCount = true
 				}
 				expectArg = false
 				continue
 			} else if itemInFunc.Typ == itemAt {
-				if len(g.Attr) > 0 && len(g.Lang) == 0 {
-					itNext, err := it.Peek(1)
-					if err == nil && itNext[0].Val == "filter" {
-						return nil, x.Errorf("Filter cannot be used inside a function.")
-					}
-					expectLang = true
-					continue
-				} else {
-					return nil, x.Errorf("Invalid usage of '@' in function argument")
+				if attrItemsAgo != 1 {
+					return nil, x.Errorf("Invalid usage of '@' in function " +
+						"argument, must only appear immediately after attr.")
 				}
+				expectLang = true
+				continue
 			} else if itemInFunc.Typ == itemMathOp {
 				val = itemInFunc.Val
 				it.Next()
@@ -1520,18 +1408,18 @@ L:
 					flags = itemInFunc.Val[end+1:]
 				}
 
-				g.Args = append(g.Args, Arg{Value: expr}, Arg{Value: flags})
+				function.Args = append(function.Args, Arg{Value: expr}, Arg{Value: flags})
 				expectArg = false
 				continue
 				// Lets reassemble the geo tokens.
 			} else if itemInFunc.Typ == itemLeftSquare {
-				isGeo := isGeoFunc(g.Name)
-				if !isGeo && !isInequalityFn(g.Name) {
+				isGeo := isGeoFunc(function.Name)
+				if !isGeo && !isInequalityFn(function.Name) {
 					return nil, x.Errorf("Unexpected character [ while parsing request.")
 				}
 
 				if isGeo {
-					if err := parseGeoArgs(it, g); err != nil {
+					if err := parseGeoArgs(it, function); err != nil {
 						return nil, err
 					}
 					expectArg = false
@@ -1552,7 +1440,13 @@ L:
 				continue
 			} else if itemInFunc.Typ != itemName {
 				return nil, x.Errorf("Expected arg after func [%s], but got item %v",
-					g.Name, itemInFunc)
+					function.Name, itemInFunc)
+			}
+
+			item, ok := it.PeekOne()
+			// Part of function continue
+			if ok && item.Typ == itemLeftRound {
+				continue
 			}
 
 			if !expectArg && !expectLang {
@@ -1561,56 +1455,63 @@ L:
 
 			// TODO - Move this to a function.
 			v := strings.Trim(itemInFunc.Val, " \t")
-			// Trim just one leading and trailing "
-			v = strings.TrimPrefix(v, "\"")
-			val += strings.TrimSuffix(v, "\"")
+			var err error
+			v, err = unquoteIfQuoted(v)
+			if err != nil {
+				return nil, err
+			}
+			val += v
 			if val == "" {
 				return nil, x.Errorf("Empty argument received")
+			}
+			if val == "uid" {
+				return nil, x.Errorf("Argument cannot be %q", val)
 			}
 
 			if isDollar {
 				val = "$" + val
 				isDollar = false
-				if g.Name == uid && gq != nil {
+				if function.Name == uid && gq != nil {
 					if len(gq.Args["id"]) > 0 {
 						return nil,
 							x.Errorf("Only one GraphQL variable allowed inside uid function.")
 					}
 					gq.Args["id"] = val
 				} else {
-					g.Args = append(g.Args, Arg{Value: val, IsGraphQLVar: true})
+					function.Args = append(function.Args, Arg{Value: val, IsGraphQLVar: true})
 				}
 				expectArg = false
 				continue
 			}
 
 			// Unlike other functions, uid function has no attribute, everything is args.
-			if len(g.Attr) == 0 && g.Name != "uid" {
+			if len(function.Attr) == 0 && function.Name != "uid" {
 				if strings.ContainsRune(itemInFunc.Val, '"') {
 					return nil, x.Errorf("Attribute in function must not be quoted with \": %s",
 						itemInFunc.Val)
 				}
-				g.Attr = val
+				function.Attr = val
+				attrItemsAgo = 0
 			} else if expectLang {
-				g.Lang = val
+				function.Lang = val
 				expectLang = false
-			} else if g.Name != uid {
+			} else if function.Name != uid {
 				// For UID function. we set g.UID
-				g.Args = append(g.Args, Arg{Value: val})
+				function.Args = append(function.Args, Arg{Value: val})
 			}
 
-			if g.Name == "var" {
+			if function.Name == "var" {
 				return nil, x.Errorf("Unexpected var(). Maybe you want to try using uid()")
 			}
 
 			expectArg = false
-			if g.Name == value {
+			if function.Name == value {
 				// E.g. @filter(gt(val(a), 10))
-				g.NeedsVar = append(g.NeedsVar, VarContext{
+				function.NeedsVar = append(function.NeedsVar, VarContext{
 					Name: val,
 					Typ:  VALUE_VAR,
 				})
-			} else if g.Name == uid {
+			} else if function.Name == uid {
 				// uid function could take variables as well as actual uids.
 				// If we can parse the value that means its an uid otherwise a variable.
 				uid, err := strconv.ParseUint(val, 0, 64)
@@ -1620,12 +1521,12 @@ L:
 						gq.UID = append(gq.UID, uid)
 						// Or uid function in filter.
 					} else {
-						g.UID = append(g.UID, uid)
+						function.UID = append(function.UID, uid)
 					}
 					continue
 				}
 				// E.g. @filter(uid(a, b, c))
-				g.NeedsVar = append(g.NeedsVar, VarContext{
+				function.NeedsVar = append(function.NeedsVar, VarContext{
 					Name: val,
 					Typ:  UID_VAR,
 				})
@@ -1633,15 +1534,15 @@ L:
 		}
 	}
 
-	if g.Name != uid && len(g.Attr) == 0 {
-		return nil, x.Errorf("Got empty attr for function: [%s]", g.Name)
+	if function.Name != uid && len(function.Attr) == 0 {
+		return nil, x.Errorf("Got empty attr for function: [%s]", function.Name)
 	}
 
-	return g, nil
+	return function, nil
 }
 
 type facetRes struct {
-	f          *Facets
+	f          *intern.FacetParams
 	ft         *FilterTree
 	vmap       map[string]string
 	facetOrder string
@@ -1660,7 +1561,8 @@ func parseFacets(it *lex.ItemIterator) (res facetRes, err error) {
 }
 
 type facetItem struct {
-	facetName string
+	name      string
+	alias     string
 	varName   string
 	ordered   bool
 	orderdesc bool
@@ -1671,7 +1573,7 @@ type facetItem struct {
 // different function.
 func tryParseFacetItem(it *lex.ItemIterator) (res facetItem, parseOk bool, err error) {
 	// We parse this:
-	// [{orderdesc|orderasc}:] [varname as] facetName
+	// [{orderdesc|orderasc|alias}:] [varname as] name
 
 	savePos := it.Save()
 	defer func() {
@@ -1684,27 +1586,31 @@ func tryParseFacetItem(it *lex.ItemIterator) (res facetItem, parseOk bool, err e
 	if !ok {
 		return res, false, nil
 	}
+
 	isOrderasc := item.Val == "orderasc"
-	if isOrderasc || item.Val == "orderdesc" {
-		if _, ok := tryParseItemType(it, itemColon); ok {
+	if _, ok := tryParseItemType(it, itemColon); ok {
+		if isOrderasc || item.Val == "orderdesc" {
 			res.ordered = true
 			res.orderdesc = !isOrderasc
-			// Step past colon.
-			item, ok = tryParseItemType(it, itemName)
-			if !ok {
-				return res, false, x.Errorf("Expected name after colon")
-			}
+		} else {
+			res.alias = item.Val
+		}
+
+		// Step past colon.
+		item, ok = tryParseItemType(it, itemName)
+		if !ok {
+			return res, false, x.Errorf("Expected name after colon")
 		}
 	}
 
-	// We've possibly set ordered, orderdesc, and now we have consumed another item, which is a
-	// name.
+	// We've possibly set ordered, orderdesc, alias and now we have consumed another item,
+	// which is a name.
 	name1 := item.Val
 
 	// Now try to consume "as".
 	if !trySkipItemVal(it, "as") {
 		name1 = collectName(it, name1)
-		res.facetName = name1
+		res.name = name1
 		return res, true, nil
 	}
 	item, ok = tryParseItemType(it, itemName)
@@ -1712,7 +1618,7 @@ func tryParseFacetItem(it *lex.ItemIterator) (res facetItem, parseOk bool, err e
 		return res, false, x.Errorf("Expected name in facet list")
 	}
 
-	res.facetName = collectName(it, item.Val)
+	res.name = collectName(it, item.Val)
 	res.varName = name1
 	return res, true, nil
 }
@@ -1731,7 +1637,7 @@ func tryParseFacetList(it *lex.ItemIterator) (res facetRes, parseOk bool, err er
 	// Skip past '('
 	if _, ok := tryParseItemType(it, itemLeftRound); !ok {
 		it.Restore(savePos)
-		var facets Facets
+		var facets intern.FacetParams
 		facets.AllKeys = true
 		res.f = &facets
 		res.vmap = make(map[string]string)
@@ -1739,7 +1645,7 @@ func tryParseFacetList(it *lex.ItemIterator) (res facetRes, parseOk bool, err er
 	}
 
 	facetVar := make(map[string]string)
-	var facets Facets
+	var facets intern.FacetParams
 	var orderdesc bool
 	var orderkey string
 
@@ -1761,43 +1667,46 @@ func tryParseFacetList(it *lex.ItemIterator) (res facetRes, parseOk bool, err er
 		// Combine the facetitem with our result.
 		{
 			if facetItem.varName != "" {
-				if _, has := facetVar[facetItem.facetName]; has {
+				if _, has := facetVar[facetItem.name]; has {
 					return res, false, x.Errorf("Duplicate variable mappings for facet %v",
-						facetItem.facetName)
+						facetItem.name)
 				}
-				facetVar[facetItem.facetName] = facetItem.varName
+				facetVar[facetItem.name] = facetItem.varName
 			}
-			facets.Keys = append(facets.Keys, facetItem.facetName)
+			facets.Param = append(facets.Param, &intern.FacetParam{
+				Key:   facetItem.name,
+				Alias: facetItem.alias,
+			})
 			if facetItem.ordered {
 				if orderkey != "" {
 					return res, false, x.Errorf("Invalid use of orderasc/orderdesc in facets")
 				}
 				orderdesc = facetItem.orderdesc
-				orderkey = facetItem.facetName
+				orderkey = facetItem.name
 			}
 		}
 
 		// Now what?  Either close-paren or a comma.
 		if _, ok := tryParseItemType(it, itemRightRound); ok {
-			sort.Slice(facets.Keys, func(i, j int) bool {
-				return facets.Keys[i] < facets.Keys[j]
+			sort.Slice(facets.Param, func(i, j int) bool {
+				return facets.Param[i].Key < facets.Param[j].Key
 			})
 			// deduplicate facets
-			out := facets.Keys[:0]
-			flen := len(facets.Keys)
+			out := facets.Param[:0]
+			flen := len(facets.Param)
 			for i := 1; i < flen; i++ {
-				if facets.Keys[i-1] == facets.Keys[i] {
+				if facets.Param[i-1].Key == facets.Param[i].Key {
 					continue
 				}
-				out = append(out, facets.Keys[i-1])
+				out = append(out, facets.Param[i-1])
 			}
-			out = append(out, facets.Keys[flen-1])
-			facets.Keys = out
+			out = append(out, facets.Param[flen-1])
+			facets.Param = out
 			res.f, res.vmap, res.facetOrder, res.orderdesc = &facets, facetVar, orderkey, orderdesc
 			return res, true, nil
 		}
 		if item, ok := tryParseItemType(it, itemComma); !ok {
-			if len(facets.Keys) < 2 {
+			if len(facets.Param) < 2 {
 				// We have only consumed ``'@facets' '(' <facetItem>`, which means parseFilter might
 				// succeed. Return no-parse, no-error.
 				return res, false, nil
@@ -1816,6 +1725,7 @@ func parseGroupby(it *lex.ItemIterator, gq *GraphQuery) error {
 	expectArg := true
 	it.Next()
 	item := it.Item()
+	alias := ""
 	if item.Typ != itemLeftRound {
 		return x.Errorf("Expected a left round after groupby")
 	}
@@ -1833,7 +1743,21 @@ func parseGroupby(it *lex.ItemIterator, gq *GraphQuery) error {
 			if !expectArg {
 				return x.Errorf("Expected a comma or right round but got: %v", item.Val)
 			}
-			attr := collectName(it, item.Val)
+
+			val := collectName(it, item.Val)
+			peekIt, err := it.Peek(1)
+			if err != nil {
+				return err
+			}
+			if peekIt[0].Typ == itemColon {
+				if alias != "" {
+					return x.Errorf("Expected predicate after %s:", alias)
+				}
+				alias = val
+				it.Next() // Consume the itemColon
+				continue
+			}
+
 			var langs []string
 			items, err := it.Peek(1)
 			if err == nil && items[0].Typ == itemAt {
@@ -1844,10 +1768,12 @@ func parseGroupby(it *lex.ItemIterator, gq *GraphQuery) error {
 					return err
 				}
 			}
-			attrLang := AttrLang{
-				Attr:  attr,
+			attrLang := GroupByAttr{
+				Attr:  val,
+				Alias: alias,
 				Langs: langs,
 			}
+			alias = ""
 			gq.GroupbyAttrs = append(gq.GroupbyAttrs, attrLang)
 			count++
 			expectArg = false
@@ -1935,7 +1861,9 @@ func parseFilter(it *lex.ItemIterator) (*FilterTree, error) {
 	// For other applications, typically after all items are
 	// consumed, we will run a loop like "while opStack is nonempty, evalStack".
 	// This is not needed here.
-	x.AssertTruef(opStack.empty(), "Op stack should be empty when we exit")
+	if !opStack.empty() {
+		return nil, x.Errorf("Unbalanced parentheses in @filter statement")
+	}
 
 	if valueStack.empty() {
 		// This happens when we have @filter(). We can either return an error or
@@ -2025,11 +1953,21 @@ func parseVarList(it *lex.ItemIterator, gq *GraphQuery) (int, error) {
 }
 
 func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
-	if curp == nil {
-		return x.Errorf("Invalid use of directive.")
+	valid := true
+	it.Prev()
+	item := it.Item()
+	if item.Typ == itemLeftCurl {
+		// Ideally we should check that curp was created at current depth.
+		valid = false
 	}
 	it.Next()
-	item := it.Item()
+	// No directive is allowed on intern.subgraph like expand all, value variables.
+	if !valid || curp == nil || curp.IsInternal {
+		return x.Errorf("Invalid use of directive.")
+	}
+
+	it.Next()
+	item = it.Item()
 	peek, err := it.Peek(1)
 	if err != nil || item.Typ != itemName {
 		return x.Errorf("Expected directive or language list")
@@ -2064,12 +2002,18 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 		// this is directive
 		switch item.Val {
 		case "filter":
+			if curp.Filter != nil {
+				return x.Errorf("Use AND, OR and round brackets instead of multiple filter directives.")
+			}
 			filter, err := parseFilter(it)
 			if err != nil {
 				return err
 			}
 			curp.Filter = filter
 		case "groupby":
+			if curp.IsGroupby {
+				return x.Errorf("Only one group by directive allowed.")
+			}
 			curp.IsGroupby = true
 			parseGroupby(it, curp)
 		default:
@@ -2135,6 +2079,16 @@ func validKey(k string) bool {
 		return true
 	}
 	return false
+}
+
+func attrAndLang(attrData string) (attr string, langs []string) {
+	idx := strings.Index(attrData, "@")
+	if idx < 0 {
+		return attrData, langs
+	}
+	attr = attrData[:idx]
+	langs = strings.Split(attrData[idx+1:], ":")
+	return
 }
 
 // getRoot gets the root graph query object after parsing the args.
@@ -2287,7 +2241,8 @@ func getRoot(it *lex.ItemIterator) (gq *GraphQuery, rerr error) {
 				if order[val] {
 					return nil, x.Errorf("Sorting by an attribute: [%s] can only be done once", val)
 				}
-				gq.Order = append(gq.Order, &protos.Order{val, key == "orderdesc"})
+				attr, langs := attrAndLang(val)
+				gq.Order = append(gq.Order, &intern.Order{attr, key == "orderdesc", langs})
 				order[val] = true
 				continue
 			}
@@ -2387,6 +2342,17 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 
 			val := collectName(it, item.Val)
 			valLower := strings.ToLower(val)
+
+			peekIt, err = it.Peek(1)
+			if err != nil {
+				return err
+			}
+			if peekIt[0].Typ == itemColon {
+				alias = val
+				it.Next() // Consume the itemCollon
+				continue
+			}
+
 			if gq.IsGroupby && (!isAggregator(val) && val != "count" && count != seen) {
 				// Only aggregator or count allowed inside the groupby block.
 				return x.Errorf("Only aggregator/count functions allowed inside @groupby. Got: %v", val)
@@ -2540,21 +2506,31 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 					goto Fall
 				}
 
-				peekIt, err := it.Peek(1)
+				peekIt, err := it.Peek(2)
 				if err != nil {
 					return err
 				}
 				if peekIt[0].Typ == itemRightRound {
-					// We encountered a count(), lets reset count to notSeen
-					// and set UidCount on parent.
+					return x.Errorf("Cannot use count(), please use count(uid)")
+				} else if peekIt[0].Val == uid && peekIt[1].Typ == itemRightRound {
+					if gq.IsGroupby {
+						// count(uid) case which occurs inside @groupby
+						val = uid
+						// Skip uid)
+						it.Next()
+						it.Next()
+						goto Fall
+					}
+
 					if varName != "" {
 						return x.Errorf("Cannot assign variable to count()")
 					}
 					count = notSeen
-					gq.UidCount = "count"
+					gq.UidCount = true
 					if alias != "" {
-						gq.UidCount = alias
+						gq.UidCountAlias = alias
 					}
+					it.Next()
 					it.Next()
 				}
 				continue
@@ -2593,9 +2569,6 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				curp = nil
 				continue
 			} else if valLower == uid {
-				if varName != "" {
-					return x.Errorf("Cannot assign a variable to uid()")
-				}
 				if count == seen {
 					return x.Errorf("count of a variable is not allowed")
 				}
@@ -2609,15 +2582,6 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				return x.Errorf("Cannot do uid() of a variable")
 			}
 		Fall:
-			peekIt, err = it.Peek(1)
-			if err != nil {
-				return err
-			}
-			if peekIt[0].Typ == itemColon {
-				alias = val
-				it.Next() // Consume the itemCollon
-				continue
-			}
 			if count == seenWithPred {
 				return x.Errorf("Multiple predicates not allowed in single count.")
 			}
@@ -2639,6 +2603,9 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				count = seenWithPred
 			}
 		case itemLeftCurl:
+			if curp == nil {
+				return x.Errorf("Query syntax invalid.")
+			}
 			if len(curp.Langs) > 0 {
 				return x.Errorf("Cannot have children for attr: %s with lang tags: %v", curp.Attr,
 					curp.Langs)
@@ -2647,6 +2614,9 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				return err
 			}
 		case itemLeftRound:
+			if curp == nil {
+				return x.Errorf("Query syntax invalid.")
+			}
 			if curp.Attr == "" {
 				return x.Errorf("Predicate name cannot be empty.")
 			}
@@ -2670,7 +2640,8 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 					if order[p.Val] {
 						return x.Errorf("Sorting by an attribute: [%s] can only be done once", p.Val)
 					}
-					curp.Order = append(curp.Order, &protos.Order{p.Val, p.Key == "orderdesc"})
+					attr, langs := attrAndLang(p.Val)
+					curp.Order = append(curp.Order, &intern.Order{attr, p.Key == "orderdesc", langs})
 					order[p.Val] = true
 					continue
 				}

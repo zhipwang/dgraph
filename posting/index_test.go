@@ -20,13 +20,14 @@ package posting
 import (
 	"bytes"
 	"context"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
@@ -36,10 +37,9 @@ const schemaStr = `
 name:string @index(term) .
 `
 
-func uids(pl *protos.PostingList) []uint64 {
-	l := &List{}
-	l.plist = pl
-	r := l.Uids(ListOptions{})
+func uids(l *List, readTs uint64) []uint64 {
+	r, err := l.Uids(ListOptions{ReadTs: readTs})
+	x.Check(err)
 	return r.Uids
 }
 
@@ -110,73 +110,75 @@ func TestIndexingInvalidLang(t *testing.T) {
 	require.Error(t, err)
 }
 
-func addMutationWithIndex(t *testing.T, l *List, edge *protos.DirectedEdge, op uint32) {
+func addMutation(t *testing.T, l *List, edge *intern.DirectedEdge, op uint32,
+	startTs uint64, commitTs uint64, index bool) {
 	if op == Del {
-		edge.Op = protos.DirectedEdge_DEL
+		edge.Op = intern.DirectedEdge_DEL
 	} else if op == Set {
-		edge.Op = protos.DirectedEdge_SET
+		edge.Op = intern.DirectedEdge_SET
 	} else {
 		x.Fatalf("Unhandled op: %v", op)
 	}
-	require.NoError(t, l.AddMutationWithIndex(context.Background(), edge))
+	txn := &Txn{
+		StartTs: startTs,
+		Indices: []uint64{1},
+	}
+	txn = Txns().PutOrMergeIndex(txn)
+	if index {
+		require.NoError(t, l.AddMutationWithIndex(context.Background(), edge, txn))
+	} else {
+		ok, err := l.AddMutation(context.Background(), txn, edge)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	require.NoError(t, txn.CommitMutations(context.Background(), commitTs))
 }
 
 const schemaVal = `
 name:string @index(term) .
+name2:string @index(term) .
 dob:dateTime @index(year) .
 friend:uid @reverse .
 	`
 
+// TODO(Txn): We can't read index key on disk if it was written in same txn.
 func TestTokensTable(t *testing.T) {
 	err := schema.ParseBytes([]byte(schemaVal), 1)
 	require.NoError(t, err)
 
 	key := x.DataKey("name", 1)
-	l := getNew(key, ps)
-	defer ps.Delete(key)
+	l, err := getNew(key, ps)
+	lcache.PutIfMissing(string(l.key), l)
+	require.NoError(t, err)
 
-	edge := &protos.DirectedEdge{
+	edge := &intern.DirectedEdge{
 		Value:  []byte("david"),
 		Label:  "testing",
 		Attr:   "name",
 		Entity: 157,
 	}
-	addMutationWithIndex(t, l, edge, Set)
-	_, err = l.SyncIfDirty(false)
-	x.Check(err)
+	addMutation(t, l, edge, Set, 1, 2, true)
+	merged, err := l.SyncIfDirty(false)
+	require.True(t, merged)
+	require.NoError(t, err)
 
-	key = x.IndexKey("name", "david")
-	var item badger.KVItem
+	key = x.IndexKey("name", "\x01david")
 	time.Sleep(10 * time.Millisecond)
-	err = ps.Get(key, &item)
+
+	txn := ps.NewTransactionAt(3, false)
+	_, err = txn.Get(key)
 	require.NoError(t, err)
 
-	var pl protos.PostingList
-	require.NoError(t, item.Value(func(val []byte) error {
-		UnmarshalOrCopy(val, item.UserMeta(), &pl)
-		return nil
-	}))
-
 	require.EqualValues(t, []string{"\x01david"}, tokensForTest("name"))
-
-	CommitLists(10, 1)
-
-	err = ps.Get(key, &item)
-	require.NoError(t, err)
-	require.NoError(t, item.Value(func(val []byte) error {
-		UnmarshalOrCopy(val, item.UserMeta(), &pl)
-		return nil
-	}))
-
-	require.EqualValues(t, []string{"\x01david"}, tokensForTest("name"))
-	deletePl(t)
 }
 
 // tokensForTest returns keys for a table. This is just for testing / debugging.
 func tokensForTest(attr string) []string {
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.IndexPrefix()
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransactionAt(math.MaxUint64, false)
+	defer txn.Discard()
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 
 	var out []string
@@ -194,78 +196,82 @@ func tokensForTest(attr string) []string {
 
 // addEdgeToValue adds edge without indexing.
 func addEdgeToValue(t *testing.T, attr string, src uint64,
-	value string) {
-	edge := &protos.DirectedEdge{
+	value string, startTs, commitTs uint64) {
+	edge := &intern.DirectedEdge{
 		Value:  []byte(value),
 		Label:  "testing",
 		Attr:   attr,
 		Entity: src,
-		Op:     protos.DirectedEdge_SET,
+		Op:     intern.DirectedEdge_SET,
 	}
 	l := Get(x.DataKey(attr, src))
 	// No index entries added here as we do not call AddMutationWithIndex.
-	ok, err := l.AddMutation(context.Background(), edge)
-	require.NoError(t, err)
-	require.True(t, ok)
+	addMutation(t, l, edge, Set, startTs, commitTs, false)
 }
 
 // addEdgeToUID adds uid edge with reverse edge
 func addEdgeToUID(t *testing.T, attr string, src uint64,
-	dst uint64) {
-	edge := &protos.DirectedEdge{
+	dst uint64, startTs, commitTs uint64) {
+	edge := &intern.DirectedEdge{
 		ValueId: dst,
 		Label:   "testing",
 		Attr:    attr,
 		Entity:  src,
-		Op:      protos.DirectedEdge_SET,
+		Op:      intern.DirectedEdge_SET,
 	}
 	l := Get(x.DataKey(attr, src))
 	// No index entries added here as we do not call AddMutationWithIndex.
-	ok, err := l.AddMutation(context.Background(), edge)
-	require.NoError(t, err)
-	require.True(t, ok)
+	addMutation(t, l, edge, Set, startTs, commitTs, false)
 }
 
 // addEdgeToUID adds uid edge with reverse edge
 func addReverseEdge(t *testing.T, attr string, src uint64,
-	dst uint64) {
-	edge := &protos.DirectedEdge{
+	dst uint64, startTs, commitTs uint64) {
+	edge := &intern.DirectedEdge{
 		ValueId: dst,
 		Label:   "testing",
 		Attr:    attr,
 		Entity:  src,
-		Op:      protos.DirectedEdge_SET,
+		Op:      intern.DirectedEdge_SET,
 	}
-	addReverseMutation(context.Background(), edge)
+	txn := Txn{
+		StartTs: startTs,
+	}
+	txn.addReverseMutation(context.Background(), edge)
+	require.NoError(t, txn.CommitMutations(context.Background(), commitTs))
 }
 
 func TestRebuildIndex(t *testing.T) {
 	schema.ParseBytes([]byte(schemaVal), 1)
-	addEdgeToValue(t, "name", 1, "Michonne")
-	addEdgeToValue(t, "name", 20, "David")
+	addEdgeToValue(t, "name2", 91, "Michonne", uint64(1), uint64(2))
+	addEdgeToValue(t, "name2", 92, "David", uint64(3), uint64(4))
 
-	// RebuildIndex requires the data to be committed to data store.
-	CommitLists(10, 1)
-	time.Sleep(10 * time.Millisecond)
+	{
+		txn := ps.NewTransactionAt(1, true)
+		require.NoError(t, txn.Set(x.IndexKey("name2", "wrongname21"), []byte("nothing")))
+		require.NoError(t, txn.Set(x.IndexKey("name2", "wrongname22"), []byte("nothing")))
+		require.NoError(t, txn.CommitAt(1, nil))
+	}
 
-	// Create some fake wrong entries for data store.
-	ps.Set(x.IndexKey("name", "wrongname1"), []byte("nothing"), 0x00)
-	ps.Set(x.IndexKey("name", "wrongname2"), []byte("nothing"), 0x00)
-
-	require.NoError(t, DeleteIndex(context.Background(), "name"))
-	require.NoError(t, RebuildIndex(context.Background(), "name"))
-
-	// Let's force a commit.
-	CommitLists(10, 1)
-	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, DeleteIndex(context.Background(), "name2"))
+	RebuildIndex(context.Background(), "name2", 5)
+	CommitLists(func(key []byte) bool {
+		pk := x.Parse(key)
+		if pk.Attr == "name2" {
+			return true
+		}
+		return false
+	})
 
 	// Check index entries in data store.
-	it := ps.NewIterator(badger.DefaultIteratorOptions)
+	txn := ps.NewTransactionAt(6, false)
+	defer txn.Discard()
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
-	pk := x.ParsedKey{Attr: "name"}
+	pk := x.ParsedKey{Attr: "name2"}
 	prefix := pk.IndexPrefix()
 	var idxKeys []string
-	var idxVals []*protos.PostingList
+	var idxVals []*List
 	for it.Seek(prefix); it.Valid(); it.Next() {
 		item := it.Item()
 		key := item.Key()
@@ -273,74 +279,70 @@ func TestRebuildIndex(t *testing.T) {
 			break
 		}
 		idxKeys = append(idxKeys, string(key))
-		pl := new(protos.PostingList)
-		require.NoError(t, item.Value(func(val []byte) error {
-			UnmarshalOrCopy(val, item.UserMeta(), pl)
-			return nil
-		}))
-		idxVals = append(idxVals, pl)
+		l := Get(key)
+		idxVals = append(idxVals, l)
 	}
 	require.Len(t, idxKeys, 2)
 	require.Len(t, idxVals, 2)
-	require.EqualValues(t, idxKeys[0], x.IndexKey("name", "\x01david"))
-	require.EqualValues(t, idxKeys[1], x.IndexKey("name", "\x01michonne"))
+	require.EqualValues(t, idxKeys[0], x.IndexKey("name2", "\x01david"))
+	require.EqualValues(t, idxKeys[1], x.IndexKey("name2", "\x01michonne"))
 
-	uids1 := uids(idxVals[0])
-	uids2 := uids(idxVals[1])
+	uids1 := uids(idxVals[0], 6)
+	uids2 := uids(idxVals[1], 6)
 	require.Len(t, uids1, 1)
 	require.Len(t, uids2, 1)
-	require.EqualValues(t, 20, uids1[0])
-	require.EqualValues(t, 1, uids2[0])
-
-	l1 := Get(x.DataKey("name", 1))
-	deletePl(t)
-	ps.Delete(l1.key)
-	l2 := Get(x.DataKey("name", 20))
-	deletePl(t)
-	ps.Delete(l2.key)
+	require.EqualValues(t, 92, uids1[0])
+	require.EqualValues(t, 91, uids2[0])
 }
 
 func TestRebuildReverseEdges(t *testing.T) {
-	addEdgeToUID(t, "friend", 1, 23)
-	addEdgeToUID(t, "friend", 1, 24)
-	addEdgeToUID(t, "friend", 2, 23)
+	schema.ParseBytes([]byte(schemaVal), 1)
+	addEdgeToUID(t, "friend", 1, 23, uint64(10), uint64(11))
+	addEdgeToUID(t, "friend", 1, 24, uint64(12), uint64(13))
+	addEdgeToUID(t, "friend", 2, 23, uint64(14), uint64(15))
 
-	// RebuildIndex requires the data to be committed to data store.
-	CommitLists(10, 1)
-	time.Sleep(10 * time.Millisecond)
-
-	require.NoError(t, RebuildReverseEdges(context.Background(), "friend"))
-
-	// Let's force a commit.
-	CommitLists(10, 1)
-	time.Sleep(10 * time.Millisecond)
+	// TODO: Remove after fixing sync marks.
+	RebuildReverseEdges(context.Background(), "friend", 16)
+	CommitLists(func(key []byte) bool {
+		pk := x.Parse(key)
+		if pk.Attr == "friend" {
+			return true
+		}
+		return false
+	})
 
 	// Check index entries in data store.
-	it := ps.NewIterator(badger.DefaultIteratorOptions)
+	txn := ps.NewTransactionAt(17, false)
+	defer txn.Discard()
+	iterOpts := badger.DefaultIteratorOptions
+	iterOpts.AllVersions = true
+	it := txn.NewIterator(iterOpts)
 	defer it.Close()
 	pk := x.ParsedKey{Attr: "friend"}
 	prefix := pk.ReversePrefix()
 	var revKeys []string
-	var revVals []*protos.PostingList
-	for it.Seek(prefix); it.Valid(); it.Next() {
+	var revVals []*List
+	var prevKey []byte
+	it.Seek(prefix)
+	for it.ValidForPrefix(prefix) {
 		item := it.Item()
 		key := item.Key()
-		if !bytes.HasPrefix(key, prefix) {
-			break
+		if bytes.Equal(key, prevKey) {
+			it.Next()
+			continue
 		}
+		prevKey := make([]byte, len(key))
+		copy(prevKey, key)
 		revKeys = append(revKeys, string(key))
-		pl := new(protos.PostingList)
-		require.NoError(t, item.Value(func(val []byte) error {
-			UnmarshalOrCopy(val, item.UserMeta(), pl)
-			return nil
-		}))
-		revVals = append(revVals, pl)
+		l, err := ReadPostingList(key, it)
+		require.NoError(t, err)
+		revVals = append(revVals, l)
 	}
 	require.Len(t, revKeys, 2)
 	require.Len(t, revVals, 2)
 
-	uids0 := uids(revVals[0])
-	uids1 := uids(revVals[1])
+	uids0 := uids(revVals[0], 17)
+	uids1 := uids(revVals[1], 17)
 	require.Len(t, uids0, 2)
 	require.Len(t, uids1, 1)
 	require.EqualValues(t, 1, uids0[0])

@@ -21,10 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/client"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
 )
@@ -73,7 +71,8 @@ func populateGraphWithFacets(t *testing.T) {
 	addEdgeToValue(t, "name", 33, "Michale", nil)
 	// missing name for 101 -- no name edge and no facets.
 
-	addEdgeToLangValue(t, "name", 320, "Test facet", "en", map[string]string{"type": `"Test facet with lang"`})
+	addEdgeToLangValue(t, "name", 320, "Test facet", "en",
+		map[string]string{"type": `"Test facet with lang"`})
 
 	time.Sleep(5 * time.Millisecond)
 }
@@ -106,9 +105,9 @@ func TestRetrieveFacetsSimple(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"@facets":{"name":{"origin":"french"}},"gender":"female","name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name|origin":"french","name":"Michonne","gender":"female"}]}}`,
 		js)
 }
 
@@ -126,9 +125,9 @@ func TestOrderFacets(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"@facets":{"_":{"since":"2004-05-02T15:04:05Z"}},"name":"Glenn Rhee"},{"@facets":{"_":{"since":"2005-05-02T15:04:05Z"}}},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Rick Grimes"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Andrea"},{"@facets":{"_":{"since":"2007-05-02T15:04:05Z"}},"name":"Daryl Dixon"}]}]}}`,
+		`{"data":{"me":[{"friend":[{"name":"Glenn Rhee","friend|since":"2004-05-02T15:04:05Z"},{"friend|since":"2005-05-02T15:04:05Z"},{"name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"name":"Daryl Dixon","friend|since":"2007-05-02T15:04:05Z"}]}]}}`,
 		js)
 }
 
@@ -146,9 +145,9 @@ func TestOrderdescFacets(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"@facets":{"_":{"since":"2007-05-02T15:04:05Z"}},"name":"Daryl Dixon"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Rick Grimes"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Andrea"},{"@facets":{"_":{"since":"2005-05-02T15:04:05Z"}}},{"@facets":{"_":{"since":"2004-05-02T15:04:05Z"}},"name":"Glenn Rhee"}]}]}}`,
+		`{"data":{"me":[{"friend":[{"name":"Daryl Dixon","friend|since":"2007-05-02T15:04:05Z"},{"name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"friend|since":"2005-05-02T15:04:05Z"},{"name":"Glenn Rhee","friend|since":"2004-05-02T15:04:05Z"}]}]}}`,
 		js)
 }
 
@@ -169,7 +168,7 @@ func TestRetrieveFacetsAsVars(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"name":"Rick Grimes","val(a)":"2006-01-02T15:04:05Z"}]}}`,
 		js)
@@ -189,114 +188,10 @@ func TestRetrieveFacetsUidValues(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"},"name":{"origin":"french"}},"name":"Rick Grimes"},{"@facets":{"_":{"close":true,"family":true,"since":"2004-05-02T15:04:05Z","tag":"Domain3"},"name":{"origin":"french"}},"name":"Glenn Rhee"},{"@facets":{"_":{"close":false,"family":true,"since":"2007-05-02T15:04:05Z", "tag":34}},"name":"Daryl Dixon"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Andrea"},{"@facets":{"_":{"age":33,"close":true,"family":false,"since":"2005-05-02T15:04:05Z"}}}]}]}}`,
+		`{"data":{"me":[{"friend":[{"name|origin":"french","name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"name|origin":"french","name":"Glenn Rhee","friend|close":true,"friend|family":true,"friend|since":"2004-05-02T15:04:05Z","friend|tag":"Domain3"},{"name":"Daryl Dixon","friend|close":false,"friend|family":true,"friend|since":"2007-05-02T15:04:05Z","friend|tag":34},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"friend|age":33,"friend|close":true,"friend|family":false,"friend|since":"2005-05-02T15:04:05Z"}]}]}}`,
 		js)
-}
-
-func TestRetrieveFacetsProtoUnmarshal(t *testing.T) {
-	populateGraphWithFacets(t)
-	defer teardownGraphWithFacets(t)
-
-	type friendFacet struct {
-		Since  time.Time `dgraph:"since"`
-		Family bool      `dgraph:"family"`
-		Tag    string    `dgraph:"tag"`
-		Age    int       `dgraph:"age"`
-		Close  bool      `dgraph:"close"`
-	}
-
-	type nameFacets struct {
-		Origin string `dgraph:"origin"`
-	}
-
-	type Person struct {
-		Name       string      `dgraph:"name"`
-		NameFacets nameFacets  `dgraph:"name@facets"`
-		Facets     friendFacet `dgraph:"@facets"`
-		Friends    []Person    `dgraph:"friend"`
-	}
-
-	type res struct {
-		Root Person `dgraph:"me"`
-	}
-
-	// to see how friend @facets are positioned in output.
-	query := `
-		{
-			me(func: uid(0x1)) {
-				name
-				friend @facets {
-					name @facets
-				}
-			}
-		}
-	`
-
-	pb := processToPB(t, query, nil, false)
-	var r res
-	err := client.Unmarshal(pb, &r)
-	require.NoError(t, err)
-	require.Equal(t, "french", r.Root.Friends[1].NameFacets.Origin)
-	ff := r.Root.Friends[1].Facets
-	require.NotZero(t, ff.Since)
-	require.NotZero(t, ff.Close)
-	require.NotZero(t, ff.Family)
-	require.NotZero(t, ff.Tag)
-	require.NotZero(t, r.Root.Friends[4].Facets.Age)
-}
-
-func TestRetrieveFacetsProtoUnmarshalPointer(t *testing.T) {
-	populateGraphWithFacets(t)
-	defer teardownGraphWithFacets(t)
-
-	type friendFacets struct {
-		Since  time.Time `dgraph:"since"`
-		Family bool      `dgraph:"family"`
-		Tag    string    `dgraph:"tag"`
-		Age    int       `dgraph:"age"`
-		Close  bool      `dgraph:"close"`
-	}
-
-	type nameFacets struct {
-		Origin string `dgraph:"origin"`
-	}
-
-	type Person struct {
-		Name       string        `dgraph:"name"`
-		NameFacets *nameFacets   `dgraph:"name@facets"`
-		Facets     *friendFacets `dgraph:"@facets"`
-		Friends    []Person      `dgraph:"friend"`
-	}
-
-	type res struct {
-		Root Person `dgraph:"me"`
-	}
-
-	// to see how friend @facets are positioned in output.
-	query := `
-		{
-			me(func: uid(0x1)) {
-				name
-				friend @facets {
-					name @facets
-				}
-			}
-		}
-	`
-
-	pb := processToPB(t, query, nil, false)
-	var r res
-	err := client.Unmarshal(pb, &r)
-	require.NoError(t, err)
-	require.Equal(t, "french", r.Root.Friends[1].NameFacets.Origin)
-	ff := r.Root.Friends[1].Facets
-	require.NotZero(t, ff.Since)
-	require.NotZero(t, ff.Close)
-	require.NotZero(t, ff.Family)
-	require.NotZero(t, ff.Tag)
-	require.NotZero(t, r.Root.Friends[4].Facets.Age)
 }
 
 func TestRetrieveFacetsAll(t *testing.T) {
@@ -315,9 +210,9 @@ func TestRetrieveFacetsAll(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"@facets":{"name":{"origin":"french"}},"friend":[{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"},"name":{"origin":"french"}},"gender":"male","name":"Rick Grimes"},{"@facets":{"_":{"close":true,"family":true,"since":"2004-05-02T15:04:05Z","tag":"Domain3"},"name":{"origin":"french"}},"name":"Glenn Rhee"},{"@facets":{"_":{"close":false,"family":true,"since":"2007-05-02T15:04:05Z","tag":34}},"name":"Daryl Dixon"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Andrea"},{"@facets":{"_":{"age":33,"close":true,"family":false,"since":"2005-05-02T15:04:05Z"}}}],"gender":"female","name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name|origin":"french","name":"Michonne","friend":[{"name|origin":"french","name":"Rick Grimes","gender":"male","friend|since":"2006-01-02T15:04:05Z"},{"name|origin":"french","name":"Glenn Rhee","friend|close":true,"friend|family":true,"friend|since":"2004-05-02T15:04:05Z","friend|tag":"Domain3"},{"name":"Daryl Dixon","friend|close":false,"friend|family":true,"friend|since":"2007-05-02T15:04:05Z","friend|tag":34},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"friend|age":33,"friend|close":true,"friend|family":false,"friend|since":"2005-05-02T15:04:05Z"}],"gender":"female"}]}}`,
 		js)
 }
 
@@ -337,7 +232,7 @@ func TestFacetsNotInQuery(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"friend":[{"gender":"male","name":"Rick Grimes"},{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"gender":"female","name":"Michonne"}]}}`,
 		js)
@@ -357,7 +252,7 @@ func TestSubjectWithNoFacets(t *testing.T) {
 			}
 		}
 	`
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"name":"Michale"}]}}`,
 		js)
@@ -378,9 +273,9 @@ func TestFetchingFewFacets(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"name":"Rick Grimes"},{"@facets":{"_":{"close":true}},"name":"Glenn Rhee"},{"@facets":{"_":{"close":false}},"name":"Daryl Dixon"},{"name":"Andrea"},{"@facets":{"_":{"close":true}}}],"name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name":"Michonne","friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee","friend|close":true},{"name":"Daryl Dixon","friend|close":false},{"name":"Andrea"},{"friend|close":true}]}]}}`,
 		js)
 }
 
@@ -399,7 +294,7 @@ func TestFetchingNoFacets(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"name":"Michonne"}]}}`,
 		js)
@@ -420,9 +315,9 @@ func TestFacetsSortOrder(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"name":"Rick Grimes"},{"@facets":{"_":{"close":true,"family":true}},"name":"Glenn Rhee"},{"@facets":{"_":{"close":false,"family":true}},"name":"Daryl Dixon"},{"name":"Andrea"},{"@facets":{"_":{"close":true,"family":false}}}],"name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name":"Michonne","friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee","friend|close":true,"friend|family":true},{"name":"Daryl Dixon","friend|close":false,"friend|family":true},{"name":"Andrea"},{"friend|close":true,"friend|family":false}]}]}}`,
 		js)
 }
 
@@ -441,7 +336,7 @@ func TestUnknownFacets(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"friend":[{"name":"Rick Grimes"},{"name":"Glenn Rhee"},{"name":"Daryl Dixon"},{"name":"Andrea"}],"name":"Michonne"}]}}`,
 		js)
@@ -464,273 +359,10 @@ func TestFacetsMutation(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Rick Grimes"},{"@facets":{"_":{"close":false,"family":true,"since":"2007-05-02T15:04:05Z","tag":34}},"name":"Daryl Dixon"},{"@facets":{"_":{"since":"2006-01-02T15:04:05Z"}},"name":"Andrea"},{"@facets":{"_":{"close":false,"family":false,"since":"2001-11-10T00:00:00Z"}}}],"name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name":"Michonne","friend":[{"name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"name":"Daryl Dixon","friend|close":false,"friend|family":true,"friend|since":"2007-05-02T15:04:05Z","friend|tag":34},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"friend|close":false,"friend|family":false,"friend|since":"2001-11-10T00:00:00Z"}]}]}}`,
 		js)
-}
-
-func TestToProtoFacets(t *testing.T) {
-	populateGraphWithFacets(t)
-	defer teardownGraphWithFacets(t)
-	query := `
-		{
-			me(func: uid(0x1)) {
-				name @facets
-				friend @facets {
-					name @facets
-				}
-			}
-		}
-	`
-	pb := processToPB(t, query, map[string]string{}, true)
-	require.EqualValues(t,
-		`attribute: "_root_"
-children: <
-  attribute: "me"
-  properties: <
-    prop: "_uid_"
-    value: <
-      uid_val: 1
-    >
-  >
-  properties: <
-    prop: "name"
-    value: <
-      str_val: "Michonne"
-    >
-  >
-  children: <
-    attribute: "friend"
-    properties: <
-      prop: "_uid_"
-      value: <
-        uid_val: 23
-      >
-    >
-    properties: <
-      prop: "name"
-      value: <
-        str_val: "Rick Grimes"
-      >
-    >
-    children: <
-      attribute: "@facets"
-      children: <
-        attribute: "name"
-        properties: <
-          prop: "origin"
-          value: <
-            str_val: "french"
-          >
-        >
-      >
-      children: <
-        attribute: "_"
-        children: <
-          attribute: "friend"
-          properties: <
-            prop: "since"
-            value: <
-              str_val: "2006-01-02T15:04:05Z"
-            >
-          >
-        >
-      >
-    >
-  >
-  children: <
-    attribute: "friend"
-    properties: <
-      prop: "_uid_"
-      value: <
-        uid_val: 24
-      >
-    >
-    properties: <
-      prop: "name"
-      value: <
-        str_val: "Glenn Rhee"
-      >
-    >
-    children: <
-      attribute: "@facets"
-      children: <
-        attribute: "name"
-        properties: <
-          prop: "origin"
-          value: <
-            str_val: "french"
-          >
-        >
-      >
-      children: <
-        attribute: "_"
-        children: <
-          attribute: "friend"
-          properties: <
-            prop: "close"
-            value: <
-              bool_val: true
-            >
-          >
-          properties: <
-            prop: "family"
-            value: <
-              bool_val: true
-            >
-          >
-          properties: <
-            prop: "since"
-            value: <
-              str_val: "2004-05-02T15:04:05Z"
-            >
-          >
-          properties: <
-            prop: "tag"
-            value: <
-              str_val: "Domain3"
-            >
-          >
-        >
-      >
-    >
-  >
-  children: <
-    attribute: "friend"
-    properties: <
-      prop: "_uid_"
-      value: <
-        uid_val: 25
-      >
-    >
-    properties: <
-      prop: "name"
-      value: <
-        str_val: "Daryl Dixon"
-      >
-    >
-    children: <
-      attribute: "@facets"
-      children: <
-        attribute: "_"
-        children: <
-          attribute: "friend"
-          properties: <
-            prop: "close"
-            value: <
-              bool_val: false
-            >
-          >
-          properties: <
-            prop: "family"
-            value: <
-              bool_val: true
-            >
-          >
-          properties: <
-            prop: "since"
-            value: <
-              str_val: "2007-05-02T15:04:05Z"
-            >
-          >
-          properties: <
-            prop: "tag"
-            value: <
-              int_val: 34
-            >
-          >
-        >
-      >
-    >
-  >
-  children: <
-    attribute: "friend"
-    properties: <
-      prop: "_uid_"
-      value: <
-        uid_val: 31
-      >
-    >
-    properties: <
-      prop: "name"
-      value: <
-        str_val: "Andrea"
-      >
-    >
-    children: <
-      attribute: "@facets"
-      children: <
-        attribute: "_"
-        children: <
-          attribute: "friend"
-          properties: <
-            prop: "since"
-            value: <
-              str_val: "2006-01-02T15:04:05Z"
-            >
-          >
-        >
-      >
-    >
-  >
-  children: <
-    attribute: "friend"
-    properties: <
-      prop: "_uid_"
-      value: <
-        uid_val: 101
-      >
-    >
-    children: <
-      attribute: "@facets"
-      children: <
-        attribute: "_"
-        children: <
-          attribute: "friend"
-          properties: <
-            prop: "age"
-            value: <
-              int_val: 33
-            >
-          >
-          properties: <
-            prop: "close"
-            value: <
-              bool_val: true
-            >
-          >
-          properties: <
-            prop: "family"
-            value: <
-              bool_val: false
-            >
-          >
-          properties: <
-            prop: "since"
-            value: <
-              str_val: "2005-05-02T15:04:05Z"
-            >
-          >
-        >
-      >
-    >
-  >
-  children: <
-    attribute: "@facets"
-    children: <
-      attribute: "name"
-      properties: <
-        prop: "origin"
-        value: <
-          str_val: "french"
-        >
-      >
-    >
-  >
->
-`,
-		proto.MarshalTextString(pb[0]))
 }
 
 func TestFacetsFilterSimple(t *testing.T) {
@@ -743,16 +375,16 @@ func TestFacetsFilterSimple(t *testing.T) {
 				name
 				friend @facets(eq(close, true)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	// 0x65 does not have name.
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x18","name":"Glenn Rhee"},{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee"},{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -766,15 +398,15 @@ func TestFacetsFilterSimple2(t *testing.T) {
 				name
 				friend @facets(eq(tag, "Domain3")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x18","name":"Glenn Rhee"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -788,15 +420,15 @@ func TestFacetsFilterSimple3(t *testing.T) {
 				name
 				friend @facets(eq(tag, "34")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -810,16 +442,16 @@ func TestFacetsFilterOr(t *testing.T) {
 				name
 				friend @facets(eq(close, true) OR eq(family, true)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	// 0x65 (101) does not have name.
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x18","name":"Glenn Rhee"},{"_uid_":"0x19","name":"Daryl Dixon"},{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee"},{"uid":"0x19","name":"Daryl Dixon"},{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -833,15 +465,15 @@ func TestFacetsFilterAnd(t *testing.T) {
 				name
 				friend @facets(eq(close, true) AND eq(family, false)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -855,15 +487,15 @@ func TestFacetsFilterle(t *testing.T) {
 				name
 				friend @facets(le(age, 35)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -877,15 +509,15 @@ func TestFacetsFilterge(t *testing.T) {
 				name
 				friend @facets(ge(age, 33)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -899,16 +531,16 @@ func TestFacetsFilterAndOrle(t *testing.T) {
 				name
 				friend @facets(eq(close, true) OR eq(family, true) AND le(since, "2007-01-10")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	// 0x65 (101) does not have name.
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x18","name":"Glenn Rhee"},{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee"},{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -922,15 +554,15 @@ func TestFacetsFilterAndOrge2(t *testing.T) {
 				name
 				friend @facets(eq(close, false) OR eq(family, true) AND ge(since, "2007-01-10")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -945,15 +577,15 @@ func TestFacetsFilterNotAndOrgeMutuallyExclusive(t *testing.T) {
 				name
 				friend @facets(not (eq(close, false) OR eq(family, true) AND ge(since, "2007-01-10"))) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x17","name":"Rick Grimes"},{"_uid_":"0x18","name":"Glenn Rhee"},{"_uid_":"0x1f","name":"Andrea"},{"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x17","name":"Rick Grimes"},{"uid":"0x18","name":"Glenn Rhee"},{"uid":"0x1f","name":"Andrea"},{"uid":"0x65"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -967,13 +599,13 @@ func TestFacetsFilterUnknownFacets(t *testing.T) {
 				name
 				friend @facets(ge(dob, "2007-01-10")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"name":"Michonne"}]}}`,
 		js)
@@ -989,15 +621,15 @@ func TestFacetsFilterUnknownOrKnown(t *testing.T) {
 				name
 				friend @facets(ge(dob, "2007-01-10") OR eq(family, true)) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x18","name":"Glenn Rhee"},{"_uid_":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee"},{"uid":"0x19","name":"Daryl Dixon"}],"name":"Michonne"}]}}`,
 		js)
 }
 
@@ -1010,15 +642,15 @@ func TestFacetsFilterallofterms(t *testing.T) {
 				name
 				friend @facets(allofterms(games, "football chess tennis")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"name":"Michonne","_uid_":"0x1"}],"name":"Andrea"}]}}`,
+		`{"data": {"me":[{"friend":[{"name":"Michonne","uid":"0x1"}],"name":"Andrea"}]}}`,
 		js)
 }
 
@@ -1031,15 +663,15 @@ func TestFacetsFilterAllofMultiple(t *testing.T) {
 				name
 				friend @facets(allofterms(games, "football basketball")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"name":"Michonne","_uid_":"0x1"}, {"name":"Daryl Dixon","_uid_":"0x19"}],"name":"Andrea"}]}}`,
+		`{"data": {"me":[{"friend":[{"name":"Michonne","uid":"0x1"}, {"name":"Daryl Dixon","uid":"0x19"}],"name":"Andrea"}]}}`,
 		js)
 }
 
@@ -1053,13 +685,13 @@ func TestFacetsFilterAllofNone(t *testing.T) {
 				name
 				friend @facets(allofterms(games, "football chess tennis cricket")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"name":"Andrea"}]}}`,
 		js)
@@ -1074,15 +706,15 @@ func TestFacetsFilteranyofterms(t *testing.T) {
 				name
 				friend @facets(anyofterms(games, "tennis cricket")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x1","name":"Michonne"}],"name":"Andrea"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x1","name":"Michonne"}],"name":"Andrea"}]}}`,
 		js)
 }
 
@@ -1095,13 +727,13 @@ func TestFacetsFilterAnyofNone(t *testing.T) {
 				name
 				friend @facets(anyofterms(games, "cricket")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
 		`{"data": {"me":[{"name":"Andrea"}]}}`,
 		js)
@@ -1116,15 +748,15 @@ func TestFacetsFilterAllofanyofterms(t *testing.T) {
 				name
 				friend @facets(allofterms(games, "basketball hockey") OR anyofterms(games, "chess")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x1","name":"Michonne"},{"_uid_":"0x19","name":"Daryl Dixon"}],"name":"Andrea"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x1","name":"Michonne"},{"uid":"0x19","name":"Daryl Dixon"}],"name":"Andrea"}]}}`,
 		js)
 }
 
@@ -1137,15 +769,15 @@ func TestFacetsFilterAllofAndanyofterms(t *testing.T) {
 				name
 				friend @facets(allofterms(games, "hockey") AND anyofterms(games, "football basketball")) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"_uid_":"0x19","name":"Daryl Dixon"}],"name":"Andrea"}]}}`,
+		`{"data": {"me":[{"friend":[{"uid":"0x19","name":"Daryl Dixon"}],"name":"Andrea"}]}}`,
 		js)
 }
 
@@ -1163,7 +795,7 @@ func TestFacetsFilterAtValueFail(t *testing.T) {
 	}
 `
 
-	_, err := processToFastJsonReq(t, query)
+	_, err := processToFastJson(t, query)
 	require.Error(t, err)
 }
 
@@ -1177,15 +809,15 @@ func TestFacetsFilterAndRetrieval(t *testing.T) {
 				name
 				friend @facets(eq(close, true)) @facets(family) {
 					name
-					_uid_
+					uid
 				}
 			}
 		}
 	`
 
-	js := processToFastJSON(t, query)
+	js := processToFastJsonNoErr(t, query)
 	require.JSONEq(t,
-		`{"data": {"me":[{"friend":[{"@facets":{"_":{"family":true}},"_uid_":"0x18","name":"Glenn Rhee"},{"@facets":{"_":{"family":false}},"_uid_":"0x65"}],"name":"Michonne"}]}}`,
+		`{"data":{"me":[{"name":"Michonne","friend":[{"name":"Glenn Rhee","uid":"0x18","friend|family":true},{"uid":"0x65","friend|family":false}]}]}}`,
 		js)
 }
 
@@ -1200,8 +832,8 @@ func TestFacetWithLang(t *testing.T) {
 		}
 	`
 
-	js := processToFastJSON(t, query)
-	require.JSONEq(t, `{"data": {"me":[{"@facets":{"name@en":{"type":"Test facet with lang"}},"name@en":"Test facet"}]}}`, js)
+	js := processToFastJsonNoErr(t, query)
+	require.JSONEq(t, `{"data":{"me":[{"name@en|type":"Test facet with lang","name@en":"Test facet"}]}}`, js)
 }
 
 func TestFilterUidFacetMismatch(t *testing.T) {
@@ -1216,6 +848,72 @@ func TestFilterUidFacetMismatch(t *testing.T) {
 		}
 	}
 	`
-	js := processToFastJSON(t, query)
-	require.JSONEq(t, `{"data": {"me":[{"friend":[{"name":"Glenn Rhee","@facets":{"_":{"close":true,"family":true,"since":"2004-05-02T15:04:05Z","tag":"Domain3"}}},{"@facets":{"_":{"age":33,"close":true,"family":false,"since":"2005-05-02T15:04:05Z"}}}]}]}}`, js)
+	js := processToFastJsonNoErr(t, query)
+	require.JSONEq(t, `{"data":{"me":[{"friend":[{"name":"Glenn Rhee","friend|close":true,"friend|family":true,"friend|since":"2004-05-02T15:04:05Z","friend|tag":"Domain3"},{"friend|age":33,"friend|close":true,"friend|family":false,"friend|since":"2005-05-02T15:04:05Z"}]}]}}`, js)
+}
+
+func TestRecurseFacetOrder(t *testing.T) {
+	populateGraphWithFacets(t)
+	defer teardownGraphWithFacets(t)
+	query := `
+    {
+		me(func: uid(1)) @recurse(depth: 2) {
+			friend @facets(orderdesc: since)
+			uid
+			name
+		}
+	}
+  `
+	js := processToFastJsonNoErr(t, query)
+	require.JSONEq(t, `{"data":{"me":[{"friend":[{"uid":"0x19","name":"Daryl Dixon","friend|since":"2007-05-02T15:04:05Z"},{"friend":[{"friend|since":"2006-01-02T15:04:05Z"}],"uid":"0x17","name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"uid":"0x1f","name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"uid":"0x65","friend|since":"2005-05-02T15:04:05Z"},{"uid":"0x18","name":"Glenn Rhee","friend|since":"2004-05-02T15:04:05Z"}],"uid":"0x1","name":"Michonne"}]}}`, js)
+
+	query = `
+    {
+		me(func: uid(1)) @recurse(depth: 2) {
+			friend @facets(orderasc: since)
+			uid
+			name
+		}
+	}
+  `
+	js = processToFastJsonNoErr(t, query)
+	require.JSONEq(t, `{"data":{"me":[{"friend":[{"uid":"0x18","name":"Glenn Rhee","friend|since":"2004-05-02T15:04:05Z"},{"uid":"0x65","friend|since":"2005-05-02T15:04:05Z"},{"friend":[{"friend|since":"2006-01-02T15:04:05Z"}],"uid":"0x17","name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"uid":"0x1f","name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"uid":"0x19","name":"Daryl Dixon","friend|since":"2007-05-02T15:04:05Z"}],"uid":"0x1","name":"Michonne"}]}}`, js)
+}
+
+func TestFacetsAlias(t *testing.T) {
+	populateGraphWithFacets(t)
+	defer teardownGraphWithFacets(t)
+	query := `
+		{
+			me(func: uid(0x1)) {
+				name @facets(o: origin)
+				friend @facets(family, tagalias: tag, since) {
+					name @facets(o: origin)
+				}
+			}
+		}
+	`
+
+	js := processToFastJsonNoErr(t, query)
+	require.Equal(t, `{"data":{"me":[{"o":"french","name":"Michonne","friend":[{"o":"french","name":"Rick Grimes","friend|since":"2006-01-02T15:04:05Z"},{"o":"french","name":"Glenn Rhee","friend|family":true,"friend|since":"2004-05-02T15:04:05Z","tagalias":"Domain3"},{"name":"Daryl Dixon","friend|family":true,"friend|since":"2007-05-02T15:04:05Z","tagalias":34},{"name":"Andrea","friend|since":"2006-01-02T15:04:05Z"},{"friend|family":false,"friend|since":"2005-05-02T15:04:05Z"}]}]}}`, js)
+}
+
+func TestFacetsAlias2(t *testing.T) {
+	populateGraphWithFacets(t)
+	defer teardownGraphWithFacets(t)
+	query := `
+		{
+			me2(func: uid(0x1)) {
+				friend @facets(f: family, a as since, orderdesc: tag, close)
+			}
+
+			me(func: uid(23)) {
+				name
+				val(a)
+			}
+		}
+	`
+
+	js := processToFastJsonNoErr(t, query)
+	require.JSONEq(t, `{"data":{"me2":[{"friend":[{"friend|close":true,"f":true,"friend|since":"2004-05-02T15:04:05Z","friend|tag":"Domain3"},{"friend|close":false,"f":true,"friend|since":"2007-05-02T15:04:05Z","friend|tag":34}]}],"me":[{"name":"Rick Grimes"}]}}`, js)
 }

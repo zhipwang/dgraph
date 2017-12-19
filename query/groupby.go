@@ -23,14 +23,15 @@ import (
 	"strconv"
 
 	"github.com/dgraph-io/dgraph/algo"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
 )
 
 type groupPair struct {
-	key  types.Val
-	attr string
+	key   types.Val
+	attr  string
+	alias string
 }
 
 type groupResult struct {
@@ -40,12 +41,16 @@ type groupResult struct {
 }
 
 func (grp *groupResult) aggregateChild(child *SubGraph) error {
+	fieldName := child.Params.Alias
 	if child.Params.DoCount {
-		if child.Attr != "_uid_" {
-			return x.Errorf("Only _uid_ predicate is allowed in count within groupby")
+		if child.Attr != "uid" {
+			return x.Errorf("Only uid predicate is allowed in count within groupby")
+		}
+		if fieldName == "" {
+			fieldName = "count"
 		}
 		grp.aggregates = append(grp.aggregates, groupPair{
-			attr: "count",
+			attr: fieldName,
 			key: types.Val{
 				Tid:   types.IntID,
 				Value: int64(len(grp.uids)),
@@ -54,7 +59,9 @@ func (grp *groupResult) aggregateChild(child *SubGraph) error {
 		return nil
 	}
 	if child.SrcFunc != nil && isAggregatorFn(child.SrcFunc.Name) {
-		fieldName := fmt.Sprintf("%s(%s)", child.SrcFunc.Name, child.Attr)
+		if fieldName == "" {
+			fieldName = fmt.Sprintf("%s(%s)", child.SrcFunc.Name, child.Attr)
+		}
 		finalVal, err := aggregateGroup(grp, child)
 		if err != nil {
 			return err
@@ -72,7 +79,7 @@ type groupResults struct {
 }
 
 type groupElements struct {
-	entities *protos.List
+	entities *intern.List
 	key      types.Val
 }
 
@@ -125,7 +132,7 @@ func (d *dedup) addValue(attr string, value types.Val, uid uint64) {
 		// If this is the first element of the group.
 		cur.elements[strKey] = groupElements{
 			key:      value,
-			entities: &protos.List{make([]uint64, 0)},
+			entities: &intern.List{make([]uint64, 0)},
 		}
 	}
 	curEntity := cur.elements[strKey].entities
@@ -143,6 +150,10 @@ func aggregateGroup(grp *groupResult, child *SubGraph) (types.Val, error) {
 		if idx == len(child.SrcUIDs.Uids) || child.SrcUIDs.Uids[idx] != uid {
 			continue
 		}
+
+		if len(child.valueMatrix[idx].Values) == 0 {
+			continue
+		}
 		v := child.valueMatrix[idx].Values[0]
 		val, err := convertWithBestEffort(v, child.Attr)
 		if err != nil {
@@ -155,7 +166,7 @@ func aggregateGroup(grp *groupResult, child *SubGraph) (types.Val, error) {
 
 // formGroup creates all possible groups with the list of uids that belong to that
 // group.
-func (res *groupResults) formGroups(dedupMap dedup, cur *protos.List, groupVal []groupPair) {
+func (res *groupResults) formGroups(dedupMap dedup, cur *intern.List, groupVal []groupPair) {
 	l := len(groupVal)
 	if len(dedupMap.groups) == 0 || (l != 0 && len(cur.Uids) == 0) {
 		// This group is already empty or no group can be formed. So stop.
@@ -175,7 +186,7 @@ func (res *groupResults) formGroups(dedupMap dedup, cur *protos.List, groupVal [
 	}
 
 	for _, v := range dedupMap.groups[l].elements {
-		temp := new(protos.List)
+		temp := new(intern.List)
 		groupVal = append(groupVal, groupPair{
 			key:  v.key,
 			attr: dedupMap.groups[l].attr,
@@ -192,13 +203,18 @@ func (res *groupResults) formGroups(dedupMap dedup, cur *protos.List, groupVal [
 }
 
 func (sg *SubGraph) processGroupBy(doneVars map[string]varValue, path []*SubGraph) error {
-	mp := make(map[string]groupResult)
-	_ = mp
 	var dedupMap dedup
 	var pathNode *SubGraph
 	for _, child := range sg.Children {
+		// Find a better name for ignoreResult.
+		// Aggregation children would be skipped because of this condition.
 		if !child.Params.ignoreResult {
 			continue
+		}
+
+		attr := child.Params.Alias
+		if attr == "" {
+			attr = child.Attr
 		}
 		if len(child.DestUIDs.Uids) != 0 {
 			// It's a UID node.
@@ -206,7 +222,7 @@ func (sg *SubGraph) processGroupBy(doneVars map[string]varValue, path []*SubGrap
 				srcUid := child.SrcUIDs.Uids[i]
 				ul := child.uidMatrix[i]
 				for _, uid := range ul.Uids {
-					dedupMap.addValue(child.Attr, types.Val{Tid: types.UidID, Value: uid}, srcUid)
+					dedupMap.addValue(attr, types.Val{Tid: types.UidID, Value: uid}, srcUid)
 				}
 			}
 			pathNode = child
@@ -214,18 +230,21 @@ func (sg *SubGraph) processGroupBy(doneVars map[string]varValue, path []*SubGrap
 			// It's a value node.
 			for i, v := range child.valueMatrix {
 				srcUid := child.SrcUIDs.Uids[i]
+				if len(v.Values) == 0 {
+					continue
+				}
 				val, err := convertTo(v.Values[0])
 				if err != nil {
 					continue
 				}
-				dedupMap.addValue(child.Attr, val, srcUid)
+				dedupMap.addValue(attr, val, srcUid)
 			}
 		}
 	}
 
 	// Create all the groups here.
 	res := new(groupResults)
-	res.formGroups(dedupMap, &protos.List{}, []groupPair{})
+	res.formGroups(dedupMap, &intern.List{}, []groupPair{})
 
 	// Go over the groups and aggregate the values.
 	for _, child := range sg.Children {
@@ -315,6 +334,5 @@ func groupLess(a, b *groupResult) bool {
 			}
 		}
 	}
-	x.Fatalf("wrong groups")
 	return false
 }

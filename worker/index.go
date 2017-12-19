@@ -25,84 +25,43 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 )
 
-func (n *node) rebuildOrDelIndex(ctx context.Context, attr string, rebuild bool) error {
+func (n *node) rebuildOrDelIndex(ctx context.Context, attr string, rebuild bool, startTs uint64) error {
 	rv := ctx.Value("raft").(x.RaftValue)
 	x.AssertTrue(rv.Group == n.gid)
 
-	// Current raft index has pending applied watermark
-	// Raft index starts from 1
-	n.syncAllMarks(ctx, rv.Index-1)
-
-	x.AssertTruef(schema.State().IsIndexed(attr) == rebuild, "Predicate %s index mismatch, rebuild %v",
-		attr, rebuild)
+	if schema.State().IsIndexed(attr) != rebuild {
+		return x.Errorf("Predicate %s index mismatch, rebuild %v", attr, rebuild)
+	}
 	// Remove index edges
-	// For delete we since mutations would have been applied, we needn't
-	// wait for synced watermarks if we delete through mutations, but
-	// it would use by lhmap
 	posting.DeleteIndex(ctx, attr)
 	if rebuild {
-		if err := posting.RebuildIndex(ctx, attr); err != nil {
-			return err
-		}
+		posting.RebuildIndex(ctx, attr, startTs)
 	}
 	return nil
 }
 
-func (n *node) rebuildOrDelRevEdge(ctx context.Context, attr string, rebuild bool) error {
+func (n *node) rebuildOrDelRevEdge(ctx context.Context, attr string, rebuild bool, startTs uint64) error {
 	rv := ctx.Value("raft").(x.RaftValue)
 	x.AssertTrue(rv.Group == n.gid)
 
-	// Current raft index has pending applied watermark
-	// Raft index starts from 1
-	n.syncAllMarks(ctx, rv.Index-1)
-
-	x.AssertTruef(schema.State().IsReversed(attr) == rebuild, "Predicate %s reverse mismatch", attr)
+	if schema.State().IsReversed(attr) != rebuild {
+		return x.Errorf("Predicate %s reverse mismatch, rebuild %v", attr, rebuild)
+	}
 	posting.DeleteReverseEdges(ctx, attr)
 	if rebuild {
 		// Remove reverse edges
-		if err := posting.RebuildReverseEdges(ctx, attr); err != nil {
-			return err
-		}
+		posting.RebuildReverseEdges(ctx, attr, startTs)
 	}
 	return nil
 }
 
-func (n *node) rebuildOrDelCountIndex(ctx context.Context, attr string, rebuild bool) error {
+func (n *node) rebuildOrDelCountIndex(ctx context.Context, attr string, rebuild bool, startTs uint64) error {
 	rv := ctx.Value("raft").(x.RaftValue)
 	x.AssertTrue(rv.Group == n.gid)
 
-	// Current raft index has pending applied watermark
-	// Raft index starts from 1
-	n.syncAllMarks(ctx, rv.Index-1)
 	posting.DeleteCountIndex(ctx, attr)
 	if rebuild {
-		if err := posting.RebuildCountIndex(ctx, attr); err != nil {
-			return err
-		}
+		posting.RebuildCountIndex(ctx, attr, startTs)
 	}
 	return nil
-}
-
-func (n *node) syncAllMarks(ctx context.Context, lastIndex uint64) error {
-	if err := n.Applied.WaitForMark(ctx, lastIndex); err != nil {
-		return err
-	}
-	return waitForSyncMark(ctx, n.gid, lastIndex)
-}
-
-func (n *node) waitForSyncMark(ctx context.Context, lastIndex uint64) error {
-	return waitForSyncMark(ctx, n.gid, lastIndex)
-}
-
-func waitForSyncMark(ctx context.Context, gid uint32, lastIndex uint64) error {
-	// Wait for posting lists applying.
-	w := posting.SyncMarks()
-	if w.DoneUntil() >= lastIndex {
-		return nil
-	}
-
-	// Force an aggressive evict.
-	posting.CommitLists(10, gid)
-
-	return w.WaitForMark(ctx, lastIndex)
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/dgraph-io/dgraph/x"
 
 	"github.com/blevesearch/bleve/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/analysis/lang/cjk"
 	"github.com/blevesearch/bleve/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/analysis/token/porter"
 	"github.com/blevesearch/bleve/analysis/token/stop"
@@ -60,12 +61,17 @@ func initFullTextTokenizers() {
 		defineStemmer(lang)
 		defineStopWordsList(lang)
 		defineAnalyzer(lang)
-		RegisterTokenizer(&FullTextTokenizer{Lang: countryCode(lang)})
+		registerTokenizer(&FullTextTokenizer{Lang: countryCode(lang)})
+	}
+
+	for _, lang := range [...]string{"chinese", "japanese", "korean"} {
+		defineCJKAnalyzer(lang)
+		registerTokenizer(&FullTextTokenizer{Lang: countryCode(lang)})
 	}
 
 	// Default full text tokenizer, with Porter stemmer (it works with English only).
 	defineDefaultFullTextAnalyzer()
-	RegisterTokenizer(FullTextTokenizer{})
+	registerTokenizer(FullTextTokenizer{})
 }
 
 // Create normalizer using Normalization Form KC (NFKC) - Compatibility Decomposition, followed
@@ -136,6 +142,22 @@ func defineAnalyzer(lang string) {
 			normalizerName,
 			stopWordsListName(ln),
 			stemmerName(ln),
+		},
+	})
+	x.Check(err)
+}
+
+// Full text search analyzer - does Chinese/Japanese/Korean style bigram
+// tokenization. It's language unaware (so doesn't do stemming or stop
+// words), but works OK in some contexts.
+func defineCJKAnalyzer(lang string) {
+	ln := countryCode(lang)
+	_, err := bleveCache.DefineAnalyzer(FtsTokenizerName(ln), map[string]interface{}{
+		"type":      custom.Name,
+		"tokenizer": unicode.Name,
+		"token_filters": []string{
+			normalizerName,
+			cjk.BigramName,
 		},
 	})
 	x.Check(err)

@@ -22,20 +22,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
-	"github.com/dgraph-io/badger/y"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/api"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/raftwal"
 	"github.com/dgraph-io/dgraph/x"
 	"golang.org/x/net/context"
 )
 
 var (
-	errReadIndex = x.Errorf("cannot get linerized read (time expired or no configured leader)")
+	ErrDuplicateRaftId = x.Errorf("Node is already part of group")
 )
 
 type sendmsg struct {
@@ -46,9 +47,6 @@ type sendmsg struct {
 type Node struct {
 	x.SafeMutex
 
-	// Changed after init but not protected by SafeMutex
-	RequestCh chan linReadReq
-
 	// SafeMutex is for fields which can be changed after init.
 	_confState *raftpb.ConfState
 	_raft      raft.Node
@@ -58,18 +56,19 @@ type Node struct {
 	MyAddr      string
 	Id          uint64
 	peers       map[uint64]string
+	confChanges map[uint64]chan error
 	messages    chan sendmsg
-	RaftContext *protos.RaftContext
+	RaftContext *intern.RaftContext
 	Store       *raft.MemoryStorage
 	Wal         *raftwal.Wal
 
 	// applied is used to keep track of the applied RAFT proposals.
 	// The stages are proposed -> committed (accepted by cluster) ->
-	// applied (to PL) -> synced (to RocksDB).
+	// applied (to PL) -> synced (to BadgerDB).
 	Applied x.WaterMark
 }
 
-func NewNode(rc *protos.RaftContext) *Node {
+func NewNode(rc *intern.RaftContext) *Node {
 	store := raft.NewMemoryStorage()
 	n := &Node{
 		Id:    rc.Id,
@@ -93,35 +92,16 @@ func NewNode(rc *protos.RaftContext) *Node {
 		// processConfChange etc are not throttled so some extra delta, so that we don't
 		// block tick when applyCh is full
 		peers:       make(map[uint64]string),
+		confChanges: make(map[uint64]chan error),
 		RaftContext: rc,
 		messages:    make(chan sendmsg, 100),
 		Applied:     x.WaterMark{Name: fmt.Sprintf("Applied watermark")},
-		RequestCh:   make(chan linReadReq, 100),
 	}
 	n.Applied.Init()
 	// TODO: n_ = n is a hack. We should properly init node, and make it part of the server struct.
 	// This can happen once we get rid of groups.
 	n_ = n
 	return n
-}
-
-func (n *Node) WaitLinearizableRead(ctx context.Context) error {
-	replyCh, err := n.ReadIndex(ctx)
-	if err != nil {
-		return err
-	}
-	select {
-	case index := <-replyCh:
-		if index == raft.None {
-			return errReadIndex
-		}
-		if err := n.Applied.WaitForMark(ctx, index); err != nil {
-			return err
-		}
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // SetRaft would set the provided raft.Node to this node.
@@ -144,7 +124,32 @@ func (n *Node) Raft() raft.Node {
 func (n *Node) SetConfState(cs *raftpb.ConfState) {
 	n.Lock()
 	defer n.Unlock()
+	x.Printf("Setting conf state to %+v\n", cs)
 	n._confState = cs
+}
+
+func (n *Node) DoneConfChange(id uint64, err error) {
+	n.Lock()
+	defer n.Unlock()
+	ch, has := n.confChanges[id]
+	if !has {
+		return
+	}
+	delete(n.confChanges, id)
+	ch <- err
+}
+
+func (n *Node) storeConfChange(che chan error) uint64 {
+	n.Lock()
+	defer n.Unlock()
+	id := rand.Uint64()
+	_, has := n.confChanges[id]
+	for has {
+		id = rand.Uint64()
+		_, has = n.confChanges[id]
+	}
+	n.confChanges[id] = che
+	return id
 }
 
 // ConfState would return the latest ConfState stored in node.
@@ -164,8 +169,18 @@ func (n *Node) Peer(pid uint64) (string, bool) {
 // addr must not be empty.
 func (n *Node) SetPeer(pid uint64, addr string) {
 	x.AssertTruef(addr != "", "SetPeer for peer %d has empty addr.", pid)
-	Get().Connect(addr)
+	n.Lock()
+	defer n.Unlock()
 	n.peers[pid] = addr
+}
+
+func (n *Node) WaitForMinProposal(ctx context.Context, read *api.LinRead) error {
+	if read == nil || read.Ids == nil {
+		return nil
+	}
+	gid := n.RaftContext.Group
+	min := read.Ids[gid]
+	return n.Applied.WaitForMark(ctx, min)
 }
 
 func (n *Node) Send(m raftpb.Message) {
@@ -303,21 +318,25 @@ func (n *Node) doSendMessage(to uint64, data []byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	addr, has := n.peers[to]
+	addr, has := n.Peer(to)
 	pool, err := Get().Get(addr)
 	if !has || err != nil {
+		x.Printf("No healthy connection found to node Id: %d, err: %v\n", to, err)
 		// No such peer exists or we got handed a bogus config (bad addr), so we
 		// can't send messages to this peer.
 		return
 	}
 	client := pool.Get()
 
-	c := protos.NewRaftClient(client)
-	p := &protos.Payload{Data: data}
+	c := intern.NewRaftClient(client)
+	p := &api.Payload{Data: data}
 
 	ch := make(chan error, 1)
 	go func() {
 		_, err = c.RaftMessage(ctx, p)
+		if err != nil {
+			x.Printf("Error while sending message to node Id: %d, err: %v\n", to, err)
+		}
 		ch <- err
 	}()
 
@@ -338,7 +357,7 @@ func (n *Node) Connect(pid uint64, addr string) {
 	if pid == n.Id {
 		return
 	}
-	if paddr, ok := n.peers[pid]; ok && paddr == addr {
+	if paddr, ok := n.Peer(pid); ok && paddr == addr {
 		// Already connected.
 		return
 	}
@@ -348,103 +367,67 @@ func (n *Node) Connect(pid uint64, addr string) {
 	if addr == n.MyAddr {
 		// TODO: Note this fact in more general peer health info somehow.
 		x.Printf("Peer %d claims same host as me\n", pid)
-		n.peers[pid] = addr
+		n.SetPeer(pid, addr)
 		return
 	}
 	Get().Connect(addr)
-	n.peers[pid] = addr
+	n.SetPeer(pid, addr)
 }
 
-type linReadReq struct {
-	// A one-shot chan which we send a raft index upon
-	indexCh chan<- uint64
-}
-
-func (n *Node) ReadIndex(ctx context.Context) (chan uint64, error) {
-	ch := make(chan uint64, 1)
-	select {
-	case n.RequestCh <- linReadReq{ch}:
-		return ch, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
+func (n *Node) DeletePeer(pid uint64) {
+	if pid == n.Id {
+		return
 	}
-}
-
-func (n *Node) RunReadIndexLoop(closer *y.Closer, readStateCh <-chan raft.ReadState) {
-	defer closer.Done()
-	counter := x.NewNonceCounter()
-	requests := []linReadReq{}
-	// We maintain one linearizable ReadIndex request at a time.  Others wait queued behind
-	// requestCh.
-	for {
-		select {
-		case <-closer.HasBeenClosed():
-			return
-		case <-readStateCh:
-			// Do nothing, discard ReadState info we don't have an activeRctx for
-		case req := <-n.RequestCh:
-		slurpLoop:
-			for {
-				requests = append(requests, req)
-				select {
-				case req = <-n.RequestCh:
-				default:
-					break slurpLoop
-				}
-			}
-			activeRctx := counter.Generate()
-			// To see if the ReadIndex request succeeds, we need to use a timeout and wait for a
-			// successful response.  If we don't see one, the raft leader wasn't configured, or the
-			// raft leader didn't respond.
-
-			// This is supposed to use context.Background().  We don't want to cancel the timer
-			// externally.  We want equivalent functionality to time.NewTimer.
-			// TODO: Second is high, if a node gets partitioned we would have to throw error sooner.
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			// We ignore the err - it would be n.ctx cancellation (which we must ignore because
-			// it's our duty to continue until `stop` is triggered) or raft.ErrStopped (which we
-			// must ignore for the same reason).
-			_ = n.Raft().ReadIndex(ctx, activeRctx[:])
-		again:
-			select {
-			case <-closer.HasBeenClosed():
-				cancel()
-				return
-			case rs := <-readStateCh:
-				if 0 != bytes.Compare(activeRctx[:], rs.RequestCtx) {
-					goto again
-				}
-				cancel()
-				index := rs.Index
-				for _, req := range requests {
-					req.indexCh <- index
-				}
-			case <-ctx.Done():
-				for _, req := range requests {
-					req.indexCh <- raft.None
-				}
-			}
-			requests = requests[:0]
-		}
-	}
+	n.Lock()
+	defer n.Unlock()
+	delete(n.peers, pid)
 }
 
 func (n *Node) AddToCluster(ctx context.Context, pid uint64) error {
-	addr, ok := n.peers[pid]
+	addr, ok := n.Peer(pid)
 	x.AssertTruef(ok, "Unable to find conn pool for peer: %d", pid)
-	rc := &protos.RaftContext{
+	rc := &intern.RaftContext{
 		Addr:  addr,
 		Group: n.RaftContext.Group,
 		Id:    pid,
 	}
 	rcBytes, err := rc.Marshal()
 	x.Check(err)
-	return n.Raft().ProposeConfChange(ctx, raftpb.ConfChange{
-		ID:      pid,
+
+	ch := make(chan error, 1)
+	id := n.storeConfChange(ch)
+	err = n.Raft().ProposeConfChange(ctx, raftpb.ConfChange{
+		ID:      id,
 		Type:    raftpb.ConfChangeAddNode,
 		NodeID:  pid,
 		Context: rcBytes,
 	})
+	if err != nil {
+		return err
+	}
+	err = <-ch
+	return err
+}
+
+func (n *Node) ProposePeerRemoval(ctx context.Context, id uint64) error {
+	if n.Raft() == nil {
+		return errNoNode
+	}
+	if _, ok := n.Peer(id); !ok && id != n.RaftContext.Id {
+		return x.Errorf("Node %d not part of group", id)
+	}
+	ch := make(chan error, 1)
+	pid := n.storeConfChange(ch)
+	err := n.Raft().ProposeConfChange(ctx, raftpb.ConfChange{
+		ID:     pid,
+		Type:   raftpb.ConfChangeRemoveNode,
+		NodeID: id,
+	})
+	if err != nil {
+		return err
+	}
+	err = <-ch
+	return err
 }
 
 // TODO: Get rid of this in the upcoming changes.
@@ -462,9 +445,9 @@ type RaftServer struct {
 }
 
 func (w *RaftServer) JoinCluster(ctx context.Context,
-	rc *protos.RaftContext) (*protos.Payload, error) {
+	rc *intern.RaftContext) (*api.Payload, error) {
 	if ctx.Err() != nil {
-		return &protos.Payload{}, ctx.Err()
+		return &api.Payload{}, ctx.Err()
 	}
 	// Commenting out the following checks for now, until we get rid of groups.
 	// TODO: Uncomment this after groups is removed.
@@ -478,11 +461,15 @@ func (w *RaftServer) JoinCluster(ctx context.Context,
 	}
 	// Also check that the new node is not me.
 	if rc.Id == node.RaftContext.Id {
-		return nil, x.Errorf("Same Raft ID")
+		return nil, ErrDuplicateRaftId
 	}
 	// Check that the new node is not already part of the group.
-	if _, ok := node.peers[rc.Id]; ok {
-		return &protos.Payload{}, x.Errorf("Node id already part of group.")
+	if addr, ok := node.peers[rc.Id]; ok && rc.Addr != addr {
+		Get().Connect(addr)
+		// There exists a healthy connection to server with same id.
+		if _, err := Get().Get(addr); err == nil {
+			return &api.Payload{}, ErrDuplicateRaftId
+		}
 	}
 	node.Connect(rc.Id, rc.Addr)
 
@@ -491,9 +478,9 @@ func (w *RaftServer) JoinCluster(ctx context.Context,
 
 	select {
 	case <-ctx.Done():
-		return &protos.Payload{}, ctx.Err()
+		return &api.Payload{}, ctx.Err()
 	case err := <-c:
-		return &protos.Payload{}, err
+		return &api.Payload{}, err
 	}
 }
 
@@ -502,7 +489,7 @@ var (
 )
 
 func (w *RaftServer) applyMessage(ctx context.Context, msg raftpb.Message) error {
-	var rc protos.RaftContext
+	var rc intern.RaftContext
 	x.Check(rc.Unmarshal(msg.Context))
 
 	node := w.GetNode()
@@ -525,9 +512,9 @@ func (w *RaftServer) applyMessage(ctx context.Context, msg raftpb.Message) error
 	}
 }
 func (w *RaftServer) RaftMessage(ctx context.Context,
-	query *protos.Payload) (*protos.Payload, error) {
+	query *api.Payload) (*api.Payload, error) {
 	if ctx.Err() != nil {
-		return &protos.Payload{}, ctx.Err()
+		return &api.Payload{}, ctx.Err()
 	}
 
 	for idx := 0; idx < len(query.Data); {
@@ -538,7 +525,7 @@ func (w *RaftServer) RaftMessage(ctx context.Context,
 		idx += 4
 		msg := raftpb.Message{}
 		if idx+sz > len(query.Data) {
-			return &protos.Payload{}, x.Errorf(
+			return &api.Payload{}, x.Errorf(
 				"Invalid query. Specified size %v overflows slice [%v,%v)\n",
 				sz, idx, len(query.Data))
 		}
@@ -549,16 +536,16 @@ func (w *RaftServer) RaftMessage(ctx context.Context,
 			x.Printf("RECEIVED: %v %v-->%v\n", msg.Type, msg.From, msg.To)
 		}
 		if err := w.applyMessage(ctx, msg); err != nil {
-			return &protos.Payload{}, err
+			return &api.Payload{}, err
 		}
 		idx += sz
 	}
 	// fmt.Printf("Got %d messages\n", count)
-	return &protos.Payload{}, nil
+	return &api.Payload{}, nil
 }
 
 // Hello rpc call is used to check connection with other workers after worker
 // tcp server for this instance starts.
-func (w *RaftServer) Echo(ctx context.Context, in *protos.Payload) (*protos.Payload, error) {
-	return &protos.Payload{Data: in.Data}, nil
+func (w *RaftServer) Echo(ctx context.Context, in *api.Payload) (*api.Payload, error) {
+	return &api.Payload{Data: in.Data}, nil
 }

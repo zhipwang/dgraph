@@ -47,8 +47,20 @@ const (
 	ErrorInvalidMutation    = "ErrorInvalidMutation"
 	ErrorServiceUnavailable = "ErrorServiceUnavailable"
 	ValidHostnameRegex      = "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"
-	Star                    = "_STAR_ALL"
-	GrpcMaxSize             = 256 << 20
+	// When changing this value also remember to change in in client/client.go:DeleteEdges.
+	Star = "_STAR_ALL"
+
+	// Use the max possible grpc msg size for the most flexibility (4GB - equal
+	// to the max grpc frame size). Users will still need to set the max
+	// message sizes allowable on the client size when dialing.
+	GrpcMaxSize = 4 << 30
+
+	// The attr used to store list of predicates for a node.
+	PredicateListAttr = "_predicate_"
+
+	PortInternal = 7080
+	PortHTTP     = 8080
+	PortGrpc     = 9080
 )
 
 var (
@@ -91,8 +103,9 @@ func AddCorsHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers",
-		"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,"+
-			"X-Auth-Token, Cache-Control, X-Requested-With")
+		"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, X-Auth-Token, "+
+			"Cache-Control, X-Requested-With, X-Dgraph-CommitNow, X-Dgraph-LinRead, X-Dgraph-Vars"+
+			"X-Dgraph-IgnoreIndexConflict")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Connection", "close")
 }
@@ -146,7 +159,7 @@ func ReadLine(r *bufio.Reader, buf *bytes.Buffer) error {
 	buf.Reset()
 	for isPrefix && err == nil {
 		var line []byte
-		// The returned line is an internal buffer in bufio and is only
+		// The returned line is an intern.buffer in bufio and is only
 		// valid until the next call to ReadLine. It needs to be copied
 		// over to our own buffer.
 		line, isPrefix, err = r.ReadLine()

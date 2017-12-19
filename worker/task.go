@@ -35,7 +35,8 @@ import (
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/conn"
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/api"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	ctask "github.com/dgraph-io/dgraph/task"
 	"github.com/dgraph-io/dgraph/tok"
@@ -48,13 +49,13 @@ import (
 )
 
 var (
-	emptyUIDList   protos.List
-	emptyResult    protos.Result
-	emptyValueList = protos.ValueList{Values: []*protos.TaskValue{&protos.TaskValue{Val: x.Nilbyte}}}
+	emptyUIDList   intern.List
+	emptyResult    intern.Result
+	emptyValueList = intern.ValueList{Values: []*intern.TaskValue{}}
 )
 
 func invokeNetworkRequest(
-	ctx context.Context, addr string, f func(context.Context, protos.WorkerClient) (interface{}, error)) (interface{}, error) {
+	ctx context.Context, addr string, f func(context.Context, intern.WorkerClient) (interface{}, error)) (interface{}, error) {
 	pl, err := conn.Get().Get(addr)
 	if err != nil {
 		return &emptyResult, x.Wrapf(err, "dispatchTaskOverNetwork: while retrieving connection.")
@@ -64,17 +65,17 @@ func invokeNetworkRequest(
 	if tr, ok := trace.FromContext(ctx); ok {
 		tr.LazyPrintf("Sending request to %v", addr)
 	}
-	c := protos.NewWorkerClient(conn)
+	c := intern.NewWorkerClient(conn)
 	return f(ctx, c)
 }
 
-const backupRequestGracePeriod = 10 * time.Millisecond
+const backupRequestGracePeriod = time.Second
 
 // TODO: Cross-server cancellation as described in Jeff Dean's talk.
 func processWithBackupRequest(
 	ctx context.Context,
 	gid uint32,
-	f func(context.Context, protos.WorkerClient) (interface{}, error)) (interface{}, error) {
+	f func(context.Context, intern.WorkerClient) (interface{}, error)) (interface{}, error) {
 	addrs := groups().AnyTwoServers(gid)
 	if len(addrs) == 0 {
 		return nil, errors.New("no network connection")
@@ -130,17 +131,19 @@ func processWithBackupRequest(
 	}
 }
 
+var errConflict = errors.New("List has a pending write.")
+
 // ProcessTaskOverNetwork is used to process the query and get the result from
 // the instance which stores posting list corresponding to the predicate in the
 // query.
-func ProcessTaskOverNetwork(ctx context.Context, q *protos.Query) (*protos.Result, error) {
+func ProcessTaskOverNetwork(ctx context.Context, q *intern.Query) (*intern.Result, error) {
 	attr := q.Attr
 	gid := groups().BelongsTo(attr)
 	if gid == 0 {
-		return &protos.Result{}, errUnservedTablet
+		return &intern.Result{}, errUnservedTablet
 	}
 	if tr, ok := trace.FromContext(ctx); ok {
-		tr.LazyPrintf("attr: %v groupId: %v", attr, gid)
+		tr.LazyPrintf("attr: %v groupId: %v, readTs: %d", attr, gid, q.ReadTs)
 	}
 
 	if groups().ServesGroup(gid) {
@@ -148,7 +151,7 @@ func ProcessTaskOverNetwork(ctx context.Context, q *protos.Query) (*protos.Resul
 		return processTask(ctx, q, gid)
 	}
 
-	result, err := processWithBackupRequest(ctx, gid, func(ctx context.Context, c protos.WorkerClient) (interface{}, error) {
+	result, err := processWithBackupRequest(ctx, gid, func(ctx context.Context, c intern.WorkerClient) (interface{}, error) {
 		if tr, ok := trace.FromContext(ctx); ok {
 			id := fmt.Sprintf("%d", rand.Int())
 			tr.LazyPrintf("Sending request to server, id: %s", id)
@@ -162,7 +165,7 @@ func ProcessTaskOverNetwork(ctx context.Context, q *protos.Query) (*protos.Resul
 		}
 		return nil, err
 	}
-	reply := result.(*protos.Result)
+	reply := result.(*intern.Result)
 	if tr, ok := trace.FromContext(ctx); ok {
 		tr.LazyPrintf("Reply from server. length: %v Group: %v Attr: %v", len(reply.UidMatrix), gid, attr)
 	}
@@ -186,8 +189,8 @@ func convertValue(attr, data string) (types.Val, error) {
 }
 
 // Returns nil byte on error
-func convertToType(v types.Val, typ types.TypeID) (*protos.TaskValue, error) {
-	result := &protos.TaskValue{ValType: int32(typ), Val: x.Nilbyte}
+func convertToType(v types.Val, typ types.TypeID) (*intern.TaskValue, error) {
+	result := &intern.TaskValue{ValType: typ.Enum(), Val: x.Nilbyte}
 	if v.Tid == typ {
 		result.Val = v.Value.([]byte)
 		return result, nil
@@ -221,10 +224,11 @@ const (
 	FullTextSearchFn
 	HasFn
 	UidInFn
+	CustomIndexFn
 	StandardFn = 100
 )
 
-func parseFuncType(srcFunc *protos.SrcFunction) (FuncType, string) {
+func parseFuncType(srcFunc *intern.SrcFunction) (FuncType, string) {
 	if srcFunc == nil {
 		return NotAFunction, ""
 	}
@@ -259,6 +263,8 @@ func parseFuncTypeHelper(name string) (FuncType, string) {
 		return HasFn, f
 	case "uid_in":
 		return UidInFn, f
+	case "anyof", "allof":
+		return CustomIndexFn, f
 	default:
 		if types.IsGeoFunc(f) {
 			return GeoFn, f
@@ -278,14 +284,14 @@ func needsIndex(fnType FuncType) bool {
 
 type result struct {
 	uid    uint64
-	facets []*protos.Facet
+	facets []*api.Facet
 }
 
 type funcArgs struct {
-	q     *protos.Query
+	q     *intern.Query
 	gid   uint32
 	srcFn *functionContext
-	out   *protos.Result
+	out   *intern.Result
 }
 
 // The function tells us whether we want to fetch value posting lists or uid posting lists.
@@ -298,7 +304,7 @@ func (srcFn *functionContext) needsValuePostings(typ types.TypeID) (bool, error)
 			return false, nil
 		}
 		return true, nil
-	case GeoFn, RegexFn, FullTextSearchFn, StandardFn, HasFn:
+	case GeoFn, RegexFn, FullTextSearchFn, StandardFn, HasFn, CustomIndexFn:
 		// All of these require index, hence would require fetching uid postings.
 		return false, nil
 	case UidInFn, CompareScalarFn:
@@ -325,8 +331,20 @@ func handleValuePostings(ctx context.Context, args funcArgs) error {
 		return x.Errorf("Unhandled function in handleValuePostings: %s", srcFn.fname)
 	}
 
+	{
+		if srcFn.atype == types.PasswordID && srcFn.fnType != PasswordFn {
+			// Silently skip if the user is trying to fetch an attribute of type password.
+			return nil
+		}
+
+		if srcFn.fnType == PasswordFn && srcFn.atype != types.PasswordID {
+			return x.Errorf("checkpwd fn can only be used on attr: [%s] with schema type password."+
+				" Got type: %s", attr, types.TypeID(srcFn.atype).Name())
+		}
+
+	}
+
 	var key []byte
-	var err error
 	listType := schema.State().IsList(attr)
 	for i := 0; i < srcFn.n; i++ {
 		select {
@@ -338,31 +356,50 @@ func handleValuePostings(ctx context.Context, args funcArgs) error {
 
 		// Get or create the posting list for an entity, attribute combination.
 		pl := posting.Get(key)
+		var err error
 		var vals []types.Val
-		// Even if its a list type and value is asked in a language we return that.
-		if listType && len(q.Langs) == 0 {
-			vals, err = pl.AllValues()
+		if q.ExpandAll {
+			vals, err = pl.AllValues(args.q.ReadTs)
+		} else if listType && len(q.Langs) == 0 {
+			vals, err = pl.AllUntaggedValues(args.q.ReadTs)
 		} else {
 			var val types.Val
-			val, err = pl.ValueFor(q.Langs)
-			if val.Tid == types.PasswordID && srcFn.fnType != PasswordFn {
-				return x.Errorf("Attribute `%s` of type password cannot be fetched", attr)
-			}
+			val, err = pl.ValueFor(args.q.ReadTs, q.Langs)
 			vals = append(vals, val)
 		}
 
 		if err != nil || len(vals) == 0 {
 			out.UidMatrix = append(out.UidMatrix, &emptyUIDList)
-			out.ValueMatrix = append(out.ValueMatrix, &emptyValueList)
+			if q.DoCount {
+				out.Counts = append(out.Counts, 0)
+			} else {
+				out.ValueMatrix = append(out.ValueMatrix, &emptyValueList)
+				out.FacetMatrix = append(out.FacetMatrix, &intern.FacetsList{})
+				if q.ExpandAll {
+					// To keep the cardinality same as that of ValueMatrix.
+					out.LangMatrix = append(out.LangMatrix, &intern.LangList{})
+				}
+			}
 			continue
 		}
 
+		if q.ExpandAll {
+			langTags, err := pl.GetLangTags(args.q.ReadTs)
+			if err != nil {
+				return err
+			}
+			out.LangMatrix = append(out.LangMatrix, &intern.LangList{langTags})
+		}
+
 		valTid := vals[0].Tid
-		newValue := &protos.TaskValue{ValType: int32(valTid), Val: x.Nilbyte}
-		uidList := new(protos.List)
-		var vl protos.ValueList
+		newValue := &intern.TaskValue{ValType: valTid.Enum(), Val: x.Nilbyte}
+		uidList := new(intern.List)
+		var vl intern.ValueList
 		for _, val := range vals {
 			newValue, err = convertToType(val, srcFn.atype)
+			if err != nil {
+				return err
+			}
 
 			// This means we fetched the value directly instead of fetching index key and intersecting.
 			// Lets compare the value and add filter the uid.
@@ -388,17 +425,21 @@ func handleValuePostings(ctx context.Context, args funcArgs) error {
 
 		// add facets to result.
 		if q.FacetParam != nil {
-			fs, err := pl.Facets(q.FacetParam, q.Langs)
+			fs, err := pl.Facets(args.q.ReadTs, q.FacetParam, q.Langs)
 			if err != nil {
-				fs = []*protos.Facet{}
+				fs = []*api.Facet{}
 			}
 			out.FacetMatrix = append(out.FacetMatrix,
-				&protos.FacetsList{[]*protos.Facets{{fs}}})
+				&intern.FacetsList{[]*intern.Facets{{fs}}})
 		}
 
 		switch {
 		case q.DoCount:
-			out.Counts = append(out.Counts, uint32(pl.Length(0)))
+			len := pl.Length(args.q.ReadTs, 0)
+			if len == -1 {
+				return posting.ErrTsTooOld
+			}
+			out.Counts = append(out.Counts, uint32(len))
 			// Add an empty UID list to make later processing consistent
 			out.UidMatrix = append(out.UidMatrix, &emptyUIDList)
 		case srcFn.fnType == AggregatorFn:
@@ -406,9 +447,11 @@ func handleValuePostings(ctx context.Context, args funcArgs) error {
 			out.UidMatrix = append(out.UidMatrix, &emptyUIDList)
 		case srcFn.fnType == PasswordFn:
 			lastPos := len(out.ValueMatrix) - 1
+			if len(out.ValueMatrix[lastPos].Values) == 0 {
+				continue
+			}
 			newValue := out.ValueMatrix[lastPos].Values[0]
 			if len(newValue.Val) == 0 {
-				// TODO - Check that this is safe.
 				out.ValueMatrix[lastPos].Values[0] = ctask.FalseVal
 			}
 			pwd := q.SrcFunc.Args[0]
@@ -454,7 +497,7 @@ func handleUidPostings(ctx context.Context, args funcArgs, opts posting.ListOpti
 			} else {
 				key = x.DataKey(attr, q.UidList.Uids[i])
 			}
-		case GeoFn, RegexFn, FullTextSearchFn, StandardFn:
+		case GeoFn, RegexFn, FullTextSearchFn, StandardFn, CustomIndexFn:
 			key = x.IndexKey(attr, srcFn.tokens[i])
 		case CompareAttrFn:
 			key = x.IndexKey(attr, srcFn.tokens[i])
@@ -467,11 +510,10 @@ func handleUidPostings(ctx context.Context, args funcArgs, opts posting.ListOpti
 
 		// get filtered uids and facets.
 		var filteredRes []*result
-		out.ValueMatrix = append(out.ValueMatrix, &emptyValueList)
 
 		var perr error
-		filteredRes = make([]*result, 0, pl.Length(opts.AfterUID))
-		pl.Postings(opts, func(p *protos.Posting) bool {
+		filteredRes = make([]*result, 0)
+		err = pl.Postings(opts, func(p *intern.Posting) bool {
 			res := true
 			res, perr = applyFacetsTree(p.Facets, facetsTree)
 			if perr != nil {
@@ -484,50 +526,68 @@ func handleUidPostings(ctx context.Context, args funcArgs, opts posting.ListOpti
 			}
 			return true // continue iteration.
 		})
-		if perr != nil {
+		if err != nil {
+			return err
+		} else if perr != nil {
 			return perr
 		}
 
 		// add facets to result.
 		if q.FacetParam != nil {
-			var fcsList []*protos.Facets
+			var fcsList []*intern.Facets
 			for _, fres := range filteredRes {
-				fcsList = append(fcsList, &protos.Facets{fres.facets})
+				fcsList = append(fcsList, &intern.Facets{fres.facets})
 			}
-			out.FacetMatrix = append(out.FacetMatrix, &protos.FacetsList{fcsList})
+			out.FacetMatrix = append(out.FacetMatrix, &intern.FacetsList{fcsList})
 		}
 
 		switch {
 		case q.DoCount:
-			out.Counts = append(out.Counts, uint32(pl.Length(0)))
+			len := pl.Length(args.q.ReadTs, 0)
+			if len == -1 {
+				return posting.ErrTsTooOld
+			}
+			out.Counts = append(out.Counts, uint32(len))
 			// Add an empty UID list to make later processing consistent
 			out.UidMatrix = append(out.UidMatrix, &emptyUIDList)
 		case srcFn.fnType == CompareScalarFn:
-			count := int64(pl.Length(0))
+			len := pl.Length(args.q.ReadTs, 0)
+			if len == -1 {
+				return posting.ErrTsTooOld
+			}
+			count := int64(len)
 			if EvalCompare(srcFn.fname, count, srcFn.threshold) {
-				tlist := &protos.List{[]uint64{q.UidList.Uids[i]}}
+				tlist := &intern.List{[]uint64{q.UidList.Uids[i]}}
 				out.UidMatrix = append(out.UidMatrix, tlist)
 			}
 		case srcFn.fnType == HasFn:
-			count := int64(pl.Length(0))
+			len := pl.Length(args.q.ReadTs, 0)
+			if len == -1 {
+				return posting.ErrTsTooOld
+			}
+			count := int64(len)
 			if EvalCompare("gt", count, 0) {
-				tlist := &protos.List{[]uint64{q.UidList.Uids[i]}}
+				tlist := &intern.List{[]uint64{q.UidList.Uids[i]}}
 				out.UidMatrix = append(out.UidMatrix, tlist)
 			}
 		case srcFn.fnType == UidInFn:
-			reqList := &protos.List{[]uint64{srcFn.uidPresent}}
+			reqList := &intern.List{[]uint64{srcFn.uidPresent}}
 			topts := posting.ListOptions{
+				ReadTs:    args.q.ReadTs,
 				AfterUID:  0,
 				Intersect: reqList,
 			}
-			plist := pl.Uids(topts)
+			plist, err := pl.Uids(topts)
+			if err != nil {
+				return err
+			}
 			if len(plist.Uids) > 0 {
-				tlist := &protos.List{[]uint64{q.UidList.Uids[i]}}
+				tlist := &intern.List{[]uint64{q.UidList.Uids[i]}}
 				out.UidMatrix = append(out.UidMatrix, tlist)
 			}
 		default:
 			// The more usual case: Getting the UIDs.
-			uidList := new(protos.List)
+			uidList := new(intern.List)
 			for _, fres := range filteredRes {
 				uidList.Uids = append(uidList.Uids, fres.uid)
 			}
@@ -537,34 +597,39 @@ func handleUidPostings(ctx context.Context, args funcArgs, opts posting.ListOpti
 	return nil
 }
 
-// This function should only be used by upsert. Upsert mutation also does a query which will wait
-// for the mutation to complete and hence would get stuck. Therefore, we only need to wait till
-// index - 1.
-func (n *node) processUpsertTask(ctx context.Context, t *task, gid uint32) (*protos.Result, error) {
-	if err := n.Applied.WaitForMark(ctx, t.rid-1); err != nil {
-		return nil, err
-	}
-	return helpProcessTask(ctx, t.upsert, gid)
-}
-
 // processTask processes the query, accumulates and returns the result.
-func processTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.Result, error) {
+func processTask(ctx context.Context, q *intern.Query, gid uint32) (*intern.Result, error) {
 	n := groups().Node
-	if err := n.WaitLinearizableRead(ctx); err != nil {
+	if err := n.WaitForMinProposal(ctx, q.LinRead); err != nil {
 		return &emptyResult, err
+	}
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Done waiting for applied watermark attr %q\n", q.Attr)
+	}
+	if err := posting.Oracle().WaitForTs(ctx, q.ReadTs); err != nil {
+		return &emptyResult, err
+	}
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Done waiting for maxPending to catch up for Attr %q, readTs: %d\n", q.Attr, q.ReadTs)
 	}
 	// If a group stops serving tablet and it gets partitioned away from group zero, then it
 	// wouldn't know that this group is no longer serving this predicate.
-	// There's no issue if a we are serving a particular tablet and we get paritioned away from
+	// There's no issue if a we are serving a particular tablet and we get partitioned away from
 	// group zero as long as it's not removed.
 	if !groups().ServesTablet(q.Attr) {
 		return &emptyResult, errUnservedTablet
 	}
-	return helpProcessTask(ctx, q, gid)
+	out, err := helpProcessTask(ctx, q, gid)
+	if err != nil {
+		return &emptyResult, err
+	}
+	out.LinRead = &api.LinRead{Ids: make(map[uint32]uint64)}
+	out.LinRead.Ids[n.RaftContext.Group] = n.Applied.DoneUntil()
+	return out, nil
 }
 
-func helpProcessTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.Result, error) {
-	out := new(protos.Result)
+func helpProcessTask(ctx context.Context, q *intern.Query, gid uint32) (*intern.Result, error) {
+	out := new(intern.Result)
 	attr := q.Attr
 
 	srcFn, err := parseSrcFn(q)
@@ -582,21 +647,16 @@ func helpProcessTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.
 
 	typ, err := schema.State().TypeOf(attr)
 	if err != nil {
-		if q.UidList == nil {
-			return out, nil
-		}
-		// Schema not defined, so lets add dummy values and return.
-		// Adding dummy values is important because the code assumes that len(SrcUids) equals
-		// len(uidMatrix)
-		for i := 0; i < len(q.UidList.Uids); i++ {
-			out.UidMatrix = append(out.UidMatrix, &emptyUIDList)
-			out.ValueMatrix = append(out.ValueMatrix, &emptyValueList)
-		}
-		return out, nil
+		// All schema checks are done before this, this type is only used to
+		// convert it to schema type before returning.
+		// Schema type won't be present only if there is no data for that predicate
+		// or if we load through bulk loader.
+		typ = types.DefaultID
 	}
 	srcFn.atype = typ
 
 	opts := posting.ListOptions{
+		ReadTs:   q.ReadTs,
 		AfterUID: uint64(q.AfterUid),
 	}
 	// If we have srcFunc and Uids, it means its a filter. So we intersect.
@@ -620,7 +680,7 @@ func helpProcessTask(ctx context.Context, q *protos.Query, gid uint32) (*protos.
 	}
 
 	if srcFn.fnType == HasFn && srcFn.isFuncAtRoot {
-		if err := handleHasFunction(funcArgs{q, gid, srcFn, out}); err != nil {
+		if err := handleHasFunction(ctx, q, out); err != nil {
 			return nil, err
 		}
 	}
@@ -667,23 +727,6 @@ func needsStringFiltering(srcFn *functionContext, langs []string) bool {
 			srcFn.fnType == FullTextSearchFn || srcFn.fnType == CompareAttrFn)
 }
 
-func handleHasFunction(arg funcArgs) error {
-	attr := arg.q.Attr
-	if ok := schema.State().HasCount(attr); !ok {
-		return x.Errorf("Need @count directive in schema for attr: %s for fn: %s at root.",
-			attr, arg.srcFn.fname)
-	}
-	cp := countParams{
-		count:   0,
-		fn:      "gt",
-		attr:    attr,
-		gid:     arg.gid,
-		reverse: arg.q.Reverse,
-	}
-	cp.evaluate(arg.out)
-	return nil
-}
-
 func handleCompareScalarFunction(arg funcArgs) error {
 	attr := arg.q.Attr
 	if ok := schema.State().HasCount(attr); !ok {
@@ -696,10 +739,10 @@ func handleCompareScalarFunction(arg funcArgs) error {
 		count:   count,
 		attr:    attr,
 		gid:     arg.gid,
+		readTs:  arg.q.ReadTs,
 		reverse: arg.q.Reverse,
 	}
-	cp.evaluate(arg.out)
-	return nil
+	return cp.evaluate(arg.out)
 }
 
 func handleRegexFunction(ctx context.Context, arg funcArgs) error {
@@ -723,8 +766,8 @@ func handleRegexFunction(ctx context.Context, arg funcArgs) error {
 	}
 
 	query := cindex.RegexpQuery(arg.srcFn.regex.Syntax)
-	empty := protos.List{}
-	uids, err := uidsForRegex(attr, arg.gid, query, &empty)
+	empty := intern.List{}
+	uids, err := uidsForRegex(attr, arg, query, &empty)
 	lang := langForFunc(arg.q.Langs)
 	if uids != nil {
 		arg.out.UidMatrix = append(arg.out.UidMatrix, uids)
@@ -740,10 +783,11 @@ func handleRegexFunction(ctx context.Context, arg funcArgs) error {
 			pl := posting.Get(key)
 
 			var val types.Val
+			var err error
 			if lang != "" {
-				val, err = pl.ValueForTag(lang)
+				val, err = pl.ValueForTag(arg.q.ReadTs, lang)
 			} else {
-				val, err = pl.Value()
+				val, err = pl.Value(arg.q.ReadTs)
 			}
 
 			if err != nil {
@@ -802,7 +846,7 @@ func handleCompareFunction(ctx context.Context, arg funcArgs) error {
 				switch lang {
 				case "":
 					pl := posting.GetNoStore(x.DataKey(attr, uid))
-					sv, err := pl.Value()
+					sv, err := pl.Value(arg.q.ReadTs)
 					if err == nil {
 						dst, err := types.Convert(sv, typ)
 						return err == nil &&
@@ -811,7 +855,7 @@ func handleCompareFunction(ctx context.Context, arg funcArgs) error {
 					return false
 				case ".":
 					pl := posting.GetNoStore(x.DataKey(attr, uid))
-					values, _ := pl.AllValues()
+					values, _ := pl.AllValues(arg.q.ReadTs)
 					for _, sv := range values {
 						dst, err := types.Convert(sv, typ)
 						if err == nil &&
@@ -821,7 +865,7 @@ func handleCompareFunction(ctx context.Context, arg funcArgs) error {
 					}
 					return false
 				default:
-					sv, err := fetchValue(uid, attr, arg.q.Langs, typ)
+					sv, err := fetchValue(uid, attr, arg.q.Langs, typ, arg.q.ReadTs)
 					if sv.Value == nil || err != nil {
 						return false
 					}
@@ -833,16 +877,16 @@ func handleCompareFunction(ctx context.Context, arg funcArgs) error {
 	return nil
 }
 
-func filterGeoFunction(arg funcArgs) {
+func filterGeoFunction(arg funcArgs) error {
 	attr := arg.q.Attr
-	var values []*protos.TaskValue
+	var values []*intern.TaskValue
 	uids := algo.MergeSorted(arg.out.UidMatrix)
 	for _, uid := range uids.Uids {
 		key := x.DataKey(attr, uid)
 		pl := posting.Get(key)
 
-		val, err := pl.Value()
-		newValue := &protos.TaskValue{ValType: int32(val.Tid)}
+		val, err := pl.Value(arg.q.ReadTs)
+		newValue := &intern.TaskValue{ValType: val.Tid.Enum()}
 		if err == nil {
 			newValue.Val = val.Value.([]byte)
 		} else {
@@ -855,9 +899,10 @@ func filterGeoFunction(arg funcArgs) {
 	for i := 0; i < len(arg.out.UidMatrix); i++ {
 		algo.IntersectWith(arg.out.UidMatrix[i], filtered, arg.out.UidMatrix[i])
 	}
+	return nil
 }
 
-func filterStringFunction(arg funcArgs) {
+func filterStringFunction(arg funcArgs) error {
 	attr := arg.q.Attr
 	uids := algo.MergeSorted(arg.out.UidMatrix)
 	var values [][]types.Val
@@ -872,13 +917,13 @@ func filterStringFunction(arg funcArgs) {
 		var err error
 		if lang == "" {
 			if schema.State().IsList(attr) {
-				vals, err = pl.AllValues()
+				vals, err = pl.AllValues(arg.q.ReadTs)
 			} else {
-				val, err = pl.Value()
+				val, err = pl.Value(arg.q.ReadTs)
 				vals = append(vals, val)
 			}
 		} else {
-			val, err = pl.ValueForTag(lang)
+			val, err = pl.ValueForTag(arg.q.ReadTs, lang)
 			vals = append(vals, val)
 		}
 		if err != nil {
@@ -900,7 +945,7 @@ func filterStringFunction(arg funcArgs) {
 		}
 	}
 
-	filtered := &protos.List{Uids: filteredUids}
+	filtered := &intern.List{Uids: filteredUids}
 	filter := stringFilter{
 		funcName: arg.srcFn.fname,
 		funcType: arg.srcFn.fnType,
@@ -925,10 +970,11 @@ func filterStringFunction(arg funcArgs) {
 	for i := 0; i < len(arg.out.UidMatrix); i++ {
 		algo.IntersectWith(arg.out.UidMatrix[i], filtered, arg.out.UidMatrix[i])
 	}
+	return nil
 }
 
-func matchRegex(uids *protos.List, values []types.Val, regex *cregexp.Regexp) *protos.List {
-	rv := &protos.List{}
+func matchRegex(uids *intern.List, values []types.Val, regex *cregexp.Regexp) *intern.List {
+	rv := &intern.List{}
 	for i := 0; i < len(values); i++ {
 		if len(values[i].Value.(string)) == 0 {
 			continue
@@ -964,7 +1010,7 @@ const (
 	eq = "eq" // equal
 )
 
-func ensureArgsCount(srcFunc *protos.SrcFunction, expected int) error {
+func ensureArgsCount(srcFunc *intern.SrcFunction, expected int) error {
 	if len(srcFunc.Args) != expected {
 		return x.Errorf("Function '%s' requires %d arguments, but got %d (%v)",
 			srcFunc.Name, expected, len(srcFunc.Args), srcFunc.Args)
@@ -972,7 +1018,7 @@ func ensureArgsCount(srcFunc *protos.SrcFunction, expected int) error {
 	return nil
 }
 
-func checkRoot(q *protos.Query, fc *functionContext) {
+func checkRoot(q *intern.Query, fc *functionContext) {
 	if q.UidList == nil {
 		// Fetch Uids from Store and populate in q.UidList.
 		fc.n = 0
@@ -991,7 +1037,7 @@ func langForFunc(langs []string) string {
 	return langs[0]
 }
 
-func parseSrcFn(q *protos.Query) (*functionContext, error) {
+func parseSrcFn(q *intern.Query) (*functionContext, error) {
 	fnType, f := parseFuncType(q.SrcFunc)
 	attr := q.Attr
 	fc := &functionContext{fnType: fnType, fname: f}
@@ -1038,7 +1084,7 @@ func parseSrcFn(q *protos.Query) (*functionContext, error) {
 					q.SrcFunc)
 			}
 			// Get tokens ge / le ineqValueToken.
-			if tokens, fc.ineqValueToken, err = getInequalityTokens(attr, f,
+			if tokens, fc.ineqValueToken, err = getInequalityTokens(q.ReadTs, attr, f,
 				fc.ineqValue); err != nil {
 				return nil, err
 			}
@@ -1099,6 +1145,28 @@ func parseSrcFn(q *protos.Query) (*functionContext, error) {
 		fnName := strings.ToLower(q.SrcFunc.Name)
 		fc.intersectDest = strings.HasPrefix(fnName, "allof") // allofterms and alloftext
 		fc.n = len(fc.tokens)
+	case CustomIndexFn:
+		if err = ensureArgsCount(q.SrcFunc, 2); err != nil {
+			return nil, err
+		}
+		tokerName := q.SrcFunc.Args[0]
+		if !verifyCustomIndex(q.Attr, tokerName) {
+			return nil, x.Errorf("Attribute %s is not indexed with custom tokenizer %s",
+				q.Attr, tokerName)
+		}
+		valToTok, err := convertValue(q.Attr, q.SrcFunc.Args[1])
+		if err != nil {
+			return nil, err
+		}
+		tokenizer, ok := tok.GetTokenizer(tokerName)
+		if !ok {
+			return nil, x.Errorf("Could not find tokenizer with name %q", tokerName)
+		}
+		fc.tokens, err = tok.BuildTokens(valToTok.Value, tokenizer)
+		fnName := strings.ToLower(q.SrcFunc.Name)
+		x.AssertTrue(fnName == "allof" || fnName == "anyof")
+		fc.intersectDest = strings.HasSuffix(fnName, "allof")
+		fc.n = len(fc.tokens)
 	case RegexFn:
 		if err = ensureArgsCount(q.SrcFunc, 2); err != nil {
 			return nil, err
@@ -1143,7 +1211,7 @@ func parseSrcFn(q *protos.Query) (*functionContext, error) {
 }
 
 // ServeTask is used to respond to a query.
-func (w *grpcWorker) ServeTask(ctx context.Context, q *protos.Query) (*protos.Result, error) {
+func (w *grpcWorker) ServeTask(ctx context.Context, q *intern.Query) (*intern.Result, error) {
 	if ctx.Err() != nil {
 		return &emptyResult, ctx.Err()
 	}
@@ -1161,7 +1229,7 @@ func (w *grpcWorker) ServeTask(ctx context.Context, q *protos.Query) (*protos.Re
 		"attr: %q groupId: %v Request sent to wrong server.", q.Attr, gid)
 
 	type reply struct {
-		result *protos.Result
+		result *intern.Result
 		err    error
 	}
 	c := make(chan reply, 1)
@@ -1190,13 +1258,13 @@ func (w *grpcWorker) ServeTask(ctx context.Context, q *protos.Query) (*protos.Re
 // applyFacetsTree : we return error only when query has some problems.
 // like Or has 3 arguments, argument facet val overflows integer.
 // returns true if postingFacets can be included.
-func applyFacetsTree(postingFacets []*protos.Facet, ftree *facetsTree) (bool, error) {
+func applyFacetsTree(postingFacets []*api.Facet, ftree *facetsTree) (bool, error) {
 	if ftree == nil {
 		return true, nil
 	}
 	if ftree.function != nil {
 		fname := strings.ToLower(ftree.function.name)
-		var fc *protos.Facet
+		var fc *api.Facet
 		for _, fci := range postingFacets {
 			if fci.Key == ftree.function.key {
 				fc = fci
@@ -1305,7 +1373,7 @@ type facetsTree struct {
 	function *facetsFunc
 }
 
-func preprocessFilter(tree *protos.FilterTree) (*facetsTree, error) {
+func preprocessFilter(tree *intern.FilterTree) (*facetsTree, error) {
 	if tree == nil {
 		return nil, nil
 	}
@@ -1369,6 +1437,7 @@ func preprocessFilter(tree *protos.FilterTree) (*facetsTree, error) {
 }
 
 type countParams struct {
+	readTs  uint64
 	count   int64
 	attr    string
 	gid     uint32
@@ -1376,13 +1445,37 @@ type countParams struct {
 	fn      string // function name
 }
 
-func (cp *countParams) evaluate(out *protos.Result) {
+func (cp *countParams) evaluate(out *intern.Result) error {
 	count := cp.count
+	var illegal bool
+	switch cp.fn {
+	case "eq":
+		illegal = count <= 0
+	case "lt":
+		illegal = count <= 1
+	case "le":
+		illegal = count <= 0
+	case "gt":
+		illegal = count < 0
+	case "ge":
+		illegal = count <= 0
+	default:
+		x.AssertTruef(false, "unhandled count comparison fn: %v", cp.fn)
+	}
+	if illegal {
+		return x.Errorf("count(predicate) cannot be used to search for " +
+			"negative counts (nonsensical) or zero counts (not tracked).")
+	}
+
 	countKey := x.CountKey(cp.attr, uint32(count), cp.reverse)
 	if cp.fn == "eq" {
 		pl := posting.Get(countKey)
-		out.UidMatrix = append(out.UidMatrix, pl.Uids(posting.ListOptions{}))
-		return
+		uids, err := pl.Uids(posting.ListOptions{ReadTs: cp.readTs})
+		if err != nil {
+			return err
+		}
+		out.UidMatrix = append(out.UidMatrix, uids)
+		return nil
 	}
 
 	if cp.fn == "lt" {
@@ -1391,28 +1484,81 @@ func (cp *countParams) evaluate(out *protos.Result) {
 		count += 1
 	}
 
-	if count < 0 && (cp.fn == "lt" || cp.fn == "le") {
-		return
-	}
-
-	if count < 0 {
-		count = 0
-	}
+	x.AssertTrue(count >= 1)
 	countKey = x.CountKey(cp.attr, uint32(count), cp.reverse)
 
 	itOpt := badger.DefaultIteratorOptions
 	itOpt.PrefetchValues = false
 	itOpt.Reverse = cp.fn == "le" || cp.fn == "lt"
-	it := pstore.NewIterator(itOpt)
-	defer it.Close()
+	txn := pstore.NewTransactionAt(cp.readTs, false)
+	defer txn.Discard()
 	pk := x.ParsedKey{
 		Attr: cp.attr,
 	}
 	countPrefix := pk.CountPrefix(cp.reverse)
+	it := posting.NewTxnPrefixIterator(txn, itOpt, countPrefix)
+	defer it.Close()
 
-	for it.Seek(countKey); it.ValidForPrefix(countPrefix); it.Next() {
-		key := it.Item().Key()
+	for it.Seek(countKey); it.Valid(); it.Next() {
+		key := it.Key()
+		nk := make([]byte, len(key))
+		copy(nk, key)
 		pl := posting.Get(key)
-		out.UidMatrix = append(out.UidMatrix, pl.Uids(posting.ListOptions{}))
+		uids, err := pl.Uids(posting.ListOptions{ReadTs: cp.readTs})
+		if err != nil {
+			return err
+		}
+		out.UidMatrix = append(out.UidMatrix, uids)
 	}
+	return nil
+}
+
+// TODO - Check meta for empty PL and skip it.
+// This is not transactionally isolated, add to docs
+func handleHasFunction(ctx context.Context, q *intern.Query, out *intern.Result) error {
+	tlist := &intern.List{}
+
+	txn := pstore.NewTransactionAt(q.ReadTs, false)
+	defer txn.Discard()
+
+	itOpt := badger.DefaultIteratorOptions
+	itOpt.PrefetchValues = false
+
+	pk := x.ParsedKey{
+		Attr: q.Attr,
+	}
+	startKey := x.DataKey(q.Attr, 0)
+	prefix := pk.DataPrefix()
+	if q.Reverse {
+		startKey = x.ReverseKey(q.Attr, 0)
+		prefix = pk.ReversePrefix()
+	}
+
+	w := 0
+	it := posting.NewTxnPrefixIterator(txn, itOpt, prefix)
+	defer it.Close()
+	for it.Seek(startKey); it.Valid(); it.Next() {
+		pl := posting.GetLru(it.Key())
+		if pl != nil && pl.CommitTs() == 0 {
+			// empty pl's can be present in lru
+			continue
+		}
+		pk := x.Parse(it.Key())
+		if w%1000 == 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if tr, ok := trace.FromContext(ctx); ok {
+					tr.LazyPrintf("handleHasFunction:"+
+						" key: %v:%v", pk.Attr, pk.Uid)
+				}
+			}
+		}
+		w++
+		tlist.Uids = append(tlist.Uids, pk.Uid)
+	}
+
+	out.UidMatrix = append(out.UidMatrix, tlist)
+	return nil
 }

@@ -1,11 +1,17 @@
 #!/bin/bash
 
+killall dgraph
+
 SERVER=./server_reload.sh
 CLIENT=./client_nopass.sh
 EXPECTED=1
 
 cp server.crt server_reload.crt
 cp server.key server_reload.key
+
+
+$GOPATH/src/github.com/dgraph-io/dgraph/dgraph/dgraph zero -w zw -o 1> /dev/null 2>&1 &
+sleep 5
 
 # start the server
 $SERVER > /dev/null 2>&1 &
@@ -21,9 +27,6 @@ pkill -HUP dgraph > /dev/null 2>&1
 # try to connect again
 timeout 30s $CLIENT > /dev/null 2>&1
 RESULT=$?
-
-rm -rf p w
-
 
 if [ $RESULT == $EXPECTED ]; then
 	echo "TLS certificate reloaded successfully"

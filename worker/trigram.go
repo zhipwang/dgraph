@@ -24,7 +24,7 @@ import (
 
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/tok"
 	"github.com/dgraph-io/dgraph/x"
 )
@@ -33,15 +33,17 @@ const maxUidsForTrigram = 1000000
 
 var regexTooWideErr = errors.New("Regular expression is too wide-ranging and can't be executed efficiently.")
 
-func uidsForRegex(attr string, gid uint32,
-	query *cindex.Query, intersect *protos.List) (*protos.List, error) {
-	var results *protos.List
-	opts := posting.ListOptions{}
+func uidsForRegex(attr string, arg funcArgs,
+	query *cindex.Query, intersect *intern.List) (*intern.List, error) {
+	var results *intern.List
+	opts := posting.ListOptions{
+		ReadTs: arg.q.ReadTs,
+	}
 	if intersect.Size() > 0 {
 		opts.Intersect = intersect
 	}
 
-	uidsForTrigram := func(trigram string) *protos.List {
+	uidsForTrigram := func(trigram string) (*intern.List, error) {
 		key := x.IndexKey(attr, trigram)
 		pl := posting.Get(key)
 		return pl.Uids(opts)
@@ -51,7 +53,10 @@ func uidsForRegex(attr string, gid uint32,
 	case cindex.QAnd:
 		tok.EncodeRegexTokens(query.Trigram)
 		for _, t := range query.Trigram {
-			trigramUids := uidsForTrigram(t)
+			trigramUids, err := uidsForTrigram(t)
+			if err != nil {
+				return nil, err
+			}
 			if results == nil {
 				results = trigramUids
 			} else {
@@ -70,7 +75,7 @@ func uidsForRegex(attr string, gid uint32,
 			}
 			// current list of result is passed for intersection
 			var err error
-			results, err = uidsForRegex(attr, gid, sub, results)
+			results, err = uidsForRegex(attr, arg, sub, results)
 			if err != nil {
 				return nil, err
 			}
@@ -82,20 +87,24 @@ func uidsForRegex(attr string, gid uint32,
 		}
 	case cindex.QOr:
 		tok.EncodeRegexTokens(query.Trigram)
-		uidMatrix := make([]*protos.List, len(query.Trigram))
+		uidMatrix := make([]*intern.List, len(query.Trigram))
+		var err error
 		for i, t := range query.Trigram {
-			uidMatrix[i] = uidsForTrigram(t)
+			uidMatrix[i], err = uidsForTrigram(t)
+			if err != nil {
+				return nil, err
+			}
 		}
 		results = algo.MergeSorted(uidMatrix)
 		for _, sub := range query.Sub {
 			if results == nil {
 				results = intersect
 			}
-			subUids, err := uidsForRegex(attr, gid, sub, intersect)
+			subUids, err := uidsForRegex(attr, arg, sub, intersect)
 			if err != nil {
 				return nil, err
 			}
-			results = algo.MergeSorted([]*protos.List{results, subUids})
+			results = algo.MergeSorted([]*intern.List{results, subUids})
 			if results.Size() > maxUidsForTrigram {
 				return nil, regexTooWideErr
 			}

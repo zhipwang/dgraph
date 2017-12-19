@@ -1,12 +1,9 @@
 #!/bin/bash
 
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 VERSIONS_ARRAY=(
-  'v0.7.7'
-  'v0.7.6'
+  'v0.9.0'
   'master'
-  'v0.7.5'
-  'v0.7.4'
+  'v0.8.3'
 )
 
 joinVersions() {
@@ -17,15 +14,29 @@ joinVersions() {
 VERSION_STRING=$(joinVersions)
 
 run() {
-  export CURRENT_BRANCH=${CURRENT_BRANCH}
+  export CURRENT_BRANCH="master"
   export CURRENT_VERSION=${VERSIONS_ARRAY[0]}
   export VERSIONS=${VERSION_STRING}
 
 
   HUGO_TITLE="Dgraph Doc - local" \
   VERSIONS=${VERSION_STRING} \
-  CURRENT_BRANCH=${CURRENT_BRANCH} \
+  CURRENT_BRANCH="master" \
+  pushd $GOPATH/src/github.com/dgraph-io/dgraph/wiki > /dev/null
+
+  pushd themes > /dev/null
+  if [ ! -d "hugo-docs" ]; then
+    git clone git@github.com:dgraph-io/hugo-docs.git
+  else
+    pushd hugo-docs > /dev/null
+    git pull
+    popd > /dev/null
+  fi
+  popd > /dev/null
+
+
   CURRENT_VERSION=${CURRENT_VERSION} hugo server -w
+  popd > /dev/null
 }
 
 run

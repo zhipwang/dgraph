@@ -21,6 +21,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dgraph-io/badger"
@@ -28,27 +29,26 @@ import (
 
 	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/x"
 )
 
 var raftIndex uint64
+var ts uint64
 
-func addEdge(t *testing.T, edge *protos.DirectedEdge, l *posting.List) {
-	edge.Op = protos.DirectedEdge_SET
-	raftIndex++
-	rv := x.RaftValue{Group: 1, Index: raftIndex}
-	ctx := context.WithValue(context.Background(), "raft", rv)
-	require.NoError(t, l.AddMutationWithIndex(ctx, edge))
+func timestamp() uint64 {
+	return atomic.AddUint64(&ts, 1)
 }
 
-func delEdge(t *testing.T, edge *protos.DirectedEdge, l *posting.List) {
-	edge.Op = protos.DirectedEdge_DEL
-	raftIndex++
-	rv := x.RaftValue{Group: 1, Index: raftIndex}
-	ctx := context.WithValue(context.Background(), "raft", rv)
-	require.NoError(t, l.AddMutationWithIndex(ctx, edge))
+func addEdge(t *testing.T, edge *intern.DirectedEdge, l *posting.List) {
+	edge.Op = intern.DirectedEdge_SET
+	commitTransaction(t, edge, l)
+}
+
+func delEdge(t *testing.T, edge *intern.DirectedEdge, l *posting.List) {
+	edge.Op = intern.DirectedEdge_DEL
+	commitTransaction(t, edge, l)
 }
 
 func getOrCreate(key []byte) *posting.List {
@@ -58,7 +58,7 @@ func getOrCreate(key []byte) *posting.List {
 
 func populateGraph(t *testing.T) {
 	// Add uid edges : predicate neightbour.
-	edge := &protos.DirectedEdge{
+	edge := &intern.DirectedEdge{
 		ValueId: 23,
 		Label:   "author0",
 		Attr:    "neighbour",
@@ -96,7 +96,7 @@ func populateGraph(t *testing.T) {
 	addEdge(t, edge, getOrCreate(x.DataKey("friend", 10)))
 }
 
-func taskValues(t *testing.T, v []*protos.TaskValue) []string {
+func taskValues(t *testing.T, v []*intern.TaskValue) []string {
 	out := make([]string, len(v))
 	for i, tv := range v {
 		out[i] = string(tv.Val)
@@ -104,30 +104,14 @@ func taskValues(t *testing.T, v []*protos.TaskValue) []string {
 	return out
 }
 
-func initTest(t *testing.T, schemaStr string) (string, *badger.KV) {
+func initTest(t *testing.T, schemaStr string) {
 	err := schema.ParseBytes([]byte(schemaStr), 1)
 	require.NoError(t, err)
-
-	dir, err := ioutil.TempDir("", "storetest_")
-	require.NoError(t, err)
-
-	opt := badger.DefaultOptions
-	opt.Dir = dir
-	opt.ValueDir = dir
-	ps, err := badger.NewKV(&opt)
-	x.Check(err)
-	pstore = ps
-
-	posting.Init(ps)
 	populateGraph(t)
-
-	return dir, ps
 }
 
 func TestProcessTask(t *testing.T) {
-	dir, ps := initTest(t, `neighbour: uid .`)
-	defer os.RemoveAll(dir)
-	defer ps.Close()
+	initTest(t, `neighbour: uid .`)
 
 	query := newQuery("neighbour", []uint64{10, 11, 12}, nil)
 	r, err := helpProcessTask(context.Background(), query, 1)
@@ -141,19 +125,20 @@ func TestProcessTask(t *testing.T) {
 }
 
 // newQuery creates a Query task and returns it.
-func newQuery(attr string, uids []uint64, srcFunc []string) *protos.Query {
+func newQuery(attr string, uids []uint64, srcFunc []string) *intern.Query {
 	x.AssertTrue(uids == nil || srcFunc == nil)
 	// TODO: Change later, hacky way to make the tests work
-	var srcFun *protos.SrcFunction
+	var srcFun *intern.SrcFunction
 	if len(srcFunc) > 0 {
-		srcFun = new(protos.SrcFunction)
+		srcFun = new(intern.SrcFunction)
 		srcFun.Name = srcFunc[0]
 		srcFun.Args = append(srcFun.Args, srcFunc[2:]...)
 	}
-	q := &protos.Query{
-		UidList: &protos.List{uids},
+	q := &intern.Query{
+		UidList: &intern.List{uids},
 		SrcFunc: srcFun,
 		Attr:    attr,
+		ReadTs:  timestamp(),
 	}
 	// It will have either nothing or attr, lang
 	if len(srcFunc) > 0 && srcFunc[1] != "" {
@@ -164,11 +149,9 @@ func newQuery(attr string, uids []uint64, srcFunc []string) *protos.Query {
 
 // Index-related test. Similar to TestProcessTaskIndex but we call MergeLists only
 // at the end. In other words, everything is happening only in mutation layers,
-// and not committed to RocksDB until near the end.
+// and not committed to BadgerDB until near the end.
 func TestProcessTaskIndexMLayer(t *testing.T) {
-	dir, ps := initTest(t, `friend:string @index(term) .`)
-	defer os.RemoveAll(dir)
-	defer ps.Close()
+	initTest(t, `friend:string @index(term) .`)
 
 	query := newQuery("friend", nil, []string{"anyofterms", "", "hey photon"})
 	r, err := helpProcessTask(context.Background(), query, 1)
@@ -181,7 +164,7 @@ func TestProcessTaskIndexMLayer(t *testing.T) {
 
 	// Now try changing 12's friend value from "photon" to "notphotonExtra" to
 	// "notphoton".
-	edge := &protos.DirectedEdge{
+	edge := &intern.DirectedEdge{
 		Value:  []byte("notphotonExtra"),
 		Label:  "author0",
 		Attr:   "friend",
@@ -204,7 +187,7 @@ func TestProcessTaskIndexMLayer(t *testing.T) {
 	}, algo.ToUintsListForTest(r.UidMatrix))
 
 	// Try deleting.
-	edge = &protos.DirectedEdge{
+	edge = &intern.DirectedEdge{
 		Value:  []byte("photon"),
 		Label:  "author0",
 		Attr:   "friend",
@@ -246,9 +229,7 @@ func TestProcessTaskIndexMLayer(t *testing.T) {
 // Index-related test. Similar to TestProcessTaskIndeMLayer except we call
 // MergeLists in between a lot of updates.
 func TestProcessTaskIndex(t *testing.T) {
-	dir, ps := initTest(t, `friend:string @index(term) .`)
-	defer os.RemoveAll(dir)
-	defer ps.Close()
+	initTest(t, `friend:string @index(term) .`)
 
 	query := newQuery("friend", nil, []string{"anyofterms", "", "hey photon"})
 	r, err := helpProcessTask(context.Background(), query, 1)
@@ -261,7 +242,7 @@ func TestProcessTaskIndex(t *testing.T) {
 
 	// Now try changing 12's friend value from "photon" to "notphotonExtra" to
 	// "notphoton".
-	edge := &protos.DirectedEdge{
+	edge := &intern.DirectedEdge{
 		Value:  []byte("notphotonExtra"),
 		Label:  "author0",
 		Attr:   "friend",
@@ -284,7 +265,7 @@ func TestProcessTaskIndex(t *testing.T) {
 	}, algo.ToUintsListForTest(r.UidMatrix))
 
 	// Try deleting.
-	edge = &protos.DirectedEdge{
+	edge = &intern.DirectedEdge{
 		Value:  []byte("photon"),
 		Label:  "author0",
 		Attr:   "friend",
@@ -315,7 +296,7 @@ func TestProcessTaskIndex(t *testing.T) {
 
 /*
 func populateGraphForSort(t *testing.T, ps store.Store) {
-	edge := &protos.DirectedEdge{
+	edge := &intern.DirectedEdge{
 		Label: "author1",
 		Attr:  "dob",
 	}
@@ -345,14 +326,14 @@ func populateGraphForSort(t *testing.T, ps store.Store) {
 	time.Sleep(200 * time.Millisecond) // Let indexing finish.
 }
 
-// newSort creates a protos.Sort for sorting.
-func newSort(uids [][]uint64, offset, count int) *protos.Sort {
+// newSort creates a intern.Sort for sorting.
+func newSort(uids [][]uint64, offset, count int) *intern.Sort {
 	x.AssertTrue(uids != nil)
-	uidMatrix := make([]*protos.List, len(uids))
+	uidMatrix := make([]*intern.List, len(uids))
 	for i, l := range uids {
-		uidMatrix[i] = &protos.List{Uids: l}
+		uidMatrix[i] = &intern.List{Uids: l}
 	}
-	return &protos.Sort{
+	return &intern.Sort{
 		Attr:      "dob",
 		Offset:    int32(offset),
 		Count:     int32(count),
@@ -615,15 +596,31 @@ func TestProcessSortOffsetCount(t *testing.T) {
 */
 
 func TestMain(m *testing.M) {
-	x.Init()
+	x.Init(true)
 	posting.Config.AllottedMemory = 1024.0
 	posting.Config.CommitFraction = 0.10
 	gr = new(groupi)
 	gr.gid = 1
-	gr.tablets = make(map[string]uint32)
-	gr.tablets["name"] = 1
-	gr.tablets["age"] = 1
-	gr.tablets["friend"] = 1
-	gr.tablets[""] = 1
+	gr.tablets = make(map[string]*intern.Tablet)
+	gr.tablets["name"] = &intern.Tablet{GroupId: 1}
+	gr.tablets["name2"] = &intern.Tablet{GroupId: 1}
+	gr.tablets["age"] = &intern.Tablet{GroupId: 1}
+	gr.tablets["friend"] = &intern.Tablet{GroupId: 1}
+	gr.tablets["http://www.w3.org/2000/01/rdf-schema#range"] = &intern.Tablet{GroupId: 1}
+	gr.tablets["friend_not_served"] = &intern.Tablet{GroupId: 2}
+	gr.tablets[""] = &intern.Tablet{GroupId: 1}
+
+	dir, err := ioutil.TempDir("", "storetest_")
+	x.Check(err)
+	defer os.RemoveAll(dir)
+
+	opt := badger.DefaultOptions
+	opt.Dir = dir
+	opt.ValueDir = dir
+	ps, err := badger.OpenManaged(opt)
+	x.Check(err)
+	pstore = ps
+	posting.Init(ps)
+	Init(ps)
 	os.Exit(m.Run())
 }

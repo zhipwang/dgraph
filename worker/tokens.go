@@ -22,6 +22,7 @@ import (
 
 	"github.com/dgraph-io/badger"
 
+	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/tok"
 	"github.com/dgraph-io/dgraph/types"
@@ -50,6 +51,18 @@ func verifyStringIndex(attr string, funcType FuncType) (string, bool) {
 	}
 
 	return requiredTokenizer, false
+}
+
+func verifyCustomIndex(attr string, tokenizerName string) bool {
+	if !schema.State().IsIndexed(attr) {
+		return false
+	}
+	for _, tn := range schema.State().TokenizerNames(attr) {
+		if tn == tokenizerName {
+			return true
+		}
+	}
+	return false
 }
 
 // Return string tokens from function arguments. It maps function type to correct tokenizer.
@@ -107,18 +120,21 @@ func pickTokenizer(attr string, f string) (tok.Tokenizer, error) {
 
 // getInequalityTokens gets tokens ge / le compared to given token using the first sortable
 // index that is found for the predicate.
-func getInequalityTokens(attr, f string, ineqValue types.Val) ([]string, string, error) {
+func getInequalityTokens(readTs uint64, attr, f string,
+	ineqValue types.Val) ([]string, string, error) {
 	tokenizer, err := pickTokenizer(attr, f)
 	if err != nil {
 		return nil, "", err
 	}
 
 	// Get the token for the value passed in function.
-	ineqTokens, err := tokenizer.Tokens(ineqValue)
+	ineqTokens, err := tok.BuildTokens(ineqValue.Value, tokenizer)
 	if err != nil {
 		return nil, "", err
 	}
-	if len(ineqTokens) != 1 {
+	if f == "eq" && tokenizer.Name() == "term" {
+		// Allow eq with term tokenizer
+	} else if len(ineqTokens) != 1 {
 		return nil, "", x.Errorf("Attribute %s does not have a valid tokenizer.", attr)
 	}
 	ineqToken := ineqTokens[0]
@@ -131,15 +147,21 @@ func getInequalityTokens(attr, f string, ineqValue types.Val) ([]string, string,
 	itOpt := badger.DefaultIteratorOptions
 	itOpt.PrefetchValues = false
 	itOpt.Reverse = !isgeOrGt
-	it := pstore.NewIterator(itOpt)
-	defer it.Close()
+	// TODO(txn): If some new index key was written as part of same transaction it won't be on disk
+	// until the txn is committed. Merge it with inmemory keys.
+	txn := pstore.NewTransactionAt(readTs, false)
+	defer txn.Discard()
 
 	var out []string
 	indexPrefix := x.IndexKey(attr, string(tokenizer.Identifier()))
-	for it.Seek(x.IndexKey(attr, ineqToken)); it.ValidForPrefix(indexPrefix); it.Next() {
-		key := it.Item().Key()
+	it := posting.NewTxnPrefixIterator(txn, itOpt, indexPrefix)
+	defer it.Close()
+	for it.Seek(x.IndexKey(attr, ineqToken)); it.Valid(); it.Next() {
+		key := it.Key()
 		k := x.Parse(key)
-		x.AssertTrue(k != nil)
+		if k == nil {
+			continue
+		}
 		out = append(out, k.Term)
 	}
 	return out, ineqToken, nil

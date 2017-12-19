@@ -1,6 +1,6 @@
 #!/bin/bash
 # This script runs in a loop, checks for updates to the Hugo docs theme or
-# to the wiki docs on certain branches and rebuilds the public folder for them.
+# to the docs on certain branches and rebuilds the public folder for them.
 # It has be made more generalized, so that we don't have to hardcode versions.
 
 # Warning - Changes should not be made on the server on which this script is running
@@ -19,13 +19,17 @@ HOST=https://docs.dgraph.io
 # append '(latest)' to the version string, and build script can place the
 # artifact in an appropriate location
 VERSIONS_ARRAY=(
-'v0.8.1'
+'v1.0.0'
 'master'
+'v0.9.4'
+'v0.9.3'
+'v0.9.2'
+'v0.9.1'
+'v0.9.0'
+'v0.8.3'
+'v0.8.2'
+'v0.8.1'
 'v0.8.0'
-'v0.7.7'
-'v0.7.6'
-'v0.7.5'
-'v0.7.4'
 )
 
 joinVersions() {
@@ -105,7 +109,7 @@ checkAndUpdate()
 }
 
 while true; do
-	# Lets move to the Wiki directory.
+	# Lets move to the docs directory.
 	pushd /home/ubuntu/dgraph/wiki > /dev/null
 
 	currentBranch=$(git rev-parse --abbrev-ref HEAD)

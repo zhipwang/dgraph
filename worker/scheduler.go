@@ -18,11 +18,13 @@
 package worker
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/types"
 	"github.com/dgraph-io/dgraph/x"
@@ -30,10 +32,9 @@ import (
 )
 
 type task struct {
-	rid    uint64 // raft index corresponding to the task
-	pid    uint32 // proposal id corresponding to the task
-	edge   *protos.DirectedEdge
-	upsert *protos.Query
+	rid  uint64 // raft index corresponding to the task
+	pid  uint32 // proposal id corresponding to the task
+	edge *intern.DirectedEdge
 }
 
 type scheduler struct {
@@ -50,7 +51,7 @@ type scheduler struct {
 func (s *scheduler) init(n *node) {
 	s.n = n
 	s.tasks = make(map[uint32][]*task)
-	s.tch = make(chan *task, 1000)
+	s.tch = make(chan *task, 10000)
 	for i := 0; i < 1000; i++ {
 		go s.processTasks()
 	}
@@ -62,6 +63,9 @@ func (s *scheduler) processTasks() {
 		nextTask := t
 		for nextTask != nil {
 			err := s.n.processMutation(nextTask)
+			if err == posting.ErrRetry {
+				continue
+			}
 			n.props.Done(nextTask.pid, err)
 			x.ActiveMutations.Add(-1)
 			nextTask = s.nextTask(nextTask)
@@ -70,11 +74,6 @@ func (s *scheduler) processTasks() {
 }
 
 func (t *task) key() uint32 {
-	if t.upsert != nil && t.upsert.Attr == t.edge.Attr {
-		// Serialize upserts by predicate.
-		return farm.Fingerprint32([]byte(t.edge.Attr))
-	}
-
 	key := fmt.Sprintf("%s|%d", t.edge.Attr, t.edge.Entity)
 	return farm.Fingerprint32([]byte(key))
 }
@@ -95,21 +94,68 @@ func (s *scheduler) register(t *task) bool {
 	}
 }
 
-func (s *scheduler) schedule(proposal *protos.Proposal, index uint64) error {
-	// ensures that index is not mark completed until all tasks
-	// are submitted to scheduler
-	total := len(proposal.Mutations.Edges)
-	s.n.props.IncRef(proposal.Id, index, 1+total)
-	x.ActiveMutations.Add(int64(total))
-	for _, supdate := range proposal.Mutations.Schema {
-		if err := s.n.processSchemaMutations(proposal.Id, index, supdate); err != nil {
-			s.n.props.Done(proposal.Id, err)
+func (s *scheduler) waitForConflictResolution(attr string) {
+	tctxs := posting.Txns().Iterate(func(key []byte) bool {
+		pk := x.Parse(key)
+		return pk.Attr == attr
+	})
+	if len(tctxs) == 0 {
+		return
+	}
+	tryAbortTransactions(tctxs)
+}
+
+// We don't support schema mutations across nodes in a transaction.
+// Wait for all transactions to either abort or complete and all write transactions
+// involving the predicate are aborted until schema mutations are done.
+func (s *scheduler) schedule(proposal *intern.Proposal, index uint64) (err error) {
+	defer func() {
+		s.n.props.Done(proposal.Id, err)
+	}()
+
+	if proposal.Mutations.DropAll {
+		// Ensures nothing get written to disk due to commit proposals.
+		posting.Txns().Reset()
+		if err = s.n.Applied.WaitForMark(s.n.ctx, index-1); err != nil {
+			posting.TxnMarks().Done(index)
 			return err
 		}
+		schema.State().DeleteAll()
+		err = posting.DeleteAll()
+		posting.TxnMarks().Done(index)
+		return
 	}
-	if total == 0 {
-		s.n.props.Done(proposal.Id, nil)
-		return nil
+
+	if len(proposal.Mutations.Schema) > 0 {
+		if err = s.n.Applied.WaitForMark(s.n.ctx, index-1); err != nil {
+			posting.TxnMarks().Done(index)
+			return err
+		}
+		startTs := proposal.Mutations.StartTs
+		if startTs == 0 {
+			posting.TxnMarks().Done(index)
+			return errors.New("StartTs must be provided.")
+		}
+		for _, supdate := range proposal.Mutations.Schema {
+			// This is neceassry to ensure that there is no race between when we start reading
+			// from badger and new mutation getting commited via raft and getting applied.
+			// Before Moving the predicate we would flush all and wait for watermark to catch up
+			// but there might be some proposals which got proposed but not comitted yet.
+			// It's ok to reject the proposal here and same would happen on all nodes because we
+			// would have proposed membershipstate, and all nodes would have the proposed state
+			// or some state after that before reaching here.
+			if tablet := groups().Tablet(supdate.Predicate); tablet != nil && tablet.ReadOnly {
+				err = errPredicateMoving
+				break
+			}
+			s.waitForConflictResolution(supdate.Predicate)
+			err = s.n.processSchemaMutations(proposal.Id, index, startTs, supdate)
+			if err != nil {
+				break
+			}
+		}
+		posting.TxnMarks().Done(index)
+		return
 	}
 
 	// Scheduler tracks tasks at subject, predicate level, so doing
@@ -122,34 +168,64 @@ func (s *scheduler) schedule(proposal *protos.Proposal, index uint64) error {
 	// stores a map of predicate and type of first mutation for each predicate
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range proposal.Mutations.Edges {
+		if tablet := groups().Tablet(edge.Attr); tablet != nil && tablet.ReadOnly {
+			err = errPredicateMoving
+			return
+		}
+		if edge.Entity == 0 && bytes.Equal(edge.Value, []byte(x.Star)) {
+			// We should only have one edge drop in one mutation call.
+			ctx, _ := s.n.props.CtxAndTxn(proposal.Id)
+			if err = s.n.Applied.WaitForMark(ctx, index-1); err != nil {
+				posting.TxnMarks().Done(index)
+				return
+			}
+			s.waitForConflictResolution(edge.Attr)
+			err = posting.DeletePredicate(ctx, edge.Attr)
+			posting.TxnMarks().Done(index)
+			return
+		}
 		if _, ok := schemaMap[edge.Attr]; !ok {
 			schemaMap[edge.Attr] = posting.TypeID(edge)
 		}
 	}
+	if proposal.Mutations.StartTs == 0 {
+		return errors.New("StartTs must be provided.")
+	}
 
+	total := len(proposal.Mutations.Edges)
+	s.n.props.IncRef(proposal.Id, total)
+	x.ActiveMutations.Add(int64(total))
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
 			// Schema doesn't exist
 			// Since committed entries are serialized, updateSchemaIfMissing is not
 			// needed, In future if schema needs to be changed, it would flow through
 			// raft so there won't be race conditions between read and update schema
-			updateSchemaType(attr, storageType, index, s.n.gid)
+			updateSchemaType(attr, storageType, index)
 		}
 	}
 
-	for _, edge := range proposal.Mutations.Edges {
+	m := proposal.Mutations
+	pctx := s.n.props.pctx(proposal.Id)
+	txn := &posting.Txn{
+		StartTs:             m.StartTs,
+		Indices:             []uint64{index},
+		IgnoreIndexConflict: m.IgnoreIndexConflict,
+	}
+	pctx.txn = posting.Txns().PutOrMergeIndex(txn)
+	for _, edge := range m.Edges {
 		t := &task{
-			rid:    index,
-			pid:    proposal.Id,
-			edge:   edge,
-			upsert: proposal.Mutations.Upsert,
+			rid:  index,
+			pid:  proposal.Id,
+			edge: edge,
 		}
 		if s.register(t) {
 			s.tch <- t
 		}
 	}
-	s.n.props.Done(proposal.Id, nil)
-	return nil
+	err = nil
+	// Block until the above edges are applied.
+	return
 }
 
 func (s *scheduler) nextTask(t *task) *task {

@@ -30,17 +30,14 @@ import (
 	"golang.org/x/net/trace"
 
 	"github.com/dgraph-io/badger/y"
-	"github.com/dgraph-io/dgraph/algo"
 	"github.com/dgraph-io/dgraph/conn"
 	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos"
+	"github.com/dgraph-io/dgraph/protos/api"
+	"github.com/dgraph-io/dgraph/protos/intern"
 	"github.com/dgraph-io/dgraph/raftwal"
 	"github.com/dgraph-io/dgraph/schema"
 	"github.com/dgraph-io/dgraph/x"
-)
-
-const (
-	errorNodeIDExists = "Error Node ID already exists in the cluster"
+	dy "github.com/dgraph-io/dgraph/y"
 )
 
 type proposalCtx struct {
@@ -52,6 +49,8 @@ type proposalCtx struct {
 	err   error
 	index uint64
 	n     *node
+	// Used for writing all deltas at end
+	txn *posting.Txn
 }
 
 type proposals struct {
@@ -69,23 +68,27 @@ func (p *proposals) Store(pid uint32, pctx *proposalCtx) bool {
 	return true
 }
 
-func (p *proposals) IncRef(pid uint32, index uint64, count int) {
+func (p *proposals) IncRef(pid uint32, count int) {
 	p.Lock()
 	defer p.Unlock()
 	pd, has := p.ids[pid]
 	x.AssertTrue(has)
 	pd.cnt += count
-	pd.index = index
 	return
 }
 
-func (p *proposals) Ctx(pid uint32) (context.Context, bool) {
+func (p *proposals) pctx(pid uint32) *proposalCtx {
 	p.RLock()
 	defer p.RUnlock()
-	if pd, has := p.ids[pid]; has {
-		return pd.ctx, true
-	}
-	return nil, false
+	return p.ids[pid]
+}
+
+func (p *proposals) CtxAndTxn(pid uint32) (context.Context, *posting.Txn) {
+	p.RLock()
+	defer p.RUnlock()
+	pd, has := p.ids[pid]
+	x.AssertTrue(has)
+	return pd.ctx, pd.txn
 }
 
 func (p *proposals) Done(pid uint32, err error) {
@@ -109,7 +112,6 @@ func (p *proposals) Done(pid uint32, err error) {
 	// Since the tasks are executed in goroutines we need one guarding watermark which
 	// is done only when all the pending sync/applied marks have been emitted.
 	pd.n.Applied.Done(pd.index)
-	posting.SyncMarks().Done(pd.index)
 }
 
 func (p *proposals) Has(pid uint32) bool {
@@ -137,7 +139,7 @@ type node struct {
 func newNode(gid uint32, id uint64, myAddr string) *node {
 	x.Printf("Node ID: %v with GroupID: %v\n", id, gid)
 
-	rc := &protos.RaftContext{
+	rc := &intern.RaftContext{
 		Addr:  myAddr,
 		Group: gid,
 		Id:    id,
@@ -184,9 +186,9 @@ func (h *header) Decode(in []byte) {
 	h.msgId = binary.LittleEndian.Uint16(in[4:6])
 }
 
-func (n *node) ProposeAndWait(ctx context.Context, proposal *protos.Proposal) error {
+func (n *node) ProposeAndWait(ctx context.Context, proposal *intern.Proposal) error {
 	if n.Raft() == nil {
-		return x.Errorf("RAFT isn't initialized yet")
+		return x.Errorf("Raft isn't initialized yet")
 	}
 	// TODO: Should be based on number of edges (amount of work)
 	pendingProposals <- struct{}{}
@@ -200,6 +202,12 @@ func (n *node) ProposeAndWait(ctx context.Context, proposal *protos.Proposal) er
 	// be persisted, we do best effort schema check while writing
 	if proposal.Mutations != nil {
 		for _, edge := range proposal.Mutations.Edges {
+			if tablet := groups().Tablet(edge.Attr); tablet != nil && tablet.ReadOnly {
+				return errPredicateMoving
+			} else if tablet.GroupId != groups().gid {
+				// Tablet can move by the time request reaches here.
+				return errUnservedTablet
+			}
 			if typ, err := schema.State().TypeOf(edge.Attr); err != nil {
 				continue
 			} else if err := ValidateAndConvert(edge, typ); err != nil {
@@ -207,6 +215,9 @@ func (n *node) ProposeAndWait(ctx context.Context, proposal *protos.Proposal) er
 			}
 		}
 		for _, schema := range proposal.Mutations.Schema {
+			if tablet := groups().Tablet(schema.Predicate); tablet != nil && tablet.ReadOnly {
+				return errPredicateMoving
+			}
 			if err := checkSchema(schema); err != nil {
 				return err
 			}
@@ -218,6 +229,7 @@ func (n *node) ProposeAndWait(ctx context.Context, proposal *protos.Proposal) er
 		ch:  che,
 		ctx: ctx,
 		n:   n,
+		cnt: 1,
 	}
 	for {
 		id := rand.Uint32()
@@ -240,52 +252,17 @@ func (n *node) ProposeAndWait(ctx context.Context, proposal *protos.Proposal) er
 		return x.Wrapf(err, "While proposing")
 	}
 
-	// Wait for the proposal to be committed.
-	if proposal.Mutations != nil {
-		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Waiting for the proposal: mutations.")
-		}
-	} else if proposal.Membership != nil {
-		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Waiting for the proposal: membership update.")
-		}
-	} else if len(proposal.Kv) > 0 {
-		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf("Waiting for the proposal: key-values.")
-		}
-	} else {
-		log.Fatalf("Unknown proposal")
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Waiting for the proposal.")
 	}
 
 	err = <-che
 	if err != nil {
 		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf(err.Error())
+			tr.LazyPrintf("Raft Propose error: %v", err)
 		}
 	}
 	return err
-}
-
-func (n *node) handleUpsert(task *task) (bool, error) {
-	if task.upsert == nil {
-		return true, nil
-	}
-
-	edge := task.edge
-	attr := task.upsert.Attr
-	if attr != edge.Attr {
-		return true, nil
-	}
-
-	res, err := n.processUpsertTask(n.ctx, task, groups().BelongsTo(attr))
-	if err != nil {
-		return false, err
-	}
-	uids := algo.MergeSorted(res.UidMatrix)
-	if len(uids.Uids) > 0 {
-		return false, nil
-	}
-	return true, nil
 }
 
 func (n *node) processMutation(task *task) error {
@@ -293,38 +270,27 @@ func (n *node) processMutation(task *task) error {
 	ridx := task.rid
 	edge := task.edge
 
-	if cont, err := n.handleUpsert(task); err != nil {
-		return err
-	} else if !cont {
-		// We found a uid which has this value, so don't continue.
-		return nil
-	}
-
-	var ctx context.Context
-	var has bool
-	if ctx, has = n.props.Ctx(pid); !has {
-		ctx = n.ctx
+	ctx, txn := n.props.CtxAndTxn(pid)
+	if txn.ShouldAbort() {
+		return dy.ErrConflict
 	}
 	rv := x.RaftValue{Group: n.gid, Index: ridx}
 	ctx = context.WithValue(ctx, "raft", rv)
-	if err := runMutation(ctx, edge); err != nil {
+	if err := runMutation(ctx, edge, txn); err != nil {
 		if tr, ok := trace.FromContext(ctx); ok {
-			tr.LazyPrintf(err.Error())
+			tr.LazyPrintf("process mutation: %v", err)
 		}
 		return err
 	}
 	return nil
 }
 
-func (n *node) processSchemaMutations(pid uint32, index uint64, s *protos.SchemaUpdate) error {
-	var ctx context.Context
-	var has bool
-	if ctx, has = n.props.Ctx(pid); !has {
-		ctx = n.ctx
-	}
+func (n *node) processSchemaMutations(pid uint32, index uint64,
+	startTs uint64, s *intern.SchemaUpdate) error {
+	ctx, _ := n.props.CtxAndTxn(pid)
 	rv := x.RaftValue{Group: n.gid, Index: index}
-	ctx = context.WithValue(n.ctx, "raft", rv)
-	if err := runSchemaMutation(ctx, s); err != nil {
+	ctx = context.WithValue(ctx, "raft", rv)
+	if err := runSchemaMutation(ctx, s, startTs); err != nil {
 		if tr, ok := trace.FromContext(n.ctx); ok {
 			tr.LazyPrintf(err.Error())
 		}
@@ -333,30 +299,31 @@ func (n *node) processSchemaMutations(pid uint32, index uint64, s *protos.Schema
 	return nil
 }
 
-const numPendingMutations = 10000
-
 func (n *node) applyConfChange(e raftpb.Entry) {
 	var cc raftpb.ConfChange
 	cc.Unmarshal(e.Data)
 
-	if len(cc.Context) > 0 {
-		var rc protos.RaftContext
+	if cc.Type == raftpb.ConfChangeRemoveNode {
+		n.DeletePeer(cc.NodeID)
+	} else if len(cc.Context) > 0 {
+		var rc intern.RaftContext
 		x.Check(rc.Unmarshal(cc.Context))
 		n.Connect(rc.Id, rc.Addr)
 	}
 
 	cs := n.Raft().ApplyConfChange(cc)
 	n.SetConfState(cs)
+	n.DoneConfChange(cc.ID, nil)
+	// Not present in proposal map
 	n.Applied.Done(e.Index)
-	posting.SyncMarks().Done(e.Index)
 	groups().triggerMembershipSync()
 }
 
 func (n *node) processApplyCh() {
 	for e := range n.applyCh {
 		if len(e.Data) == 0 {
+			// This is not in the proposal map
 			n.Applied.Done(e.Index)
-			posting.SyncMarks().Done(e.Index)
 			continue
 		}
 
@@ -367,40 +334,85 @@ func (n *node) processApplyCh() {
 
 		x.AssertTrue(e.Type == raftpb.EntryNormal)
 
-		proposal := &protos.Proposal{}
+		proposal := &intern.Proposal{}
 		if err := proposal.Unmarshal(e.Data); err != nil {
 			log.Fatalf("Unable to unmarshal proposal: %v %q\n", err, e.Data)
 		}
 
 		// One final applied and synced watermark would be emitted when proposal ctx ref count
 		// becomes zero.
-		if !n.props.Has(proposal.Id) {
-			pctx := &proposalCtx{
+		pctx := n.props.pctx(proposal.Id)
+		if pctx == nil {
+			// This is during replay of logs after restart
+			pctx = &proposalCtx{
 				ch:  make(chan error, 1),
 				ctx: n.ctx,
 				n:   n,
+				cnt: 1,
 			}
-			n.props.Store(proposal.Id, pctx)
 		}
+		pctx.index = e.Index
+		n.props.Store(proposal.Id, pctx)
+
+		posting.TxnMarks().Begin(e.Index)
 		if proposal.Mutations != nil {
+			// syncmarks for this shouldn't be marked done until it's comitted.
 			n.sch.schedule(proposal, e.Index)
-		} else if proposal.Membership != nil {
-			x.Fatalf("Dgraph does not handle membership proposals anymore.")
 		} else if len(proposal.Kv) > 0 {
 			go n.processKeyValues(e.Index, proposal.Id, proposal.Kv)
+		} else if proposal.State != nil {
+			// This state needn't be snapshotted in this group, on restart we would fetch
+			// a state which is latest or equal to this.
+			groups().applyState(proposal.State)
+			// When proposal is done it emits done watermarks.
+			posting.TxnMarks().Done(e.Index)
+			n.props.Done(proposal.Id, nil)
+		} else if len(proposal.CleanPredicate) > 0 {
+			go n.deletePredicate(e.Index, proposal.Id, proposal.CleanPredicate)
+		} else if proposal.TxnContext != nil {
+			go n.commitOrAbort(e.Index, proposal.Id, proposal.TxnContext)
 		} else {
 			x.Fatalf("Unknown proposal")
 		}
 	}
 }
 
-func (n *node) processKeyValues(index uint64, pid uint32, kvs []*protos.KV) error {
-	// We need to update index in props map
-	n.props.IncRef(pid, index, 1)
-	ctx, _ := n.props.Ctx(pid)
+func (n *node) commitOrAbort(index uint64, pid uint32, tctx *api.TxnContext) {
+	ctx, _ := n.props.CtxAndTxn(pid)
+	_, err := commitOrAbort(ctx, tctx)
+	if tr, ok := trace.FromContext(ctx); ok {
+		tr.LazyPrintf("Status of commitOrAbort %+v %v\n", tctx, err)
+	}
+	if err == nil {
+		posting.Txns().Done(tctx.StartTs)
+		posting.Oracle().Done(tctx.StartTs)
+	}
+	posting.TxnMarks().Done(index)
+	n.props.Done(pid, err)
+}
+
+func (n *node) deletePredicate(index uint64, pid uint32, predicate string) {
+	ctx, _ := n.props.CtxAndTxn(pid)
+	rv := x.RaftValue{Group: n.gid, Index: index}
+	ctx = context.WithValue(ctx, "raft", rv)
+	err := posting.DeletePredicate(ctx, predicate)
+	posting.TxnMarks().Done(index)
+	n.props.Done(pid, err)
+}
+
+func (n *node) processKeyValues(index uint64, pid uint32, kvs []*intern.KV) error {
+	ctx, _ := n.props.CtxAndTxn(pid)
 	err := populateKeyValues(ctx, kvs)
+	posting.TxnMarks().Done(index)
 	n.props.Done(pid, err)
 	return nil
+}
+
+func (n *node) applyAllMarks(ctx context.Context) {
+	// Get index of last committed.
+	lastIndex, err := n.Store.LastIndex()
+	x.Checkf(err, "Error while getting last index")
+	n.Applied.WaitForMark(ctx, lastIndex)
 }
 
 func (n *node) retrieveSnapshot(peerID uint64) {
@@ -412,13 +424,10 @@ func (n *node) retrieveSnapshot(peerID uint64) {
 			peerID, err)
 	}
 
-	// Get index of last committed.
-	lastIndex, err := n.Store.LastIndex()
-	x.Checkf(err, "Error while getting last index")
 	// Wait for watermarks to sync since populateShard writes directly to db, otherwise
 	// the values might get overwritten
 	// Safe to keep this line
-	n.syncAllMarks(n.ctx, lastIndex)
+	n.applyAllMarks(n.ctx)
 	// Need to clear pl's stored in memory for the case when retrieving snapshot with
 	// index greater than this node's last index
 	// Should invalidate/remove pl's to this group only ideally
@@ -431,6 +440,7 @@ func (n *node) retrieveSnapshot(peerID uint64) {
 	// Populate shard stores the streamed data directly into db, so we need to refresh
 	// schema for current group id
 	x.Checkf(schema.LoadFromDb(), "Error while initilizating schema")
+	groups().triggerMembershipSync()
 }
 
 func (n *node) Run() {
@@ -442,15 +452,9 @@ func (n *node) Run() {
 	rcBytes, err := n.RaftContext.Marshal()
 	x.Check(err)
 
-	// This chan could have capacity zero, because runReadIndexLoop never blocks without selecting
-	// on readStateCh.  It's 2 so that sending rarely blocks (so the Go runtime doesn't have to
-	// switch threads as much.)
-	readStateCh := make(chan raft.ReadState, 2)
+	// Ensure we don't exit unless any snapshot in progress in done.
 	closer := y.NewCloser(1)
-	// We only stop runReadIndexLoop after the for loop below has finished interacting with it.
-	// That way we know sending to readStateCh will not deadlock.
-	defer closer.SignalAndWait()
-	go n.RunReadIndexLoop(closer, readStateCh)
+	go n.snapshotPeriodically(closer)
 
 	for {
 		select {
@@ -458,11 +462,8 @@ func (n *node) Run() {
 			n.Raft().Tick()
 
 		case rd := <-n.Raft().Ready():
-			for _, rs := range rd.ReadStates {
-				readStateCh <- rs
-			}
-
 			if rd.SoftState != nil {
+				groups().triggerMembershipSync()
 				leader = rd.RaftState == raft.StateLeader
 			}
 			if leader {
@@ -485,7 +486,7 @@ func (n *node) Run() {
 				// We don't send snapshots to other nodes. But, if we get one, that means
 				// either the leader is trying to bring us up to state; or this is the
 				// snapshot that I created. Only the former case should be handled.
-				var rc protos.RaftContext
+				var rc intern.RaftContext
 				x.Check(rc.Unmarshal(rd.Snapshot.Data))
 				x.AssertTrue(rc.Group == n.gid)
 				if rc.Id != n.Id {
@@ -514,7 +515,6 @@ func (n *node) Run() {
 				// Mark{3, false} is emitted. So it's safer to emit watermarks as soon as
 				// possible sequentially
 				n.Applied.Begin(entry.Index)
-				posting.SyncMarks().Begin(entry.Index)
 
 				if !leader && entry.Type == raftpb.EntryConfChange {
 					// Config changes in followers must be applied straight away.
@@ -555,10 +555,12 @@ func (n *node) Run() {
 						}
 					}
 					n.Raft().Stop()
+					closer.SignalAndWait()
 					close(n.done)
 				}()
 			} else {
 				n.Raft().Stop()
+				closer.SignalAndWait()
 				close(n.done)
 			}
 		case <-n.done:
@@ -577,14 +579,7 @@ func (n *node) Stop() {
 	<-n.done // wait for Run to respond.
 }
 
-func (n *node) snapshotPeriodically() {
-	if n.gid == 0 {
-		// Group zero is dedicated for membership information, whose state we don't persist.
-		// So, taking snapshots would end up deleting the RAFT entries that we need to
-		// regenerate the state on a crash. Therefore, don't take snapshots.
-		return
-	}
-
+func (n *node) snapshotPeriodically(closer *y.Closer) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
@@ -593,20 +588,15 @@ func (n *node) snapshotPeriodically() {
 		case <-ticker.C:
 			n.snapshot(Config.MaxPendingCount)
 
-		case <-n.done:
+		case <-closer.HasBeenClosed():
+			closer.Done()
 			return
 		}
 	}
 }
 
 func (n *node) snapshot(skip uint64) {
-	if n.gid == 0 {
-		// Group zero is dedicated for membership information, whose state we don't persist.
-		// So, taking snapshots would end up deleting the RAFT entries that we need to
-		// regenerate the state on a crash. Therefore, don't take snapshots.
-		return
-	}
-	water := posting.SyncMarks()
+	water := posting.TxnMarks()
 	le := water.DoneUntil()
 
 	existing, err := n.Store.Snapshot()
@@ -644,9 +634,13 @@ func (n *node) joinPeers() {
 
 	gconn := pl.Get()
 
-	c := protos.NewRaftClient(gconn)
+	c := intern.NewRaftClient(gconn)
 	x.Printf("Calling JoinCluster")
-	_, err := c.JoinCluster(n.ctx, n.RaftContext)
+	ctx, cancel := context.WithTimeout(n.ctx, time.Second)
+	defer cancel()
+	// JoinCluster can block idefinitely, raft ignores conf change proposal
+	// if it has pending configuration.
+	_, err := c.JoinCluster(ctx, n.RaftContext)
 	// TODO: This should keep on indefinitely trying to join the cluster, instead of crashing.
 	x.Checkf(err, "Error while joining cluster")
 	x.Printf("Done with JoinCluster call\n")
@@ -657,23 +651,24 @@ func (n *node) InitAndStartNode(wal *raftwal.Wal) {
 	idx, restart, err := n.InitFromWal(wal)
 	x.Check(err)
 	n.Applied.SetDoneUntil(idx)
-	posting.SyncMarks().SetDoneUntil(idx)
+	posting.TxnMarks().SetDoneUntil(idx)
 
 	if restart {
 		x.Printf("Restarting node for group: %d\n", n.gid)
-		found := groups().HasMeInState()
-		_, hasPeer := groups().MyPeer()
-		if !found && hasPeer {
-			n.joinPeers()
+		sp, err := n.Store.Snapshot()
+		x.Checkf(err, "Unable to get existing snapshot")
+		if !raft.IsEmptySnap(sp) {
+			members := groups().members(n.gid)
+			for _, id := range sp.Metadata.ConfState.Nodes {
+				n.Connect(id, members[id].Addr)
+			}
 		}
 		n.SetRaft(raft.RestartNode(n.Cfg))
-
 	} else {
 		x.Printf("New Node for group: %d\n", n.gid)
 		if _, hasPeer := groups().MyPeer(); hasPeer {
 			n.joinPeers()
 			n.SetRaft(raft.StartNode(n.Cfg, nil))
-
 		} else {
 			peers := []raft.Peer{{ID: n.Id}}
 			n.SetRaft(raft.StartNode(n.Cfg, peers))
@@ -683,7 +678,6 @@ func (n *node) InitAndStartNode(wal *raftwal.Wal) {
 	}
 	go n.processApplyCh()
 	go n.Run()
-	go n.snapshotPeriodically()
 	go n.BatchAndSendMessages()
 }
 
